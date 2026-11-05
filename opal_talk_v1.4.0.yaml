@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: OPAL Talk API
-  version: 1.2.0
+  version: 1.4.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Talk provides\
     \ a stable REST contract over one or more host-installed TTS\nengines such as Piper or Kokoro. Clients\
     \ interact with OPAL concepts—engines,\nvoices, profiles, generation settings, and audio output—without\
@@ -1137,7 +1137,7 @@ paths:
       tags:
       - settings
       summary: Upsert Setting
-      description: Create the setting if absent or replace its string value if present.
+      description: Create the setting if absent or replace its native JSON value if present.
       operationId: upsert_setting_api_v1_settings__key__put
       requestBody:
         required: true
@@ -1298,13 +1298,17 @@ paths:
         '
       operationId: create_backup_api_v1_backup_create_post
       responses:
-        '200':
+        '201':
           description: Backup created.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BackupCreateResponse'
           headers:
+            Location:
+              description: URI of the created backup (/api/v1/backup/download/{filename}).
+              schema:
+                type: string
             X-Opal-Session-Id:
               $ref: '#/components/headers/OpalSessionIdHeader'
             X-Opal-Transaction-Id:
@@ -1878,19 +1882,23 @@ components:
         minimum: 1
       example: 1
     OpalSessionIdHeader:
-      description: Effective OPAL context for this response.
+      description: Effective OPAL session context for this response. Returned when a session identifier is known; conditionally present.
+      required: false
       schema:
         type: string
     OpalTransactionIdHeader:
-      description: Effective OPAL context for this response.
+      description: Logical transaction identifier for this exchange. Always returned; generated when the inbound request lacks one.
+      required: true
       schema:
         type: string
     OpalRequestIdHeader:
-      description: Effective OPAL context for this response.
+      description: Identifier of this inbound HTTP exchange. Always returned; regenerated for each downstream hop.
+      required: true
       schema:
         type: string
     OpalCausationIdHeader:
-      description: Effective OPAL context for this response.
+      description: Immediate parent event/request identifier for this response. Returned when applicable; conditionally present.
+      required: false
       schema:
         type: string
   responses:
@@ -2819,8 +2827,7 @@ components:
         key:
           type: string
         value:
-          type: string
-          description: String setting value, matching the OPAL Listen setting convention.
+          description: Native JSON setting value, typed per the setting's own semantics.
         updated_at:
           type: string
           format: date-time
@@ -2831,8 +2838,7 @@ components:
       - value
       properties:
         value:
-          type: string
-          description: New string value for the setting.
+          description: New native JSON value for the setting.
     EngineHealthRead:
       type: object
       required:
@@ -3112,6 +3118,7 @@ x-opal-context-standard:
     - causation_id
     metadata_schema_version: '1.0'
     zero_mq_frames: 2
+    compatibility: 'metadata_schema_version versions the optional data.metadata block only; the two-frame wire envelope (topic + JSON with topic/data) is unchanged across versions. Consumers extract known correlation keys (session_id, transaction_id, request_id, causation_id) and MUST ignore unknown metadata fields; producers may emit any metadata_schema_version without breaking the wire contract.'
   pagination:
     history: cursor
     configuration: none
