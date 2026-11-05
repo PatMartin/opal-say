@@ -873,9 +873,7 @@ For low-latency pipelines, set `--sample-rate` to a known value, especially when
 
 ### Configuration and API philosophy
 
-The implemented API is **v1.2.0**. The authoritative copy is the packaged document `src/opal_talk/contract/opal_talk.yaml`: it is loaded by `opal_talk.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. The root [`opal_talk_v1.2.0.yaml`](opal_talk_v1.2.0.yaml) is a byte-identical human-facing copy; a test enforces that the two never drift.
-
-> **Next revision in flight.** [`opal_talk_v1.4.0.yaml`](opal_talk_v1.4.0.yaml) sits at the repo root as the incoming contract. Its delta is small but semantic: settings values become native JSON instead of strings, and `POST /api/v1/backup/create` returns `201` with a `Location` header instead of `200`. It is **not yet implemented** — the code, version metadata, and packaged contract still describe 1.2.0. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
+The implemented API is **v1.4.0**. The authoritative copy is the packaged document `src/opal_talk/contract/opal_talk.yaml`: it is loaded by `opal_talk.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. The root [`opal_talk_v1.4.0.yaml`](opal_talk_v1.4.0.yaml) is a byte-identical human-facing copy; a test enforces that the two never drift. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
 
 The full service is **API-first**:
 
@@ -923,8 +921,7 @@ Real-engine tests require installed model files — they look for `~/piper/voice
 opal-talk/
 ├── opal-talk.png                       project artwork
 ├── README.md                           this guide
-├── opal_talk_v1.2.0.yaml               active OpenAPI contract (v1.2.0)
-├── opal_talk_v1.4.0.yaml               incoming contract revision (not yet implemented)
+├── opal_talk_v1.4.0.yaml               authoritative OpenAPI contract (v1.4.0)
 ├── pyproject.toml                      packaging and entry points
 ├── Makefile                            development commands
 ├── config/

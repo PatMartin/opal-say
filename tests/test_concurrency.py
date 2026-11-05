@@ -1,4 +1,4 @@
-"""ETag/If-Match optimistic concurrency on configuration mutations (contract 1.2.0)."""
+"""ETag/If-Match optimistic concurrency on configuration mutations (contract 1.4.0)."""
 
 from __future__ import annotations
 

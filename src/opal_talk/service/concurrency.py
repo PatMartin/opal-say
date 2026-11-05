@@ -1,4 +1,4 @@
-"""Optimistic concurrency for configuration mutations (contract 1.2.0 conventions).
+"""Optimistic concurrency for configuration mutations (contract 1.4.0 conventions).
 
 The single logical configuration revision (`Store.config_revision`) backs strong
 ETags on configuration reads and mandatory `If-Match` preconditions on mutations:

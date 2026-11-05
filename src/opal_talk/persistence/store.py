@@ -100,7 +100,7 @@ class Store:
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
         """Write transaction. A commit that actually modified rows bumps `config_revision`
-        (the store-wide mutation counter backing ETag/If-Match in contract 1.2.0)."""
+        (the store-wide mutation counter backing ETag/If-Match in contract 1.4.0)."""
         with self._lock:
             changes_before = self._conn.total_changes
             self._conn.execute("BEGIN IMMEDIATE")

@@ -1,6 +1,6 @@
 """OPAL suite correlation identifiers (X-Opal-* headers) as pure-ASGI middleware.
 
-Implements the contract-1.2.0 context convention ahead of the contract swap: every
+Implements the contract's context convention: every
 request may carry four optional correlation headers, and every response — JSON,
 binary, streamed or error — echoes them. Supplied values must be opaque printable
 ASCII tokens of 1..128 characters; invalid values are rejected with 422. Missing
@@ -61,7 +61,7 @@ def opal_error_body(
     details: dict[str, Any] | None = None,
     ids: CorrelationIds | None = None,
 ) -> dict[str, Any]:
-    """Serialize an error in the shared `OpalError` envelope (contract 1.2.0).
+    """Serialize an error in the shared `OpalError` envelope (contract 1.4.0).
 
     `request_id`/`transaction_id` are required by the schema; they come from the
     request's CorrelationIds when available and are generated otherwise.

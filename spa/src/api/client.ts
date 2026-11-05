@@ -9,7 +9,7 @@ export interface ErrorResponse {
   details?: Record<string, unknown>
 }
 
-/** Shared OPAL error envelope body (`{"error": OpalError}`), contract 1.2.0. */
+/** Shared OPAL error envelope body (`{"error": OpalError}`), contract 1.4.0. */
 export interface OpalError extends ErrorResponse {
   request_id: string
   transaction_id: string

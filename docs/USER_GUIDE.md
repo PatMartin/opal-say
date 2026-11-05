@@ -64,7 +64,7 @@ There are three ways to use it, and all three can do the same things:
 | **Profile** | A reusable set of generation settings: voice, speed, volume, output format, sample rate and engine options. Profiles have a numeric id and a unique name. | `default`, `telephony` |
 | **Active profile** | At most one profile is active. It's used whenever a request doesn't name a profile. | `default` (id 1) |
 | **Engine options** | Opaque, engine-specific settings (`engine_options` / `options`). Each adapter declares the keys it accepts and their scope. | `{"noise_scale": 0.5}`, `{"lang": "en-gb"}` |
-| **Setting** | A service-wide key/value pair, stored as a string. Known keys are validated. | `max_text_chars = 20000` |
+| **Setting** | A service-wide key/value pair, stored as a native JSON value. Known keys are validated. | `max_text_chars = 20000` |
 | **Generation** | Turning text into audio: completed (`/generate`) or streamed (`/generate/stream`). | |
 | **Chunking** | Long text is split internally at sentence boundaries. Chunk boundaries never show in the API or in the audio. | `chunk_max_chars = 400` |
 | **Backup** | A `.tar.gz` holding the logical configuration (engines, voices, profiles, settings) as JSON. It never contains model files. | `opal-talk-2026-10-12T162205Z.tar.gz` |
@@ -227,7 +227,7 @@ Useful URLs:
 | `http://127.0.0.1:8001/api/v1/health/` | Readiness and engine state |
 | `http://127.0.0.1:8001/docs` | Swagger UI (interactive API docs) |
 | `http://127.0.0.1:8001/redoc` | ReDoc |
-| `http://127.0.0.1:8001/openapi.json` | The authoritative contract (`opal_talk.yaml`), published as is |
+| `http://127.0.0.1:8001/openapi.json` | The authoritative contract (`opal_talk_v1.4.0.yaml`), published as is |
 | `http://127.0.0.1:8001/ui/` | Web GUI (after `npm run build` in `spa/`) |
 
 ### 2.6 Verify the installation
@@ -491,7 +491,7 @@ One SQLite database (default `var/opal_talk.db`). The schema is created on start
 | `engines` | `engine_id`, `enabled`, `options` (JSON) |
 | `voices` | registration fields, `native_sample_rate`, `engine_options` and `metadata` (JSON), timestamps |
 | `profiles` | `id`, unique `name`, `is_active`, voice, speed, volume, format, sample rate, `engine_options` (JSON), timestamps |
-| `settings` | unique `key`, string `value`, `updated_at` |
+| `settings` | unique `key`, `value` (native JSON), `updated_at` |
 
 There's no request log, synthesis history or audio cache. Generated audio is never stored.
 
@@ -563,7 +563,7 @@ The top-level `service:` key is optional; a flat mapping works too. See
 | `engines.yaml` | `engines` | Map of `engine_id` → `{enabled, options}` | `enabled` boolean, `options` a map. Options are checked against the engine's specs. |
 | `voices.yaml` | `voices` | List of voices | Same fields and rules as `POST /voices/`; unknown fields are rejected |
 | `profiles.yaml` | `profiles` | List of profiles | Same fields and rules as `POST /profiles/`; unknown fields (including `id`) are rejected |
-| `settings.yaml` | `settings` | Map of key → scalar | Known keys are range-checked. Booleans become `true`/`false`; lists/maps become JSON strings. |
+| `settings.yaml` | `settings` | Map of key → native JSON value | Known keys are range-checked. |
 
 Every file starts with an optional `version: 1`. Only the files that are present replace their section;
 the other sections are kept. Engines in `engines.yaml` that aren't installed are ignored with a warning,
@@ -742,9 +742,9 @@ Every message has a `code`, a `message`, an optional `field` (for example
 
 ### 5.1 Conventions
 
-- **Contract-first:** the authoritative contract is `opal_talk.yaml` (OpenAPI 3.1, API `v1`, contract
-  version 1.0.0). Every route uses the contract's `operationId`, and `/openapi.json` publishes the
-  contract file itself rather than a generated schema.
+- **Contract-first:** the authoritative contract is `opal_talk_v1.4.0.yaml` (OpenAPI 3.1, API `v1`,
+  contract version 1.4.0). Every route uses the contract's `operationId`, and `/openapi.json` publishes
+  the packaged contract file itself rather than a generated schema.
 - **Base URL:** `http://<host>:8001`. All resources are under `/api/v1`.
 - **Trailing slashes:** collection endpoints end with `/` (for example `/api/v1/voices/`). Calling them
   without the slash triggers a redirect.
@@ -759,12 +759,13 @@ Every message has a `code`, a `message`, an optional `field` (for example
   for every other field, `null` is a `422`.
 - **Timestamps:** ISO 8601, UTC, with a `Z` suffix, for example `2026-10-12T16:19:33.361017Z`.
 - **Authentication:** none (see [Security](#27-access-from-other-machines)).
-- **Concurrency:** last write wins. There are no ETags or `If-Match` preconditions in this version.
+- **Concurrency:** optimistic, via strong ETags. `GET` on settings returns an `ETag`; mutations to
+  settings require `If-Match` (`428` when missing, `412` when stale).
 
-> The repository also contains `opal_talk.1.2.0.yaml`, which adopts the OPAL Suite Standard v1.2
-> (correlation headers, ETag/`If-Match`, `health/live` and `health/ready`, an atomic
-> `PATCH /settings/`, and `POST /backup/validate`). That revision is **not implemented yet**. This guide
-> documents the running service.
+> The contract adopted the OPAL Suite Standard conventions: `X-Opal-*` correlation headers on every
+> request and response, ETag/`If-Match` optimistic concurrency on configuration mutations,
+> `health/live` and `health/ready` probes, an atomic `PATCH /settings/`, `POST /backup/validate`,
+> native-JSON setting values, and `201 + Location` from `POST /backup/create`.
 
 The examples below use:
 
@@ -811,7 +812,7 @@ Request validation errors use FastAPI's `HTTPValidationError` shape, with `loc` 
 curl -s $API/
 ```
 ```json
-{"name": "opal-talk-svc", "version": "1.0.0", "api_version": "v1",
+{"name": "opal-talk-svc", "version": "1.4.0", "api_version": "v1",
  "description": "Implementation-neutral OPAL text-to-speech service"}
 ```
 
@@ -1225,7 +1226,7 @@ curl -s $API/api/v1/health/
 ```json
 {
   "status": "degraded",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "active_profile_id": 1,
   "engines": [
     {"engine_id": "kokoro", "enabled": true, "available": false, "message": "Kokoro model file '/nope.onnx' not found"},
@@ -1600,7 +1601,7 @@ opal talk health        # GET /api/v1/health/     -> status line + engine table
 ```
 
 ```
-status: ok  version: 1.0.0  active_profile_id: 1
+status: ok  version: 1.4.0  active_profile_id: 1
 ENGINE_ID  ENABLED  AVAILABLE  MESSAGE
 kokoro     yes      yes        -
 piper      yes      yes        -
@@ -1989,7 +1990,7 @@ missing.
 | Suite | Location | Covers |
 |---|---|---|
 | Units | `tests/test_units.py` | Chunking, audio encoding/resampling, option checking, config loading |
-| Contract | `tests/test_contract.py`, `tests/contract.py` | Every operation is implemented with the contract's operationId/method/path; responses validate against `opal_talk.yaml` |
+| Contract | `tests/test_contract.py`, `tests/contract.py` | Every operation is implemented with the contract's operationId/method/path; responses validate against the packaged contract |
 | API resources | `tests/test_api_resources.py` | Engines, voices, profiles, settings and health, including error paths |
 | Generation | `tests/test_generate.py` | Resolution order, formats, routing, error codes |
 | Streaming | `tests/test_streaming.py` | Headers, raw byte format, progressive delivery, constant rate, abort semantics |
@@ -2000,9 +2001,10 @@ missing.
 | SPA | `spa/src/test/*.test.ts(x)` | Important GUI workflows, and the SPA operation map against the contract |
 
 The contract and parity tests read the packaged contract at `src/opal_talk/contract/opal_talk.yaml`,
-a byte-for-byte copy of the authoritative `opal_talk.yaml` in the repository root. The two are real
-files (symlinks break on Windows checkouts and in built wheels); a contract test asserts they never
-drift. `opal_talk.<version>.yaml` files at the root are the versioned history of the same document.
+a byte-for-byte copy of the authoritative `opal_talk_v{version}.yaml` in the repository root. The two
+are real files (symlinks break on Windows checkouts and in built wheels); a contract test asserts
+they never drift. Other `opal_talk_v*.yaml` files at the root are not-yet-adopted revisions and must
+never be selected while their version differs from the implementation.
 
 ---
 
@@ -2025,7 +2027,7 @@ drift. `opal_talk.<version>.yaml` files at the root are the versioned history of
 | Stream stops with an incomplete-read error | The engine failed mid-stream. Check the service log. The audio received so far is incomplete. |
 | First request for a voice is slow | The model is loaded on first use. Warm it up with `voices test`. Raise Piper's `cache_size` if you switch between many voices. |
 | Requests queue up | Synthesis is serialized per engine. Use a smaller `chunk_max_chars` for faster first audio, or spread the load across engines. |
-| `/openapi.json` returns `500`, `/docs` shows nothing | The service publishes `src/opal_talk/contract/opal_talk.yaml`, the packaged copy of `opal_talk.yaml` from the repository root. If the file is missing or unreadable, reinstall/re-checkout the package. |
+| `/openapi.json` returns `500`, `/docs` shows nothing | The service publishes `src/opal_talk/contract/opal_talk.yaml`, the packaged copy of `opal_talk_v1.4.0.yaml` from the repository root. If the file is missing or unreadable, reinstall/re-checkout the package. |
 | Web GUI is `404` at `/ui` | Build it (`make spa-build`), and check that `spa_dir` points at `spa/dist`. |
 | Browser app gets CORS errors | Add its origin to `cors_origins` in `service.yaml` and restart. |
 | `backup restore` → `backup_not_found` for a copied file | It must be in `<data_dir>/backups/` and keep its `opal-talk-<timestamp>.tar.gz` name. |

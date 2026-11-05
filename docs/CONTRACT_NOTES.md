@@ -1,6 +1,6 @@
 # Contract notes
 
-`opal_talk.yaml` is implemented unchanged. Ambiguities or under-specified behaviour found while implementing it, and the interpretation chosen, are recorded here.
+`opal_talk_v1.4.0.yaml` is implemented unchanged. Ambiguities or under-specified behaviour found while implementing it, and the interpretation chosen, are recorded here.
 
 | # | Area | Observation | Implementation choice |
 |---|------|-------------|-----------------------|

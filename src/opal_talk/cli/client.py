@@ -19,7 +19,7 @@ DEFAULT_API_URL = "http://127.0.0.1:8001"
 OPERATIONS: dict[str, tuple[str, str]] = contract_operations()
 
 # Operations that mutate logical configuration and carry the mandatory If-Match
-# precondition (contract 1.2.0): the client fetches the current ETag first and
+# precondition (contract 1.4.0): the client fetches the current ETag first and
 # retries once on 412.
 PRECONDITION_OPS = {
     "update_engine_api_v1_engines__engine_id__patch",

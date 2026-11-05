@@ -819,8 +819,9 @@ ffmpeg -f s16le -ar 16000 -ac 1 -i s.pcm s.wav
 
 ## 9. `settings`: service settings
 
-Settings are service-wide key/value pairs, stored as strings. Known keys are validated when you set
-them. Unknown keys are accepted and stored as they are.
+Settings are service-wide key/value pairs whose values are **native JSON** — numbers, booleans and
+objects round-trip with their type. Known keys are validated when you set them (a string that parses
+is still accepted). Unknown keys are stored with whatever JSON type you send.
 
 | Command | Description |
 |---|---|
@@ -834,6 +835,7 @@ them. Unknown keys are accepted and stored as they are.
 | Key | Type | Built-in default | Allowed / range | Effect |
 |---|---|---|---|---|
 | `max_text_chars` | int | `20000` | 1 to 1000000 | Longer text is rejected with `413` |
+| `max_audio_bytes` | int | `134217728` (128 MiB) | 65536 to 536870912 | Cap on the encoded non-streaming response body (WAV container included); `413` above. Streaming is governed by text and runtime limits instead. |
 | `chunk_max_chars` | int | `400` | 50 to 5000 | Maximum size of an internal synthesis chunk. Smaller chunks make streaming start sooner. |
 | `default_speed` | float | `1.0` | 0.25 to 4.0 | Used when neither the request nor the profile sets a speed |
 | `default_volume` | float | `1.0` | 0.0 to 2.0 | Used when neither the request nor the profile sets a volume |
@@ -851,8 +853,8 @@ opal talk settings list
 ```
 ```json
 {
-  "chunk_max_chars": "400",
-  "max_text_chars": "20000"
+  "chunk_max_chars": 400,
+  "max_text_chars": 20000
 }
 ```
 
@@ -874,7 +876,8 @@ opal talk settings set default_output_format pcm
 opal talk settings set chunk_max_chars 10
 # Error: HTTP 422 validation error: body.value: setting 'chunk_max_chars' must be between 50 and 5000
 
-# Unknown keys are stored as they are (useful for your own tooling)
+# Unknown keys keep your JSON type — `5` stores a number, `'"5"'` a string,
+# `true` a boolean, `'{"a": 1}'` an object (useful for your own tooling)
 opal talk settings set deployment_note "kitchen pi"
 
 # Go back to the built-in default
@@ -1070,7 +1073,7 @@ opal talk info
 ```json
 {
   "name": "opal-talk-svc",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "api_version": "v1",
   "description": "Implementation-neutral OPAL text-to-speech service"
 }
@@ -1080,7 +1083,7 @@ opal talk info
 opal talk health
 ```
 ```
-status: degraded  version: 1.0.0  active_profile_id: 1
+status: degraded  version: 1.4.0  active_profile_id: 1
 ENGINE_ID  ENABLED  AVAILABLE  MESSAGE
 kokoro     yes      no         Kokoro model file '/nope.onnx' not found
 piper      yes      yes        -
@@ -1411,7 +1414,7 @@ See the [User Guide](USER_GUIDE.md#10-integrating-with-your-application) for str
 | First `generate` with a voice is slow | The model is loaded on first use. Later calls reuse it (Piper keeps `cache_size` models). Raise `--timeout` for very long texts. |
 | `backup restore` says `backup_not_found` for a copied file | The file must be in the service's `<data_dir>/backups/` and keep its `opal-talk-<timestamp>.tar.gz` name. |
 | `backup import` says `config_not_found` | The service's `config_dir` has none of `engines.yaml`, `voices.yaml`, `profiles.yaml`, `settings.yaml`. |
-| `/docs` loads but shows no operations, `/openapi.json` returns `500` | The service publishes `src/opal_talk/contract/opal_talk.yaml`, the packaged copy of `opal_talk.yaml` from the repository root. If it is missing or unreadable, reinstall/re-checkout the package. The CLI is not affected. |
+| `/docs` loads but shows no operations, `/openapi.json` returns `500` | The service publishes `src/opal_talk/contract/opal_talk.yaml`, the packaged copy of `opal_talk_v1.4.0.yaml` from the repository root. If it is missing or unreadable, reinstall/re-checkout the package. The CLI is not affected. |
 
 ---
 

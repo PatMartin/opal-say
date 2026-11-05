@@ -1,9 +1,8 @@
 """Correlation middleware: X-Opal-* identifier validation, propagation and echo.
 
-Covers the contract-1.2.0 context convention on the v1.0.0 runtime: the extra
-response headers are contract-compatible (undocumented headers are ignored by the
-v1 checks), while deliberately invalid identifiers are exercised with
-`skip_contract` because the active contract does not document those 422s.
+Covers the contract's context convention: supplied X-Opal-* identifiers are
+validated and echoed, while deliberately invalid identifiers are exercised with
+`skip_contract` because the contract does not document those 422s.
 """
 
 from __future__ import annotations

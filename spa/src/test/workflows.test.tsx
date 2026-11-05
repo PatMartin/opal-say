@@ -5,7 +5,7 @@ import { pcmToWav } from '../audio'
 import { AUDIO_HEADERS, ENGINE, PROFILE, VOICE, audio, json, mockApi } from './mockApi'
 
 const BASE_ROUTES = {
-  'GET /': { name: 'opal-talk-svc', version: '1.0.0', api_version: 'v1' },
+  'GET /': { name: 'opal-talk-svc', version: '1.4.0', api_version: 'v1' },
   'GET /healthz': { status: 'ok' },
   'GET /api/v1/profiles/': [PROFILE],
   'GET /api/v1/voices/': [VOICE],
@@ -20,7 +20,7 @@ describe('App shell', () => {
   it('shows service identity and liveness', async () => {
     mockApi(BASE_ROUTES)
     render(<App />)
-    expect(await screen.findByText('opal-talk-svc 1.0.0 (API v1)')).toBeInTheDocument()
+    expect(await screen.findByText('opal-talk-svc 1.4.0 (API v1)')).toBeInTheDocument()
     expect(screen.getByText('online')).toBeInTheDocument()
   })
 })

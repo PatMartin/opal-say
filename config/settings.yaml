@@ -1,5 +1,5 @@
 version: 1
-# Service-wide settings (string values). Known keys:
+# Service-wide settings (native JSON values). Known keys:
 #   max_text_chars         maximum accepted text length (413 above this)
 #   chunk_max_chars        internal text-chunk size used for synthesis/streaming
 #   default_speed          service default speed when no profile/request value applies

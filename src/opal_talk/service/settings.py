@@ -117,7 +117,7 @@ class SettingsService:
 
         Values are normalized to strings (same rules as YAML import); known keys are
         validated. Every change is checked first, then applied in one transaction —
-        all or nothing — and the full resulting map is returned. Contract 1.2.0's
+        all or nothing — and the full resulting map is returned. Contract 1.4.0's
         `PATCH /api/v1/settings/` sits directly on top of this.
         """
         normalized: dict[str, str | None] = {}
