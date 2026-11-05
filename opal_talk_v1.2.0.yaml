@@ -1298,13 +1298,17 @@ paths:
         '
       operationId: create_backup_api_v1_backup_create_post
       responses:
-        '200':
+        '201':
           description: Backup created.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BackupCreateResponse'
           headers:
+            Location:
+              description: URI of the created backup (/api/v1/backup/download/{filename}).
+              schema:
+                type: string
             X-Opal-Session-Id:
               $ref: '#/components/headers/OpalSessionIdHeader'
             X-Opal-Transaction-Id:

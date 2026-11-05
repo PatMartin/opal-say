@@ -413,9 +413,11 @@ def list_backups(svc: Services = Depends(services)):
 
 
 @router.post("/api/v1/backup/create", tags=["backup"], operation_id="create_backup_api_v1_backup_create_post",
-             response_model=BackupCreateResponse)
-def create_backup(svc: Services = Depends(services)):
-    return svc.config_ops.create_backup()
+             response_model=BackupCreateResponse, status_code=201)
+def create_backup(response: Response, svc: Services = Depends(services)):
+    result = svc.config_ops.create_backup()
+    response.headers["Location"] = f"/api/v1/backup/download/{result['filename']}"
+    return result
 
 
 @router.get("/api/v1/backup/download/{filename}", tags=["backup"],

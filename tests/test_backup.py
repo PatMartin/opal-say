@@ -34,6 +34,14 @@ def test_export_contains_full_configuration(client, populated):
     assert {e["engine_id"]: e["enabled"] for e in data["engines"]} == {"alt": False, "fake": True}
 
 
+def test_backup_create_returns_201_and_location(client, populated):
+    resp = client.post("/api/v1/backup/create")
+    assert resp.status_code == 201
+    filename = resp.json()["filename"]
+    assert resp.headers["Location"] == f"/api/v1/backup/download/{filename}"
+    assert client.get(resp.headers["Location"]).status_code == 200
+
+
 def test_backup_roundtrip_restores_exact_state(client, populated):
     before = client.get("/api/v1/backup/export").json()
     filename = client.post("/api/v1/backup/create").json()["filename"]

@@ -247,7 +247,10 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.get("/api/v1/health/live").json() == {"status": "ok", "ready": True}
     assert c.get("/api/v1/health/ready").json()["ready"] is True
 
-    filename = c.post("/api/v1/backup/create").json()["filename"]
+    created = c.post("/api/v1/backup/create")
+    assert created.status_code == 201
+    filename = created.json()["filename"]
+    assert created.headers["location"] == f"/api/v1/backup/download/{filename}"
     assert c.get("/api/v1/backup/list").status_code == 200
     assert c.get(f"/api/v1/backup/download/{filename}").status_code == 200
     assert c.post(f"/api/v1/backup/restore/{filename}").status_code == 200

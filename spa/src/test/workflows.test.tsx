@@ -262,7 +262,10 @@ describe('Settings and backup', () => {
     mockApi({
       ...BASE_ROUTES,
       'GET /api/v1/backup/list': [{ filename: 'opal-talk-2026-10-04T230000Z.tar.gz', created_at: 'now', size_bytes: 10 }],
-      'POST /api/v1/backup/create': { filename: 'opal-talk-2026-10-04T230000Z.tar.gz', message: 'Backup created successfully.' },
+      'POST /api/v1/backup/create': () => json(
+        { filename: 'opal-talk-2026-10-04T230000Z.tar.gz', message: 'Backup created successfully.' },
+        201, { Location: '/api/v1/backup/download/opal-talk-2026-10-04T230000Z.tar.gz' },
+      ),
       'POST /api/v1/backup/import': {
         success: false,
         validation: { valid: false, errors: [{ code: 'voice_not_found', message: 'bad ref', field: 'profiles.x.voice_id' }], warnings: [], details: {} },
