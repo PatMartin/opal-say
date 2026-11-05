@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
 import typer
 
 from opal_talk.cli.common import _call, _emit
@@ -23,9 +26,14 @@ def settings_get(ctx: typer.Context, key: str) -> None:
 
 @settings_app.command("set")
 def settings_set(ctx: typer.Context, key: str, value: str) -> None:
-    """Create or replace a setting."""
+    """Create or replace a setting. The value is sent as native JSON when it
+    parses as such (`5`, `true`, `{"a": 1}`); otherwise it is sent as a string."""
+    try:
+        parsed: Any = json.loads(value)
+    except ValueError:
+        parsed = value
     _emit(ctx, _call(ctx, "upsert_setting_api_v1_settings__key__put", path_params={"key": key},
-                     json={"value": value}).json())
+                     json={"value": parsed}).json())
 
 
 @settings_app.command("delete")
@@ -40,8 +48,6 @@ def settings_patch(ctx: typer.Context, payload: str = typer.Option(
     ..., "--json", help='JSON object of changes, e.g. \'{"default_speed": 1.2}\' (null deletes a key).'
 )) -> None:
     """Atomically merge-patch the whole settings document."""
-    import json
-
     _emit(ctx, _call(ctx, "patch_talk_settings", json=json.loads(payload)).json())
 
 

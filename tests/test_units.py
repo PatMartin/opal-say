@@ -149,15 +149,15 @@ class TestSettingsPatch:
 
     def test_patch_sets_and_returns_full_map(self, svc):
         out = svc.patch({"chunk_max_chars": "200", "custom": "x"})
-        assert out == {"chunk_max_chars": "200", "custom": "x"}
+        assert out == {"chunk_max_chars": 200, "custom": "x"}
         assert svc.all() == out
 
     def test_null_deletes(self, svc):
         svc.patch({"chunk_max_chars": "200", "other": "1"})
         assert svc.patch({"chunk_max_chars": None}) == {"other": "1"}
 
-    def test_values_normalized_to_strings(self, svc):
-        assert svc.patch({"chunk_max_chars": 200, "flag": True}) == {"chunk_max_chars": "200", "flag": "true"}
+    def test_values_returned_as_native_json(self, svc):
+        assert svc.patch({"chunk_max_chars": 200, "flag": True}) == {"chunk_max_chars": 200, "flag": True}
 
     def test_known_key_validated_and_atomic(self, svc):
         svc.patch({"chunk_max_chars": "300"})
@@ -165,7 +165,7 @@ class TestSettingsPatch:
             svc.patch({"chunk_max_chars": "not-a-number", "good": "1"})
         assert "must be" in str(exc_info.value)
         # the valid key in the same patch must not have been applied either
-        assert svc.all() == {"chunk_max_chars": "300"}
+        assert svc.all() == {"chunk_max_chars": 300}
 
     def test_multiple_errors_reported(self, svc):
         with pytest.raises(Exception) as exc_info:

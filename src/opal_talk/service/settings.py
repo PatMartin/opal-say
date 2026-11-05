@@ -44,18 +44,37 @@ KNOWN_SETTINGS: dict[str, tuple[Callable[[str], Any], Any]] = {
 
 
 def settings_to_str(raw: dict[str, Any]) -> dict[str, str]:
-    """Normalize setting values to storage strings (shared by PATCH, YAML import and restore)."""
+    """Normalize native JSON setting values to storage strings (shared by PATCH,
+    YAML import and backup restore).
+
+    Known keys store the canonical scalar string their parser validates (a
+    parseable string stays accepted). Unknown keys store the JSON encoding of
+    the value so arbitrary typed values round-trip faithfully.
+    """
     out: dict[str, str] = {}
     for key, value in raw.items():
-        if isinstance(value, bool):
-            out[str(key)] = "true" if value else "false"
-        elif value is None:
-            out[str(key)] = ""
-        elif isinstance(value, dict | list):
-            out[str(key)] = json.dumps(value)
+        k = str(key)
+        if value is None:
+            out[k] = ""
+        elif k in KNOWN_SETTINGS:
+            out[k] = str(value)
         else:
-            out[str(key)] = str(value)
+            out[k] = json.dumps(value)
     return out
+
+
+def setting_typed_value(key: str, raw: str) -> Any:
+    """Rehydrate a stored value for the API: parsers for known keys, JSON decoding
+    for unknown keys (legacy raw strings pass through unchanged)."""
+    if key in KNOWN_SETTINGS:
+        try:
+            return KNOWN_SETTINGS[key][0](raw)
+        except ValueError:
+            return raw
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return raw
 
 
 def setting_problem(key: str, value: str) -> str | None:
@@ -72,20 +91,22 @@ class SettingsService:
     def __init__(self, store: Store):
         self.store = store
 
-    def all(self) -> dict[str, str]:
-        return {row["key"]: row["value"] for row in self.store.list_settings()}
+    def all(self) -> dict[str, Any]:
+        return {row["key"]: setting_typed_value(row["key"], row["value"]) for row in self.store.list_settings()}
 
     def get(self, key: str) -> dict[str, Any]:
         row = self.store.get_setting(key)
         if row is None:
             raise NotFound(f"setting '{key}' not found", details={"key": key})
-        return row
+        return {**row, "value": setting_typed_value(key, row["value"])}
 
-    def upsert(self, key: str, value: str) -> dict[str, Any]:
-        problem = setting_problem(key, value)
+    def upsert(self, key: str, value: Any) -> dict[str, Any]:
+        text = settings_to_str({key: value})[key]
+        problem = setting_problem(key, text)
         if problem:
             raise InvalidRequest.single(["body", "value"], f"setting '{key}' {problem}", input_=value)
-        return self.store.upsert_setting(key, value)
+        row = self.store.upsert_setting(key, text)
+        return {**row, "value": setting_typed_value(key, row["value"])}
 
     def delete(self, key: str) -> None:
         self.get(key)

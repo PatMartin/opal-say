@@ -91,8 +91,8 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert stdout_audio[:4] == b"RIFF"
 
     run("settings set chunk_max_chars 200")
-    assert json.loads(run("settings list").stdout) == {"chunk_max_chars": "200"}
-    assert json.loads(run("settings get chunk_max_chars").stdout)["value"] == "200"
+    assert json.loads(run("settings list").stdout) == {"chunk_max_chars": 200}
+    assert json.loads(run("settings get chunk_max_chars").stdout)["value"] == 200
     run("settings delete chunk_max_chars")
     assert json.loads(run("settings patch --json '{\"greeting\": \"hi\"}'").stdout)["greeting"] == "hi"
     run("settings patch --json '{\"greeting\": null}'")

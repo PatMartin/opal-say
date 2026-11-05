@@ -30,7 +30,7 @@ def test_export_contains_full_configuration(client, populated):
     data = client.get("/api/v1/backup/export").json()
     assert [v["voice_id"] for v in data["voices"]] == ["v1", "v2"]
     assert data["profiles"][0]["name"] == "main"
-    assert data["settings"] == {"chunk_max_chars": "120"}
+    assert data["settings"] == {"chunk_max_chars": 120}
     assert {e["engine_id"]: e["enabled"] for e in data["engines"]} == {"alt": False, "fake": True}
 
 
@@ -132,7 +132,7 @@ def test_import_from_config_dir(client, config):
     assert client.get("/api/v1/voices/a").json()["native_sample_rate"] == 22050
     profiles = client.get("/api/v1/profiles/").json()
     assert [(p["id"], p["name"], p["is_active"]) for p in profiles] == [(1, "one", True), (2, "two", False)]
-    assert client.get("/api/v1/settings/").json() == {"chunk_max_chars": "250", "flag": "true"}
+    assert client.get("/api/v1/settings/").json() == {"chunk_max_chars": 250, "flag": True}
     assert client.get("/api/v1/engines/alt").json()["enabled"] is False
     assert client.post("/api/v1/generate", json={"text": "hi"}).headers["x-opal-voice-id"] == "a"
 
@@ -141,7 +141,7 @@ def test_import_only_replaces_present_sections(client, config, populated):
     write_config(config, {"settings.yaml": "version: 1\nsettings:\n  default_volume: 0.5\n"})
     assert client.post("/api/v1/backup/import").json()["success"] is True
     assert [v["voice_id"] for v in client.get("/api/v1/voices/").json()] == ["v1", "v2"]
-    assert client.get("/api/v1/settings/").json() == {"default_volume": "0.5"}
+    assert client.get("/api/v1/settings/").json() == {"default_volume": 0.5}
 
 
 @pytest.mark.parametrize(

@@ -108,7 +108,7 @@ def test_config_import_bumps_revision(client, config):
     (config.config_dir / "settings.yaml").write_text("version: 1\nsettings:\n  chunk_max_chars: 250\n")
     assert client.post("/api/v1/backup/import").json()["success"] is True
     assert etag(client) != before
-    assert client.get("/api/v1/settings/chunk_max_chars").json()["value"] == "250"
+    assert client.get("/api/v1/settings/chunk_max_chars").json()["value"] == 250
 
 
 def test_backup_restore_bumps_revision_and_restores_content(client):

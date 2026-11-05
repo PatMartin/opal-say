@@ -205,8 +205,35 @@ class TestSettings:
         assert client.put("/api/v1/settings/max_text_chars", json={"value": "abc"}).status_code == 422
         assert client.put("/api/v1/settings/default_output_format", json={"value": "mp3"}).status_code == 422
         assert client.put("/api/v1/settings/max_text_chars", json={"value": "10"}).status_code == 200
-        assert client.put("/api/v1/settings/x", json={"value": 5}).status_code == 422
         assert client.put("/api/v1/settings/x", json={}).status_code == 422
+
+    def test_settings_round_trip_native_json(self, client):
+        """Setting values are native JSON: unknown keys keep their submitted type."""
+        cases = {
+            "an_int": 42, "a_float": 1.5, "a_bool": True,
+            "a_dict": {"nested": [1, 2]}, "a_list": [1, "two"], "a_str": "plain",
+        }
+        for key, value in cases.items():
+            assert client.put(f"/api/v1/settings/{key}", json={"value": value}).status_code == 200
+            assert client.get(f"/api/v1/settings/{key}").json()["value"] == value
+        assert client.get("/api/v1/settings/").json() == cases
+
+    def test_known_settings_accept_typed_and_parseable_values(self, client):
+        """Known keys take typed values and still accept strings that parse."""
+        assert client.put("/api/v1/settings/chunk_max_chars", json={"value": 250}).status_code == 200
+        assert client.get("/api/v1/settings/chunk_max_chars").json()["value"] == 250
+        assert client.put("/api/v1/settings/default_volume", json={"value": 0.5}).status_code == 200
+        assert client.get("/api/v1/settings/default_volume").json()["value"] == 0.5
+        assert client.put("/api/v1/settings/max_text_chars", json={"value": True}).status_code == 422
+        assert client.put("/api/v1/settings/default_output_format", json={"value": 9}).status_code == 422
+
+    def test_string_value_round_trips_for_unknown_keys(self, client):
+        """Strings that look like JSON scalars stay strings for unknown keys."""
+        client.put("/api/v1/settings/looks_numeric", json={"value": "5"})
+        client.put("/api/v1/settings/looks_bool", json={"value": "true"})
+        got = client.get("/api/v1/settings/").json()
+        assert got["looks_numeric"] == "5"
+        assert got["looks_bool"] == "true"
 
 
 class TestHealth:

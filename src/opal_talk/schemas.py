@@ -175,12 +175,12 @@ class GenerateRequest(GenerateStreamRequest):
 class SettingRead(BaseModel):
     id: int
     key: str
-    value: str
+    value: Any
     updated_at: str
 
 
 class SettingUpdate(_Request):
-    value: str
+    value: Any
 
 
 class ValidationMessage(BaseModel):

@@ -40,6 +40,7 @@ from opal_talk.schemas import (
 from opal_talk.service.concurrency import config_etag, mutate_with_revision
 from opal_talk.service.config_candidate import Candidate
 from opal_talk.service.container import Services
+from opal_talk.service.settings import settings_to_str
 from opal_talk.tts.base import Report
 
 router = APIRouter()
@@ -458,7 +459,7 @@ def validate_backup_payload(body: ConfigExport, svc: Services = Depends(services
         engines={e["engine_id"]: {"enabled": e["enabled"], "options": e["options"]} for e in dump["engines"]},
         voices=dump["voices"],
         profiles=dump["profiles"],
-        settings={k: str(v) for k, v in dump["settings"].items()},
+        settings=settings_to_str(dump["settings"]),
     )
     return report_dict(svc.config_ops.validate_candidate(cand, resources_are_errors=True)[0])
 

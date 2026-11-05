@@ -247,7 +247,7 @@ describe('Settings and backup', () => {
     const calls = mockApi({
       ...BASE_ROUTES,
       'GET /api/v1/settings/': {},
-      'PUT /api/v1/settings/chunk_max_chars': { id: 1, key: 'chunk_max_chars', value: '200', updated_at: 'now' },
+      'PUT /api/v1/settings/chunk_max_chars': { id: 1, key: 'chunk_max_chars', value: 200, updated_at: 'now' },
     })
     render(<App />)
     await openTab('Settings')
@@ -255,7 +255,7 @@ describe('Settings and backup', () => {
     await userEvent.type(screen.getByLabelText('Value'), '200')
     await userEvent.click(screen.getByRole('button', { name: 'Set' }))
     expect(await screen.findByTestId('setting-detail')).toHaveTextContent('chunk_max_chars = 200')
-    expect(calls.find((c) => c.method === 'PUT')!.body).toEqual({ value: '200' })
+    expect(calls.find((c) => c.method === 'PUT')!.body).toEqual({ value: 200 })
   })
 
   it('creates backups and imports configuration', async () => {

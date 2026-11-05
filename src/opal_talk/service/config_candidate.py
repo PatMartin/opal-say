@@ -19,7 +19,7 @@ from opal_talk.persistence.store import Store, now_iso
 from opal_talk.schemas import ProfileCreate, VoiceCreate
 from opal_talk.service.catalog import EngineService
 from opal_talk.service.errors import Conflict, OperationFailed
-from opal_talk.service.settings import setting_problem, settings_to_str
+from opal_talk.service.settings import setting_problem, setting_typed_value, settings_to_str
 from opal_talk.tts.base import EngineUnavailableError, Issue, Report, TtsEngine, VoiceResolutionError
 from opal_talk.tts.runtime import split_runtime_options
 
@@ -71,7 +71,7 @@ class CandidateService:
             "engines": self.engines.list(),
             "voices": self.store.list_voices(),
             "profiles": self.store.list_profiles(),
-            "settings": {r["key"]: r["value"] for r in self.store.list_settings()},
+            "settings": {r["key"]: setting_typed_value(r["key"], r["value"]) for r in self.store.list_settings()},
         }
 
     # -- validation -------------------------------------------------------------

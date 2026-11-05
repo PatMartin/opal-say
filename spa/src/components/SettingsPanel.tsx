@@ -3,6 +3,20 @@ import { call } from '../api/client'
 import type { Setting } from '../api/types'
 import { ErrorBanner, useAction, useLoad } from './common'
 
+// Settings values are native JSON: `5`, `true`, {"a": 1} send as typed values;
+// anything that doesn't parse is sent as a plain string.
+function parseValue(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+function formatValue(v: unknown): string {
+  return typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)
+}
+
 export function SettingsPanel() {
   const settings = useLoad(() => call<Record<string, unknown>>('get_all_settings_api_v1_settings__get'), {})
   const [key, setKey] = useState('')
@@ -13,7 +27,7 @@ export function SettingsPanel() {
   const save = (e: FormEvent) => {
     e.preventDefault()
     void action.run(async () => {
-      setDetail(await call<Setting>('upsert_setting_api_v1_settings__key__put', { path: { key }, body: { value } }))
+      setDetail(await call<Setting>('upsert_setting_api_v1_settings__key__put', { path: { key }, body: { value: parseValue(value) } }))
       setKey('')
       setValue('')
       await settings.reload()
@@ -33,16 +47,17 @@ export function SettingsPanel() {
     <section>
       <h2>Settings</h2>
       <p className="muted">
-        Known keys: max_text_chars, chunk_max_chars, default_speed, default_volume, default_output_format. Deleting a setting restores its default.
+        Known keys: max_text_chars, max_audio_bytes, chunk_max_chars, default_speed, default_volume, default_output_format. Values are native JSON (numbers, booleans, objects). Deleting a setting restores its default.
         <button
           onClick={() =>
             void action.run(async () => {
               await call('patch_talk_settings', {
                 body: {
-                  max_text_chars: '20000',
-                  chunk_max_chars: '400',
-                  default_speed: '1',
-                  default_volume: '1',
+                  max_text_chars: 20000,
+                  max_audio_bytes: 134217728,
+                  chunk_max_chars: 400,
+                  default_speed: 1,
+                  default_volume: 1,
                   default_output_format: 'wav',
                 },
               })
@@ -66,9 +81,9 @@ export function SettingsPanel() {
           {Object.entries(settings.data).map(([k, v]) => (
             <tr key={k}>
               <td>{k}</td>
-              <td className="mono">{String(v)}</td>
+              <td className="mono">{formatValue(v)}</td>
               <td className="actions">
-                <button onClick={() => (setKey(k), setValue(String(v)))}>Edit</button>
+                <button onClick={() => (setKey(k), setValue(formatValue(v)))}>Edit</button>
                 <button onClick={() => void show(k)}>Details</button>
                 <button onClick={() => void remove(k)}>Delete</button>
               </td>
@@ -79,7 +94,7 @@ export function SettingsPanel() {
       <ErrorBanner error={action.error} />
       {detail && (
         <p className="muted" data-testid="setting-detail">
-          #{detail.id} {detail.key} = {detail.value} (updated {detail.updated_at})
+          #{detail.id} {detail.key} = {formatValue(detail.value)} (updated {detail.updated_at})
         </p>
       )}
       <form onSubmit={save} className="row">

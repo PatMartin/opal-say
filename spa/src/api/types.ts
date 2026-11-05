@@ -58,7 +58,7 @@ export interface ValidationResult {
 export interface Setting {
   id: number
   key: string
-  value: string
+  value: unknown
   updated_at: string
 }
 

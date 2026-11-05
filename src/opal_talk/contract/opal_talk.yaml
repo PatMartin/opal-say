@@ -1137,7 +1137,7 @@ paths:
       tags:
       - settings
       summary: Upsert Setting
-      description: Create the setting if absent or replace its string value if present.
+      description: Create the setting if absent or replace its native JSON value if present.
       operationId: upsert_setting_api_v1_settings__key__put
       requestBody:
         required: true
@@ -2819,8 +2819,7 @@ components:
         key:
           type: string
         value:
-          type: string
-          description: String setting value, matching the OPAL Listen setting convention.
+          description: Native JSON setting value, typed per the setting's own semantics.
         updated_at:
           type: string
           format: date-time
@@ -2831,8 +2830,7 @@ components:
       - value
       properties:
         value:
-          type: string
-          description: New string value for the setting.
+          description: New native JSON value for the setting.
     EngineHealthRead:
       type: object
       required:
