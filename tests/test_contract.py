@@ -20,49 +20,44 @@ from opal_talk.contract import CONTRACT_RESOURCE, contract_operations, load_cont
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# The implemented API is v1.2.0. Three byte-identical copies of it exist: the
-# authoritative human-facing root file, a version-pinned sibling, and the packaged
-# copy that the service loads and serves at /openapi.json. opal_talk.1.0.0.yaml is
-# the superseded document and must never be selected as the active contract.
+# The active contract lives in two byte-identical copies: the human-facing root
+# file `opal_talk_v{version}.yaml` and the packaged copy that the service loads
+# and serves at /openapi.json (symlinks break on Windows checkouts and in built
+# wheels, so two real files are kept). Other `opal_talk_v*.yaml` files at the
+# root are not-yet-adopted revisions and must never be selected as the active
+# contract until the implementation version matches their filename.
 ACTIVE_VERSION = __version__
-ROOT_CONTRACT = ROOT / "opal_talk.yaml"
-VERSIONED_CONTRACT = ROOT / f"opal_talk.{ACTIVE_VERSION}.yaml"
-PREVIOUS_CONTRACT = ROOT / "opal_talk.1.0.0.yaml"  # superseded; must never be selected
+ROOT_CONTRACT = ROOT / f"opal_talk_v{ACTIVE_VERSION}.yaml"
 PACKAGED = CONTRACT_RESOURCE
 TRACKED = "src/opal_talk/contract/opal_talk.yaml"
+CONTRACT_GLOB = "opal_talk_v*.yaml"
 
 
 def test_packaged_contract_matches_repo_root():
-    """`opal_talk.yaml` (repo root) and the packaged copy must stay identical.
-
-    Two real files are kept (the root copy is the human-facing document; the packaged
-    copy is what the service and tests load) because symlinks break on Windows
-    checkouts and in built wheels. This test is the drift guard.
-    """
+    """The root `opal_talk_v{version}.yaml` and the packaged copy must stay identical."""
     assert ROOT_CONTRACT.read_bytes() == files("opal_talk").joinpath(PACKAGED).read_bytes()
 
 
-def test_versioned_contract_matches_repo_root():
-    """The version-pinned copy must stay identical to the authoritative root contract."""
-    assert VERSIONED_CONTRACT.read_bytes() == ROOT_CONTRACT.read_bytes()
-
-
-def test_all_active_copies_parse_to_the_same_document():
-    """Root, versioned and packaged copies parse to one document at the active version."""
+def test_active_contract_parses_at_active_version():
+    """Root and packaged copies parse to one document at the implemented version."""
     root = yaml.safe_load(ROOT_CONTRACT.read_text(encoding="utf-8"))
-    versioned = yaml.safe_load(VERSIONED_CONTRACT.read_text(encoding="utf-8"))
     packaged = load_contract()
-    assert root == versioned == packaged
-    for doc in (root, versioned, packaged):
+    assert root == packaged
+    for doc in (root, packaged):
         assert doc["info"]["version"] == ACTIVE_VERSION
 
 
-def test_superseded_contract_is_not_selected():
-    """The old v1.0 document must never become the active contract again."""
-    previous = yaml.safe_load(PREVIOUS_CONTRACT.read_text(encoding="utf-8"))
-    assert previous["info"]["version"] != ACTIVE_VERSION
-    assert PREVIOUS_CONTRACT.read_bytes() != ROOT_CONTRACT.read_bytes()
-    assert load_contract() != previous
+def test_pending_contract_revisions_are_not_selected():
+    """`opal_talk_v*.yaml` files other than the active one are pending revisions —
+    they must parse, must not match the implemented version and must not equal
+    the packaged contract. Becomes a no-op once every pending revision is adopted."""
+    for path in ROOT.glob(CONTRACT_GLOB):
+        if path == ROOT_CONTRACT:
+            continue
+        pending = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert pending["info"]["version"] != ACTIVE_VERSION, f"{path.name} claims the active version"
+        assert path.read_bytes() != ROOT_CONTRACT.read_bytes(), f"{path.name} duplicates the active contract"
+        assert load_contract() != pending
 
 
 def test_packaged_contract_is_a_readable_regular_file():
@@ -76,7 +71,7 @@ def test_load_contract_returns_valid_v1_document():
     """load_contract() must yield a parseable OpenAPI document pinned to the implemented v1.0 API."""
     spec = load_contract()
     assert spec["openapi"].startswith("3.")
-    assert spec["info"]["version"] == ACTIVE_VERSION, "v1.2 contract must not be packaged silently"
+    assert spec["info"]["version"] == ACTIVE_VERSION, "packaged contract must not silently differ from __version__"
     assert spec["paths"] and spec["components"]["schemas"]
 
 
@@ -113,7 +108,7 @@ _UniqueKeyLoader.add_constructor("tag:yaml.org,2002:map", _reject_duplicate_keys
 
 def test_contracts_have_no_duplicate_yaml_keys():
     """Duplicate keys (e.g. two `paths:` entries or a repeated path) must not parse silently."""
-    for path in (ROOT_CONTRACT, VERSIONED_CONTRACT, PREVIOUS_CONTRACT):
+    for path in sorted(ROOT.glob(CONTRACT_GLOB)):
         yaml.load(path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)
 
 

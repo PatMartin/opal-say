@@ -3,32 +3,6 @@
 # OPAL Talk
 ### Turn ordinary text into a voice your projects can actually use.
 
-<<<<<<< HEAD
-**Implementation-neutral text-to-speech for the OPAL suite.** One authoritative REST contract, three interchangeable clients, and pluggable speech engines — so the same API surface works whether the backend is Piper on a Raspberry Pi or Kokoro on a GPU host.
-
-- **`opal-talk-svc`** — FastAPI service implementing every contract operation: WAV and raw-PCM output, progressive streaming, internal text chunking, bounded inference admission, and a reference-counted model cache. Ships with working **Piper** (`piper-tts`) and **Kokoro** (`kokoro-onnx`) adapters; more engines can register via the `opal_talk.engines` entry-point group.
-- **`opal talk …`** — Typer CLI in which every command is a thin HTTP client of the REST API (`opal-talk …` is an equivalent entry point).
-- **SPA** — React + Vite + Vitest UI in [spa/](spa/) that talks only to the REST API and is served at `/ui` when built.
-
-No audio playback, no engine lock-in, no hidden surface: clients can only do what the contract declares.
-
-## Contract
-
-The implemented API is **v1.2.0**. The single authoritative copy is the packaged document [`src/opal_talk/contract/opal_talk.yaml`](src/opal_talk/contract/opal_talk.yaml): it is loaded by `opal_talk.contract.load_contract()`, served by the service at `/openapi.json`, and used by the test suite to validate every response.
-
-> **Next revision in flight.** [`opal_talk_v1.4.0.yaml`](opal_talk_v1.4.0.yaml) sits at the repo root as the incoming contract. Its delta over 1.2.0 is small but semantic: settings values become native JSON (instead of strings), and `POST /api/v1/backup/create` returns `201` with a `Location` header (instead of `200`). It is **not yet implemented** — the code, version metadata, and packaged contract still describe 1.2.0. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
-
-Parity is enforced by tests, not convention: every contract operation has a route with the same operationId/method/path, every suite response is schema-validated against the contract, the CLI and SPA operation maps equal the contract's, every operation has an exercised CLI command, and every operation is used by the SPA.
-
-## Highlights
-
-- **Three clients, one API** — REST, CLI, and SPA never diverge because the contract is the source of truth for all of them.
-- **Progressive streaming** — `POST /api/v1/generate/stream` emits raw S16LE mono PCM as it is synthesized; `x-opal-sample-rate`, `x-opal-channels`, and `x-opal-sample-format` headers describe the wire format. Errors before headers return a JSON error envelope; errors after headers truncate the stream.
-- **Bounded inference** — engines declare a concurrency cap (`max_concurrent_inferences`, default 1); requests queue on a bounded semaphore and excess load fails fast with `503 engine_unavailable` instead of overloading the host.
-- **Safe reconfiguration** — runtime configuration updates create generations: in-flight requests finish on their bound generation, updates apply deterministically on drain, and waiters are never orphaned or interrupted mid-synthesis.
-- **Bounded model cache** — LRU-capped, single-flight model loading with reference-counted entries; evicted models are disposed exactly once, even after same-key replacement.
-- **Host-level operations** — health probes (`/healthz`, `/api/v1/health/live`, `/api/v1/health/ready`), engine/voice validation, settings management, and full backup create/restore/export/import/validate.
-=======
 **Your camera sees someone at the door. Your assistant knows what to say. Now it needs a voice.**
 
 OPAL Talk is the **text-to-speech engine of [OPAL](https://github.com/PatMartin/opal)**: send text to a small REST service, choose a voice, and get real audio back—either a ready-to-use WAV file or **progressive PCM audio** that starts arriving while the rest of the sentence is still being synthesized.
@@ -74,122 +48,20 @@ It provides one consistent interface over local synthesis engines, including **P
 - **Three consistent interfaces.** FastAPI REST, a complete Typer CLI (`opal talk ...`), and a React web console all use the same backend.
 - **Extensible engines.** New TTS implementations can be registered through the `opal_talk.engines` Python entry-point group.
 - **Inspectable by design.** Health checks, engine/voice validation, predictable errors, configuration export, and tests make voice infrastructure easier to operate.
->>>>>>> ef4f5b699744d030732d6aa7409e22e376cafe3c
 
 OPAL Talk complements [OPAL Listen](https://github.com/PatMartin/opal-listen), which understands speech, and [OPAL Event](https://github.com/PatMartin/opal-event), which routes events and executes actions. **Listen hears. Event reacts. Talk speaks.**
 
-<<<<<<< HEAD
-```
-src/opal_talk/
-  api/            REST layer — routes use the contract's operationIds; /openapi.json serves the contract
-  service/        application layer: catalog (engines/voices/profiles), generation, settings,
-                  config/backup, error mapping, bounded-concurrency helpers
-  tts/            engine-neutral core — TtsEngine interface, chunking, resampling/gain/WAV encoding,
-                  bounded LRU model cache, runtime manager, registry
-    piper_adapter.py    Piper (piper-tts)
-    kokoro_adapter.py   Kokoro (kokoro-onnx)
-  persistence/    SQLite store
-  cli/            HTTP client + Typer commands
-  contract/       packaged opal_talk.yaml (the served contract)
-  config.py       YAML service configuration
-spa/              React + Vite + Vitest
-config/           service.yaml and importable engines/voices/profiles/settings YAML
-```
-
-Adapters implement `TtsEngine` (`availability`, `describe_voice`, `synthesize`, declarative `option_specs`). The core handles chunking, sample-rate conversion, volume, and encoding, so engine-specific behavior stays in the adapter and reaches requests only through opaque `engine_options`.
-=======
 ## Installation
 
 ### 1. Install the project
->>>>>>> ef4f5b699744d030732d6aa7409e22e376cafe3c
 
 Requires **Python 3.11+**. Linux and Raspberry Pi OS are natural targets; macOS can also run the Python service with supported engine dependencies. Node.js **18+** is needed only for the optional web UI.
 
-<<<<<<< HEAD
-Requires **Python ≥ 3.11** and, for the SPA, **Node ≥ 18**.
-=======
 ~~~bash
 git clone https://github.com/PatMartin/opal-talk.git
 cd opal-talk
->>>>>>> ef4f5b699744d030732d6aa7409e22e376cafe3c
 
 python3 -m venv .venv
-<<<<<<< HEAD
-.venv/bin/pip install -e '.[engines,dev]'   # or '.[piper]' / '.[kokoro]' / '.' for core only
-(cd spa && npm install && npm run build)    # optional: served at /ui
-```
-
-On Windows the same commands work in Git Bash (the Makefile handles `.venv/Scripts` paths); `make install` bootstraps everything.
-
-## Engines
-
-OPAL Talk ships two adapters. Engine runtimes and models are **host-installed and never uploaded** — the service only stores references to files on the machine it runs on.
-
-### Piper (`piper-tts`)
-
-Lightweight ONNX voices for local, low-latency synthesis — the practical choice for CPU-only hosts and Raspberry Pi.
-
-```bash
-# runtime
-pip install -e '.[piper]'
-
-# voices: pick from https://huggingface.co/rhasspy/piper-voices —
-# each voice is a *.onnx model plus its *.onnx.json config, e.g.
-mkdir -p ~/piper/voices && cd ~/piper/voices
-curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/low/en_US-amy-low.onnx
-curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/low/en_US-amy-low.onnx.json
-```
-
-Point the engine at the directory via `config/service.yaml` (`engines.piper.options.voices_dir`) or at runtime:
-
-```bash
-opal talk engines update piper --option voices_dir=~/piper/voices
-opal talk engines validate piper
-opal talk voices add amy --name Amy --engine piper --ref en_US-amy-low
-opal talk voices test amy
-opal talk profiles add main --voice amy --active
-opal talk generate "Hello from OPAL Talk." -o hello.wav
-```
-
-`--ref` is the voice name (the `.onnx` basename) when `voices_dir` is set, or an absolute model path. Per-request tweaks go through `engine_options`, e.g. `opal talk generate "…" -O noise_scale=0.667 -O length_scale=1.2`. On CUDA hosts, install `onnxruntime-gpu` and set `use_cuda: true`.
-
-### Kokoro (`kokoro-onnx`)
-
-Kokoro-82M ONNX: higher-quality multi-voice synthesis, still CPU-friendly, with an int8-quantized model for constrained hosts.
-
-```bash
-# runtime
-pip install -e '.[kokoro]'
-
-# model + voices: from https://github.com/thewh1teagle/kokoro-onnx/releases
-mkdir -p ~/kokoro && cd ~/kokoro
-curl -LO https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx
-curl -LO https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
-```
-
-```bash
-opal talk engines update kokoro --option model_path=~/kokoro/kokoro-v1.0.int8.onnx \
-                                --option voices_path=~/kokoro/voices-v1.0.bin \
-                                --option default_lang=en-us
-opal talk engines validate kokoro
-opal talk voices add heart --name Heart --engine kokoro --ref af_heart
-opal talk voices test heart
-opal talk profiles add alt --voice heart --active
-opal talk generate "Kokoro speaks too." -o heart.wav
-```
-
-`--ref` is a Kokoro voice name from `voices-v1.0.bin` (`af_heart`, `af_bella`, `bm_george`, …). Use the full-precision `kokoro-v1.0.onnx` where fidelity matters more than size.
-
-### License implications
-
-Engine availability ≠ freedom to redistribute. Before shipping or offering this publicly, check **three layers** per engine:
-
-- **Adapter/runtime code** — `piper-tts` and `kokoro-onnx` are MIT-licensed Python packages; `onnxruntime` is MIT. These pose no restriction on use or redistribution.
-- **Model weights & voices** — this is the layer that varies. Kokoro-82M weights are Apache-2.0, but the bundled voices in `voices-v1.0.bin` carry **per-voice licenses** recorded in the upstream project; some are derived from datasets that require attribution or restrict commercial use. Piper voices come from many different training datasets — each voice directory in `rhasspy/piper-voices` carries its own license, ranging from permissive/CC-BY to **non-commercial**. Check the license for each voice you deploy; it applies to generated audio used commercially as well.
-- **Bundled components** — `piper-tts` incorporates espeak-ng-derived phonemization components licensed **GPL-3.0**. Using the engine as a service in your own process is generally fine, but redistributing the engine binaries (e.g., shipping an appliance image) may trigger GPL obligations — consult counsel if that's your deployment model.
-
-Practical rule: the service's MIT-style engine integrations are safe; **audit each voice/model file individually** before commercial use, keep attribution where required, and don't assume "downloadable" means "redistributable."
-=======
 source .venv/bin/activate
 
 # Both speech engines plus developer/testing tools:
@@ -200,42 +72,18 @@ pip install -e '.[engines,dev]'
 # pip install -e '.[kokoro]'     # Kokoro only
 # pip install -e .              # API/CLI core, no speech engine runtime
 ~~~
->>>>>>> ef4f5b699744d030732d6aa7409e22e376cafe3c
 
 The package installs three commands:
 
-<<<<<<< HEAD
-- [`config/service.yaml`](config/service.yaml) — host/port (default `127.0.0.1:8001`), `data_dir` (SQLite + backups, default `./var`), `config_dir`, CORS origins, SPA dir, and initial engine options. Override the file with `OPAL_TALK_CONFIG`; override fields with `OPAL_TALK_HOST`, `OPAL_TALK_PORT`, `OPAL_TALK_DATA_DIR`, `OPAL_TALK_CONFIG_DIR`, `OPAL_TALK_SPA_DIR`.
-- `config/{engines,voices,profiles,settings}.yaml` — imported on first start and via `POST /api/v1/backup/import` (`opal talk backup import`). Only present files replace their section; everything is validated before anything is applied.
-- Settings (`opal talk settings set KEY VALUE`):
-
-| Key | Default | Meaning |
-|---|---|---|
-| `max_text_chars` | 20000 | Maximum accepted text length (413 above) |
-| `max_audio_bytes` | 128 MiB | Maximum **encoded** response body for non-streaming generate, WAV container included |
-| `chunk_max_chars` | 400 | Internal text-chunk size for synthesis/streaming |
-| `default_speed` | 1.0 | Service default speed when no profile/request value applies (0.25–4.0) |
-| `default_volume` | 1.0 | Service default volume (0.0–2.0) |
-| `default_output_format` | `wav` | `wav` \| `pcm` |
-
-Streaming responses are governed by text and runtime resource limits, not `max_audio_bytes`.
-=======
 | Command | What it does |
 | --- | --- |
 | `opal-talk-svc` | Starts the REST service |
 | `opal talk ...` | OPAL Talk's Typer CLI beneath the shared `opal` root |
 | `opal-talk ...` | Standalone shortcut to the same Talk CLI |
->>>>>>> ef4f5b699744d030732d6aa7409e22e376cafe3c
 
 If you install multiple OPAL packages in the same Python environment, they may each install an `opal` entry point. The last installed script can win. **Use `opal-talk` in automation scripts** when you want an unambiguous executable; the examples below use `opal talk` for consistency across OPAL.
 
-<<<<<<< HEAD
-```bash
-.venv/bin/opal-talk-svc                         # http://127.0.0.1:8001 — docs at /docs, SPA at /ui
-export OPAL_TALK_API_URL=http://127.0.0.1:8001  # CLI default
-=======
 ### 2. Install at least one voice model
->>>>>>> ef4f5b699744d030732d6aa7409e22e376cafe3c
 
 **The Python engine package and its speech model are separate things.** OPAL Talk does **not** download, upload, or delete voice model files for you. Install those files on the **service host**.
 
@@ -272,6 +120,16 @@ mkdir -p ~/kokoro
 ~~~
 
 Kokoro voice references such as `af_heart` and `bm_george` live inside that voices file; you do **not** need a separate ONNX model for each voice. The shipped catalog registers examples under `kokoro-af-heart` and `kokoro-bm-george`.
+
+#### License implications
+
+Engine availability is not freedom to redistribute. Before shipping or offering this publicly, check **three layers** per engine:
+
+- **Adapter/runtime code** — `piper-tts` and `kokoro-onnx` are MIT-licensed Python packages; `onnxruntime` is MIT. These pose no restriction on use or redistribution.
+- **Model weights & voices** — this is the layer that varies. Kokoro-82M weights are Apache-2.0, but the bundled voices in `voices-v1.0.bin` carry **per-voice licenses** recorded upstream; some derive from datasets that require attribution or restrict commercial use. Piper voices come from many different training datasets — each voice directory in `rhasspy/piper-voices` carries its own license, ranging from permissive/CC-BY to **non-commercial**. Check the license for each voice you deploy; it can apply to generated audio used commercially as well.
+- **Bundled components** — `piper-tts` incorporates espeak-ng-derived phonemization components licensed **GPL-3.0**. Running the engine as a service is generally fine, but redistributing the engine binaries (e.g., shipping an appliance image) may trigger GPL obligations — consult counsel if that's your deployment model.
+
+Practical rule: audit each voice/model file individually before commercial use, keep attribution where required, and don't assume "downloadable" means "redistributable."
 
 ### 3. Start the service
 
@@ -900,41 +758,13 @@ opal talk backup validate
 opal talk backup create
 opal talk backup list
 
-<<<<<<< HEAD
-Global options go before the command group: `opal-talk --json voices list` prints raw JSON; `-O key=value` / `--options-json` pass `engine_options`. The complete CLI reference is [docs/CLI.md](docs/CLI.md); the [User Guide](docs/USER_GUIDE.md) covers installation, architecture, configuration, the REST API, streaming, the web GUI, and integration.
-
-## API surface
-
-All operations live under `/api/v1` and carry `X-Opal-*` correlation headers (session, transaction, request, causation), with errors in the uniform `OpalError` envelope.
-
-- **engines** — list/get/reconfigure engines and options, `parameters`, `validate`
-- **voices** — CRUD, `parameters`, `validate`, `test`
-- **profiles** — CRUD, `activate`
-- **generate** — `POST /api/v1/generate` (WAV/PCM file or JSON-encoded audio) and `POST /api/v1/generate/stream` (raw PCM stream)
-- **settings** — list/get/put/patch/delete
-- **backup** — list/create/download/restore/delete/export/import/validate
-- **health** — service health, plus `/healthz`, `/api/v1/health/live`, `/api/v1/health/ready`
-=======
 # Save a human-readable logical config export locally:
 opal talk backup export -o talk-config.json
->>>>>>> ef4f5b699744d030732d6aa7409e22e376cafe3c
 
 # Check a saved export/backup payload:
 opal talk backup validate --payload talk-config.json
 ~~~
 
-<<<<<<< HEAD
-```bash
-make test        # Python: unit, contract, adapter (real Piper/Kokoro when present), CLI, integration, streaming
-make test-fast   # without real engines — this is what standard CI runs
-make test-spa    # Vitest + typecheck
-make lint        # ruff
-make spa-dev     # Vite dev server on :5173 against the service on :8001
-```
-
-- **Real-engine tests** look for `~/piper/voices/en_US-amy-low.onnx` and `~/kokoro/` (override with `OPAL_TALK_TEST_PIPER_MODEL`, `OPAL_TALK_TEST_KOKORO_DIR`) and are skipped — never failed — when absent. See [docs/PERFORMANCE_TESTS.md](docs/PERFORMANCE_TESTS.md) for CPU/GPU/Raspberry Pi notes and [docs/RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md) for the real-engine release checklist.
-- **CI** runs Python 3.11/3.13 on Linux and Windows, builds and validates the wheel (checking package metadata ↔ `__version__` ↔ contract `info.version` consistency), runs the SPA suite, and keeps all real-engine work behind a manual-dispatch job — no model downloads on push/PR.
-=======
 Backups are created **on the service host** and can be downloaded by the filename returned from `backup list`:
 
 ~~~bash
@@ -1021,12 +851,13 @@ opal talk settings patch --json '{"default_volume":0.85,"chunk_max_chars":250}'
 | Key | Built-in default | Purpose |
 | --- | --- | --- |
 | `max_text_chars` | 20,000 | Reject text above the configured maximum |
+| `max_audio_bytes` | 128 MiB | Cap on the encoded non-streaming response body (WAV container included) |
 | `chunk_max_chars` | 400 | Size limit for internal sentence chunks |
 | `default_speed` | 1.0 | Service-wide fallback speed |
 | `default_volume` | 1.0 | Service-wide fallback gain |
 | `default_output_format` | `wav` | Service-wide fallback output |
 
-`settings list` returns **stored** settings, not every built-in default. A missing `settings get KEY` result doesn't mean the default doesn't exist.
+`settings list` returns **stored** settings, not every built-in default. A missing `settings get KEY` result doesn't mean the default doesn't exist. Streaming responses are governed by text and runtime resource limits, not `max_audio_bytes`.
 
 For a generation request, the precedence is: **explicit request → selected/active profile → service setting → built-in default**. The voice usually determines the engine and its native sample rate.
 
@@ -1042,7 +873,9 @@ For low-latency pipelines, set `--sample-rate` to a known value, especially when
 
 ### Configuration and API philosophy
 
-The authoritative OpenAPI document is [`opal_talk.yaml`](opal_talk.yaml) (v1.2.0), with a version-pinned copy [`opal_talk.1.2.0.yaml`](opal_talk.1.2.0.yaml). The packaged contract drives the server's `/openapi.json` endpoint. The previous [v1.0.0 specification](opal_talk.1.0.0.yaml) remains for reference.
+The implemented API is **v1.2.0**. The authoritative copy is the packaged document `src/opal_talk/contract/opal_talk.yaml`: it is loaded by `opal_talk.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. The root [`opal_talk_v1.2.0.yaml`](opal_talk_v1.2.0.yaml) is a byte-identical human-facing copy; a test enforces that the two never drift.
+
+> **Next revision in flight.** [`opal_talk_v1.4.0.yaml`](opal_talk_v1.4.0.yaml) sits at the repo root as the incoming contract. Its delta is small but semantic: settings values become native JSON instead of strings, and `POST /api/v1/backup/create` returns `201` with a `Location` header instead of `200`. It is **not yet implemented** — the code, version metadata, and packaged contract still describe 1.2.0. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
 
 The full service is **API-first**:
 
@@ -1082,7 +915,7 @@ make test-spa       # React/Vitest and frontend type checking
 make spa-dev        # Vite development server
 ~~~
 
-Real-engine tests require installed model files and skip when their resources aren't available. The test suite checks OpenAPI route alignment, CLI/SPA operation parity, output formats, error handling, and streaming behavior.
+Real-engine tests require installed model files — they look for `~/piper/voices/en_US-amy-low.onnx` and `~/kokoro/` (override with `OPAL_TALK_TEST_PIPER_MODEL` / `OPAL_TALK_TEST_KOKORO_DIR`) — and skip cleanly when the resources aren't available. Standard CI runs `make test-fast`; real-engine validation is a manual-dispatch job only, so no model downloads ever happen on push or PR. The test suite checks OpenAPI route alignment, CLI/SPA operation parity, output formats, error handling, and streaming behavior. See [docs/PERFORMANCE_TESTS.md](docs/PERFORMANCE_TESTS.md) for CPU/GPU/Raspberry Pi notes and [docs/RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md) for the real-engine release checklist.
 
 ### Find your way around
 
@@ -1090,8 +923,8 @@ Real-engine tests require installed model files and skip when their resources ar
 opal-talk/
 ├── opal-talk.png                       project artwork
 ├── README.md                           this guide
-├── opal_talk.yaml                      authoritative OpenAPI v1.2.0
-├── opal_talk.1.2.0.yaml                version-pinned contract
+├── opal_talk_v1.2.0.yaml               active OpenAPI contract (v1.2.0)
+├── opal_talk_v1.4.0.yaml               incoming contract revision (not yet implemented)
 ├── pyproject.toml                      packaging and entry points
 ├── Makefile                            development commands
 ├── config/
@@ -1112,15 +945,15 @@ opal-talk/
 │   ├── CLI.md                          exhaustive command reference
 │   ├── USER_GUIDE.md                   detailed operating manual
 │   ├── CONTRACT_NOTES.md               contract interpretation notes
-│   └── PERFORMANCE_TESTS.md            performance testing notes
+│   ├── PERFORMANCE_TESTS.md            performance testing notes
+│   └── RELEASE_VALIDATION.md           real-engine release checklist
 └── tests/                              Python and contract tests
 ~~~
 
-For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs/USER_GUIDE.md), [Contract Notes](docs/CONTRACT_NOTES.md), and [Performance Tests](docs/PERFORMANCE_TESTS.md).
+For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs/USER_GUIDE.md), [Contract Notes](docs/CONTRACT_NOTES.md), [Performance Tests](docs/PERFORMANCE_TESTS.md), and [Release Validation](docs/RELEASE_VALIDATION.md).
 
 ---
 
 **OPAL Talk doesn't decide what to say. It makes the words audible.** Put a local speech engine behind a simple REST contract, give it the voice that fits the moment, and let the rest of OPAL decide when it's time to speak.
 
 [Explore OPAL](https://github.com/PatMartin/opal) · [OPAL Listen](https://github.com/PatMartin/opal-listen) · [OPAL Event](https://github.com/PatMartin/opal-event) · [OPAL Look](https://github.com/PatMartin/opal-look) · [OPAL Think](https://github.com/PatMartin/opal-think)
->>>>>>> ef4f5b699744d030732d6aa7409e22e376cafe3c
