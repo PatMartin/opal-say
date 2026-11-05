@@ -306,7 +306,8 @@ opal (or opal-talk, which starts at 'talk')
     ├── backup    list | create | download | restore | delete | export | import | validate
     ├── health
     ├── info
-    └── ping
+    ├── ping
+    └── tree        prints the full command tree (introspected from the Typer app)
 ```
 
 ---

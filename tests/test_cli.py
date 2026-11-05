@@ -155,3 +155,17 @@ def test_unreachable_server(monkeypatch):
     monkeypatch.setattr(cli, "client_factory", lambda url, timeout: ApiClient("http://127.0.0.1:9", 1))
     result = CliRunner().invoke(cli.app, ["talk", "ping"])
     assert result.exit_code == 2 and "cannot reach" in result.stderr
+
+
+def test_tree_command_prints_command_surface():
+    result = CliRunner().invoke(cli.app, ["talk", "tree"])
+    assert result.exit_code == 0
+    out = result.stdout
+    for cmd in ("generate", "engines", "voices", "profiles", "settings", "backup", "health"):
+        assert cmd in out
+    # Required args/options are bare; optional ones are bracketed.
+    assert "generate TEXT -o/--output" in out
+    assert "get ENGINE_ID" in out
+    assert "set KEY VALUE" in out
+    assert "[--stream]" in out and "[--enable/--disable]" in out
+    assert "│   ├──" in out and "└──" in out
