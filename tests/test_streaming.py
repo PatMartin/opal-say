@@ -22,7 +22,7 @@ def _runtime_refs(app, engine_id: str = "fake") -> int:
     return app.state.services.runtime._records[engine_id].refs
 
 
-def _wait_until(predicate, timeout: float = 10.0) -> bool:
+def _wait_until(predicate, timeout: float = 5.0) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():
@@ -106,7 +106,7 @@ def test_progressive_delivery_over_real_http(live_server, client, voices):
     body = {"text": SENTENCES, "voice_id": "v1", "engine_options": {"delay": 0.3}}
     start = time.monotonic()
     arrivals: list[float] = []
-    with httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=30) as resp:
+    with httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=10) as resp:
         assert resp.status_code == 200
         for _ in resp.iter_raw():
             arrivals.append(time.monotonic() - start)
@@ -120,7 +120,7 @@ def test_failure_after_start_terminates_stream(live_server, client, voices):
     received = 0
     with (
         pytest.raises(httpx.HTTPError),
-        httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=30) as resp,
+        httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=10) as resp,
     ):
         assert resp.status_code == 200
         for chunk in resp.iter_raw():
@@ -219,7 +219,7 @@ def test_stream_at_capacity_returns_engine_unavailable(live_server, client, voic
     body = {"text": "hi.", "voice_id": "v1"}
 
     def request():
-        with httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=30) as resp:
+        with httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=10) as resp:
             return resp.status_code, resp.read()
 
     try:

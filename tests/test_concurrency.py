@@ -93,7 +93,7 @@ def test_concurrent_writers_race_once(live_server):
     def attempt(i: int) -> int:
         return httpx.put(
             f"{live_server}/api/v1/settings/race-{i % 2}",
-            json={"value": str(i)}, headers={"If-Match": base}, timeout=30,
+            json={"value": str(i)}, headers={"If-Match": base}, timeout=10,
         ).status_code
 
     with ThreadPoolExecutor(max_workers=8) as pool:

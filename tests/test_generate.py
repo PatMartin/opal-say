@@ -203,7 +203,7 @@ def test_voice_test_endpoint(client, setup):
 # -- bounded inference admission -------------------------------------------------------
 
 
-def _wait_until(predicate, timeout: float = 10.0) -> bool:
+def _wait_until(predicate, timeout: float = 5.0) -> bool:
     import time
 
     deadline = time.monotonic() + timeout
@@ -238,7 +238,7 @@ def test_generation_at_capacity_returns_engine_unavailable(live_server, client, 
     body = {"text": "hi.", "voice_id": "v1"}
     try:
         with ThreadPoolExecutor(max_workers=3) as pool:
-            post = lambda path: httpx.post(f"{live_server}{path}", json=body, timeout=30)  # noqa: E731
+            post = lambda path: httpx.post(f"{live_server}{path}", json=body, timeout=10)  # noqa: E731
             first = pool.submit(post, "/api/v1/generate")
             assert entered.wait(10)  # holder has the only permit
             queued = pool.submit(post, "/api/v1/generate")
@@ -247,7 +247,7 @@ def test_generation_at_capacity_returns_engine_unavailable(live_server, client, 
             assert resp.status_code == 503
             assert resp.json()["error"]["code"] == "engine_unavailable"
             resp = pool.submit(
-                lambda: httpx.post(f"{live_server}/api/v1/voices/v1/test", json={"text": "hi."}, timeout=30)
+                lambda: httpx.post(f"{live_server}/api/v1/voices/v1/test", json={"text": "hi."}, timeout=10)
             ).result(10)
             assert resp.status_code == 503
             assert json.loads(resp.content)["error"]["code"] == "engine_unavailable"

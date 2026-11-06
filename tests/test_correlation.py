@@ -114,7 +114,7 @@ def test_identifiers_are_available_on_request_state():
 def test_concurrent_requests_do_not_leak_identifiers(live_server):
     def call(i: int) -> None:
         headers = {**IDS, "X-Opal-Session-Id": f"sess-{i}", "X-Opal-Transaction-Id": f"txn-{i}"}
-        resp = httpx.get(f"{live_server}/api/v1/health/", headers=headers, timeout=30)
+        resp = httpx.get(f"{live_server}/api/v1/health/", headers=headers, timeout=10)
         assert resp.status_code == 200
         assert resp.headers["X-Opal-Session-Id"] == f"sess-{i}"
         assert resp.headers["X-Opal-Transaction-Id"] == f"txn-{i}"

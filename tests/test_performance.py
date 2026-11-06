@@ -48,7 +48,7 @@ def voices(client):
     client.put("/api/v1/settings/chunk_max_chars", json={"value": "50"})
 
 
-def _wait_until(predicate, timeout: float = 10.0) -> bool:
+def _wait_until(predicate, timeout: float = 5.0) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():
@@ -57,7 +57,7 @@ def _wait_until(predicate, timeout: float = 10.0) -> bool:
     return predicate()
 
 
-def _stream(url: str, body: dict, timeout: float = 60) -> tuple[int, list[float], int]:
+def _stream(url: str, body: dict, timeout: float = 20) -> tuple[int, list[float], int]:
     """Stream one request over real HTTP; return (status, arrival times, byte count)."""
     start = time.monotonic()
     arrivals: list[float] = []
