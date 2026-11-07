@@ -61,6 +61,17 @@ def _run_worker(args: list[str], chunks: Iterable[bytes], sent: list[bytes]) -> 
     return proc.wait(), err
 
 
+def _backend_alive(sample_rate: int, channels: int, bytes_per_sample: int, backend: str) -> bool:
+    """Probe a backend with a few frames of silence.
+
+    A broken simpleaudio build can play a partial buffer before crashing natively —
+    probing first avoids a truncated first attempt echoing before the fallback restarts.
+    """
+    silence = b"\x00" * (channels * bytes_per_sample * 240)
+    code, _ = _run_worker(_worker_args(sample_rate, channels, bytes_per_sample, backend), [silence], [])
+    return code == 0
+
+
 def _play_via_worker(chunks: Iterable[bytes], sample_rate: int, channels: int, bytes_per_sample: int) -> int:
     """Pipe PCM chunks to a playback worker; returns bytes played.
 
@@ -68,17 +79,18 @@ def _play_via_worker(chunks: Iterable[bytes], sample_rate: int, channels: int, b
     start — speech audio is small enough to buffer.
     """
     sent: list[bytes] = []
-    code, err = _run_worker(_worker_args(sample_rate, channels, bytes_per_sample, "simpleaudio"),
-                            chunks, sent)
-    total = sum(len(c) for c in sent)
-    if code == 0:
-        return total
-    if sys.platform == "win32":
-        code, err = _run_worker(_worker_args(sample_rate, channels, bytes_per_sample, "winsound"),
-                                sent, [])
+    backends = ["simpleaudio"] + (["winsound"] if sys.platform == "win32" else [])
+    err = ""
+    for backend in backends:
+        if not _backend_alive(sample_rate, channels, bytes_per_sample, backend):
+            continue
+        # First call streams chunks and buffers them into `sent`; retries replay the buffer.
+        source = iter(sent) if sent else chunks
+        code, err = _run_worker(_worker_args(sample_rate, channels, bytes_per_sample, backend),
+                                source, [] if sent else sent)
         if code == 0:
-            return total
-    detail = err or f"the audio worker crashed (check your playback backend); exit code {code}"
+            return sum(len(c) for c in sent)
+    detail = err or "no working playback backend (check your simpleaudio installation)"
     raise typer.BadParameter(f"playback failed: {detail}")
 
 
