@@ -29,7 +29,7 @@ class TestEngines:
         from fastapi.testclient import TestClient
 
         from conftest import FakeEngine
-        from opal_talk.api.app import create_app
+        from opal_say.api.app import create_app
 
         app2 = create_app(config, engines=[FakeEngine("fake"), FakeEngine("alt")])
         with TestClient(app2) as c2:

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import typer.main
 
-from opal_talk.cli.main import COMMANDS, app
-from opal_talk.contract import contract_operations
+from opal_say.cli.main import COMMANDS, app
+from opal_say.contract import contract_operations
 
 SPA = Path(__file__).resolve().parents[1] / "spa"
 
@@ -16,9 +16,9 @@ SPA = Path(__file__).resolve().parents[1] / "spa"
 def test_every_operation_has_a_cli_command_that_exists():
     assert set(COMMANDS) == set(contract_operations())
     root = typer.main.get_command(app)
-    talk = root.commands["talk"]  # type: ignore[attr-defined]
+    say = root.commands["say"]  # type: ignore[attr-defined]
     for op_id, command in COMMANDS.items():
-        node = talk
+        node = say
         for word in command.split():
             if word.startswith("--"):
                 assert word in {opt for p in node.params for opt in p.opts}, f"{op_id}: option {word} missing"

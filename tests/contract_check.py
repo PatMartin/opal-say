@@ -1,4 +1,4 @@
-"""Helpers that validate HTTP responses against opal_talk.yaml."""
+"""Helpers that validate HTTP responses against opal_say.yaml."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 from jsonschema import Draft202012Validator
 
-from opal_talk.contract import load_contract
+from opal_say.contract import load_contract
 
 SPEC = load_contract()
 METHODS = ("get", "put", "post", "patch", "delete")

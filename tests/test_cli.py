@@ -11,9 +11,9 @@ from contract_check import check_response, match_operation
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
-from opal_talk.cli import main as cli
-from opal_talk.cli.client import ApiClient
-from opal_talk.contract import contract_operations
+from opal_say.cli import main as cli
+from opal_say.cli.client import ApiClient
+from opal_say.contract import contract_operations
 
 
 class RecordingTestClient(TestClient):
@@ -43,7 +43,7 @@ def run(http):
     runner = CliRunner()
 
     def invoke(args: str, code: int = 0, stdin: str | None = None):
-        result = runner.invoke(cli.app, ["talk", *shlex.split(args)], input=stdin)
+        result = runner.invoke(cli.app, ["say", *shlex.split(args)], input=stdin)
         assert result.exit_code == code, f"{args}\nstdout: {result.stdout}\nstderr: {result.stderr}"
         return result
 
@@ -100,7 +100,7 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert "status:" in run("health").stdout
     assert json.loads(run("--json health --live").stdout)["ready"] is True
     assert json.loads(run("--json health --ready").stdout)["ready"] is True
-    assert json.loads(run("info").stdout)["name"] == "opal-talk-svc"
+    assert json.loads(run("info").stdout)["name"] == "opal-say-svc"
     assert run("ping").stdout.strip() == "ok"
 
     filename = json.loads(run("backup create").stdout)["filename"]
@@ -153,12 +153,12 @@ def test_invalid_validation_result_exits_nonzero(run):
 
 def test_unreachable_server(monkeypatch):
     monkeypatch.setattr(cli, "client_factory", lambda url, timeout: ApiClient("http://127.0.0.1:9", 1))
-    result = CliRunner().invoke(cli.app, ["talk", "ping"])
+    result = CliRunner().invoke(cli.app, ["say", "ping"])
     assert result.exit_code == 2 and "cannot reach" in result.stderr
 
 
 def test_tree_command_prints_command_surface():
-    result = CliRunner().invoke(cli.app, ["talk", "tree"])
+    result = CliRunner().invoke(cli.app, ["say", "tree"])
     assert result.exit_code == 0
     out = result.stdout
     for cmd in ("generate", "engines", "voices", "profiles", "settings", "backup", "health"):

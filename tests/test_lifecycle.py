@@ -11,12 +11,12 @@ import numpy as np
 import pytest
 
 from conftest import FakeEngine, make_voice
-from opal_talk.schemas import GenerateRequest, VoiceTestRequest
-from opal_talk.service.errors import Conflict, PayloadTooLarge
-from opal_talk.tts.base import AudioChunk, EngineUnavailableError, VoiceResolutionError
-from opal_talk.tts.cache import ModelCache
-from opal_talk.tts.registry import EngineRegistry
-from opal_talk.tts.runtime import EngineRuntimeManager
+from opal_say.schemas import GenerateRequest, VoiceTestRequest
+from opal_say.service.errors import Conflict, PayloadTooLarge
+from opal_say.tts.base import AudioChunk, EngineUnavailableError, VoiceResolutionError
+from opal_say.tts.cache import ModelCache
+from opal_say.tts.registry import EngineRegistry
+from opal_say.tts.runtime import EngineRuntimeManager
 
 
 class GatedEngine(FakeEngine):
@@ -309,8 +309,8 @@ class IncrementalEngine(FakeEngine):
 
 
 def _services_with_engine(config, engine):
-    from opal_talk.persistence.store import now_iso
-    from opal_talk.service.container import build_services
+    from opal_say.persistence.store import now_iso
+    from opal_say.service.container import build_services
 
     services = build_services(config, engines=[engine])
     stamp = now_iso()
@@ -326,7 +326,7 @@ def _services_with_engine(config, engine):
 
 
 def _plan(services, engine_id="fake"):
-    from opal_talk.schemas import GenerateRequest
+    from opal_say.schemas import GenerateRequest
 
     return services.generation.plan(GenerateRequest(text="hello", voice_id="v1"))
 
@@ -381,7 +381,7 @@ def test_render_rejects_audio_beyond_max_buffer(client):
 
 
 def _plan_sized(services, text, output_format="pcm"):
-    from opal_talk.schemas import GenerateRequest
+    from opal_say.schemas import GenerateRequest
 
     return services.generation.plan(GenerateRequest(text=text, voice_id="v1", output_format=output_format))
 
@@ -435,7 +435,7 @@ def test_max_audio_bytes_counts_wav_container_overhead(config):
 def test_to_pcm16_byte_identical_output():
     import numpy as np
 
-    from opal_talk.tts.audio import to_pcm16
+    from opal_say.tts.audio import to_pcm16
 
     samples = np.linspace(-1.2, 1.2, 4001, dtype=np.float32)
     expected = (np.clip(samples.astype(np.float32) * 0.5, -1.0, 1.0) * 32767.0).round().astype("<i2").tobytes()

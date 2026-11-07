@@ -28,11 +28,11 @@ from conftest import (
     make_voice,
     piper_ready,
 )
-from opal_talk.api.app import create_app
-from opal_talk.config import ServiceConfig
-from opal_talk.schemas import GenerateStreamRequest
-from opal_talk.tts.base import AudioChunk
-from opal_talk.tts.chunking import chunk_text
+from opal_say.api.app import create_app
+from opal_say.config import ServiceConfig
+from opal_say.schemas import GenerateStreamRequest
+from opal_say.tts.base import AudioChunk
+from opal_say.tts.chunking import chunk_text
 
 SENTENCES = " ".join(f"This is sentence number {i}." for i in range(6))
 STREAM_PATH = "/api/v1/generate/stream"
@@ -229,7 +229,7 @@ def _smoke_stream(client, voice_id: str) -> tuple[int, dict, list[float], bytes]
     arrivals: list[float] = []
     body = bytearray()
     with client.stream("POST", STREAM_PATH,
-                       json={"text": "Hello from OPAL Talk. A second sentence.", "voice_id": voice_id}) as resp:
+                       json={"text": "Hello from OPAL Say. A second sentence.", "voice_id": voice_id}) as resp:
         status = resp.status_code
         headers = dict(resp.headers)
         for chunk in resp.iter_raw():

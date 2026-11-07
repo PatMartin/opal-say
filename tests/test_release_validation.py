@@ -17,13 +17,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import KOKORO_MODEL, KOKORO_VOICES, PIPER_MODEL, kokoro_ready, piper_ready
-from opal_talk.api.app import create_app
-from opal_talk.config import ServiceConfig
+from opal_say.api.app import create_app
+from opal_say.config import ServiceConfig
 
 needs_piper = pytest.mark.skipif(not piper_ready(), reason=f"Piper runtime or model {PIPER_MODEL} not available")
 needs_kokoro = pytest.mark.skipif(not kokoro_ready(), reason="kokoro-onnx runtime or model files not available")
 
-TEXT = "Hello from OPAL Talk release validation. A second sentence."
+TEXT = "Hello from OPAL Say release validation. A second sentence."
 
 
 def _timed_stream(client, body):

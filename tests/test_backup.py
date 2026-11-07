@@ -45,7 +45,7 @@ def test_backup_create_returns_201_and_location(client, populated):
 def test_backup_roundtrip_restores_exact_state(client, populated):
     before = client.get("/api/v1/backup/export").json()
     filename = client.post("/api/v1/backup/create").json()["filename"]
-    assert filename.startswith("opal-talk-") and filename.endswith(".tar.gz")
+    assert filename.startswith("opal-say-") and filename.endswith(".tar.gz")
 
     client.post("/api/v1/profiles/", json={"name": "extra", "voice_id": "v2"})
     client.delete("/api/v1/settings/chunk_max_chars")
@@ -65,8 +65,8 @@ def test_backup_archive_contents(client, populated):
     assert resp.headers["content-type"] == "application/octet-stream"
     assert filename in resp.headers["content-disposition"]
     with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
-        assert tar.getnames() == ["opal-talk-config.json"]
-        payload = json.loads(tar.extractfile("opal-talk-config.json").read())
+        assert tar.getnames() == ["opal-say-config.json"]
+        payload = json.loads(tar.extractfile("opal-say-config.json").read())
     assert payload["voices"][0]["voice_id"] == "v1"
     listing = client.get("/api/v1/backup/list").json()
     assert listing[0]["filename"] == filename and listing[0]["size_bytes"] == len(resp.content)
@@ -87,14 +87,14 @@ def test_traversal_is_rejected(client, name):
 
 
 def test_unknown_backup_is_404(client):
-    assert client.get("/api/v1/backup/download/opal-talk-2020-01-01T000000Z.tar.gz").status_code == 404
+    assert client.get("/api/v1/backup/download/opal-say-2020-01-01T000000Z.tar.gz").status_code == 404
     assert client.post("/api/v1/backup/restore/nothing.tar.gz").status_code == 404
     assert client.delete("/api/v1/backup/nothing.tar.gz").status_code == 404
 
 
 def test_corrupt_backup_restore_is_conflict_and_changes_nothing(client, populated, config):
     before = client.get("/api/v1/backup/export").json()
-    bad = config.backup_dir / "opal-talk-2020-01-01T000000Z.tar.gz"
+    bad = config.backup_dir / "opal-say-2020-01-01T000000Z.tar.gz"
     config.backup_dir.mkdir(parents=True, exist_ok=True)
     bad.write_bytes(b"not a tarball")
     resp = client.post(f"/api/v1/backup/restore/{bad.name}")
@@ -106,10 +106,10 @@ def test_invalid_backup_content_is_rejected_atomically(client, populated, config
     export = client.get("/api/v1/backup/export").json()
     export["profiles"][0]["voice_id"] = "ghost"
     payload = json.dumps(export).encode()
-    path = config.backup_dir / "opal-talk-2020-01-02T000000Z.tar.gz"
+    path = config.backup_dir / "opal-say-2020-01-02T000000Z.tar.gz"
     config.backup_dir.mkdir(parents=True, exist_ok=True)
     with tarfile.open(path, "w:gz") as tar:
-        info = tarfile.TarInfo("opal-talk-config.json")
+        info = tarfile.TarInfo("opal-say-config.json")
         info.size = len(payload)
         tar.addfile(info, io.BytesIO(payload))
     client.post("/api/v1/profiles/", json={"name": "keep-me", "voice_id": "v2"})
@@ -201,7 +201,7 @@ def test_validate_current_config(client, populated):
 def test_first_start_seeds_from_config_dir(config, engines):
     from fastapi.testclient import TestClient
 
-    from opal_talk.api.app import create_app
+    from opal_say.api.app import create_app
 
     write_config(config, {"voices.yaml": "voices:\n  - {voice_id: seeded, name: S, engine_id: fake, "
                                          "engine_voice_ref: tone-a}\n"})

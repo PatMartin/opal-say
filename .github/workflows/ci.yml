@@ -25,9 +25,9 @@ jobs:
       - name: Editable install sanity (contract loads, entry points start)
         shell: bash
         run: |
-          python -c "from importlib.metadata import version; import opal_talk; from opal_talk.contract import load_contract, contract_operations; spec = load_contract(); assert spec['info']['version'] == version('opal-talk') == opal_talk.__version__ and contract_operations()"
-          opal-talk-svc --help >/dev/null
-          opal-talk --help >/dev/null
+          python -c "from importlib.metadata import version; import opal_say; from opal_say.contract import load_contract, contract_operations; spec = load_contract(); assert spec['info']['version'] == version('opal-say') == opal_say.__version__ and contract_operations()"
+          opal-say-svc --help >/dev/null
+          opal-say --help >/dev/null
           opal --help >/dev/null
       - name: Ruff
         run: ruff check src tests
@@ -49,7 +49,7 @@ jobs:
       - name: Build wheel
         run: pip wheel --no-deps -w dist .
       - name: Wheel bundles the OpenAPI contract
-        run: python -c "import glob, zipfile; whl = glob.glob('dist/*.whl')[0]; assert 'opal_talk/contract/opal_talk.yaml' in zipfile.ZipFile(whl).namelist(), whl"
+        run: python -c "import glob, zipfile; whl = glob.glob('dist/*.whl')[0]; assert 'opal_say/contract/opal_say.yaml' in zipfile.ZipFile(whl).namelist(), whl"
       - name: Install wheel into a clean venv
         shell: bash
         run: |
@@ -60,9 +60,9 @@ jobs:
         shell: bash
         run: |
           if [ -x .pkgenv/bin/python ]; then BIN=.pkgenv/bin; else BIN=.pkgenv/Scripts; fi
-          "$BIN/python" -c "from importlib.metadata import version; import opal_talk; from opal_talk.contract import load_contract, contract_operations; spec = load_contract(); assert spec['info']['version'] == version('opal-talk') == opal_talk.__version__; assert contract_operations()"
-          "$BIN/opal-talk-svc" --help >/dev/null
-          "$BIN/opal-talk" --help >/dev/null
+          "$BIN/python" -c "from importlib.metadata import version; import opal_say; from opal_say.contract import load_contract, contract_operations; spec = load_contract(); assert spec['info']['version'] == version('opal-say') == opal_say.__version__; assert contract_operations()"
+          "$BIN/opal-say-svc" --help >/dev/null
+          "$BIN/opal-say" --help >/dev/null
           "$BIN/opal" --help >/dev/null
 
   engines:
@@ -84,7 +84,7 @@ jobs:
           curl -fL "$BASE/en_US-amy-low.onnx.json" -o piper/voices/en_US-amy-low.onnx.json
       - name: Release validation (piper)
         env:
-          OPAL_TALK_TEST_PIPER_MODEL: ${{ github.workspace }}/piper/voices/en_US-amy-low.onnx
+          OPAL_SAY_TEST_PIPER_MODEL: ${{ github.workspace }}/piper/voices/en_US-amy-low.onnx
         run: pytest -m piper tests/ -v -s
 
   spa:

@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from conftest import make_voice
-from opal_talk.api.correlation import CORRELATION_HEADERS, CorrelationMiddleware, correlation_ids
+from opal_say.api.correlation import CORRELATION_HEADERS, CorrelationMiddleware, correlation_ids
 
 IDS = {
     "X-Opal-Session-Id": "sess-abc",

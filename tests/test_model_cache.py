@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from opal_talk.tts.cache import ModelCache
+from opal_say.tts.cache import ModelCache
 
 
 class Closable:

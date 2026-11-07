@@ -14,11 +14,11 @@ from contract_check import check_response
 from fastapi.testclient import TestClient
 
 from conftest import KOKORO_MODEL, KOKORO_VOICES, PIPER_MODEL, kokoro_ready, piper_ready
-from opal_talk.api.app import create_app
-from opal_talk.config import ServiceConfig
-from opal_talk.tts.base import EngineOptionsError, VoiceResolutionError
-from opal_talk.tts.kokoro_adapter import KokoroEngine
-from opal_talk.tts.piper_adapter import PiperEngine
+from opal_say.api.app import create_app
+from opal_say.config import ServiceConfig
+from opal_say.tts.base import EngineOptionsError, VoiceResolutionError
+from opal_say.tts.kokoro_adapter import KokoroEngine
+from opal_say.tts.piper_adapter import PiperEngine
 
 needs_piper = pytest.mark.skipif(not piper_ready(), reason=f"Piper runtime or model {PIPER_MODEL} not available")
 needs_kokoro = pytest.mark.skipif(not kokoro_ready(), reason="kokoro-onnx runtime or model files not available")
@@ -184,7 +184,7 @@ def test_rest_to_piper_end_to_end(tmp_path):
         native = resp.json()["native_sample_rate"]
         assert c.post("/api/v1/voices/p/validate").json()["valid"] is True
 
-        resp = c.post("/api/v1/generate", json={"text": "Hello from OPAL Talk. Second sentence.", "voice_id": "p"})
+        resp = c.post("/api/v1/generate", json={"text": "Hello from OPAL Say. Second sentence.", "voice_id": "p"})
         check_response(resp)
         assert resp.headers["x-opal-sample-rate"] == str(native)
         with wave.open(io.BytesIO(resp.content)) as w:

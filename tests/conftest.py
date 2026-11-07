@@ -13,9 +13,9 @@ import pytest
 from contract_check import check_response
 from fastapi.testclient import TestClient
 
-from opal_talk.api.app import create_app
-from opal_talk.config import ServiceConfig
-from opal_talk.tts.base import (
+from opal_say.api.app import create_app
+from opal_say.config import ServiceConfig
+from opal_say.tts.base import (
     AudioChunk,
     EngineOptionsError,
     Issue,
@@ -26,8 +26,8 @@ from opal_talk.tts.base import (
     VoiceResolutionError,
 )
 
-PIPER_MODEL = Path(os.environ.get("OPAL_TALK_TEST_PIPER_MODEL", "~/piper/voices/en_US-amy-low.onnx")).expanduser()
-KOKORO_DIR = Path(os.environ.get("OPAL_TALK_TEST_KOKORO_DIR", "~/kokoro")).expanduser()
+PIPER_MODEL = Path(os.environ.get("OPAL_SAY_TEST_PIPER_MODEL", "~/piper/voices/en_US-amy-low.onnx")).expanduser()
+KOKORO_DIR = Path(os.environ.get("OPAL_SAY_TEST_KOKORO_DIR", "~/kokoro")).expanduser()
 KOKORO_MODEL = next(iter(sorted(KOKORO_DIR.glob("kokoro-v1.0*.onnx"))), KOKORO_DIR / "kokoro-v1.0.onnx")
 KOKORO_VOICES = KOKORO_DIR / "voices-v1.0.bin"
 
@@ -110,7 +110,7 @@ def _needs_if_match(method: str, url: str) -> bool:
 
 
 class ContractClient(TestClient):
-    """TestClient that checks every response against opal_talk.yaml.
+    """TestClient that checks every response against opal_say.yaml.
 
     Preconditions: mutating calls auto-attach a fresh `If-Match` (mirroring what a
     correct client must do) unless `skip_if_match` is set or a header is given.

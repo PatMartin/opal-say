@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from opal_talk.persistence.store import Store
-from opal_talk.tts.audio import resample, to_pcm16, wav_bytes
-from opal_talk.tts.base import OptionSpec, check_options
-from opal_talk.tts.chunking import chunk_text
+from opal_say.persistence.store import Store
+from opal_say.tts.audio import resample, to_pcm16, wav_bytes
+from opal_say.tts.base import OptionSpec, check_options
+from opal_say.tts.chunking import chunk_text
 
 
 class TestChunking:
@@ -144,7 +144,7 @@ class TestConfigRevision:
 class TestSettingsPatch:
     @pytest.fixture
     def svc(self, tmp_path):
-        from opal_talk.service.settings import SettingsService
+        from opal_say.service.settings import SettingsService
         return SettingsService(Store(tmp_path / "db.sqlite"))
 
     def test_patch_sets_and_returns_full_map(self, svc):

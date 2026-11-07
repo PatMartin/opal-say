@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "opal-talk"
+name = "opal-say"
 version = "1.4.0"
-description = "OPAL Talk: implementation-neutral text-to-speech service (opal-talk-svc), CLI and SPA"
+description = "OPAL Say: implementation-neutral text-to-speech service (opal-say-svc), CLI and SPA"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -26,15 +26,15 @@ engines = ["piper-tts>=1.3", "kokoro-onnx>=0.4"]
 dev = ["pytest>=8", "pytest-timeout>=2", "jsonschema>=4.21", "referencing>=0.30", "ruff>=0.4"]
 
 [project.scripts]
-opal = "opal_talk.cli.main:app"
-opal-talk = "opal_talk.cli.main:talk_app"
-opal-talk-svc = "opal_talk.__main__:main"
+opal = "opal_say.cli.main:app"
+opal-say = "opal_say.cli.main:say_app"
+opal-say-svc = "opal_say.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-opal_talk = ["contract/opal_talk.yaml"]
+opal_say = ["contract/opal_say.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -55,4 +55,4 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 ignore = ["B008"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["opal_talk", "conftest", "contract"]
+known-first-party = ["opal_say", "conftest", "contract"]

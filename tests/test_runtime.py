@@ -8,9 +8,9 @@ import time
 import pytest
 
 from conftest import FakeEngine
-from opal_talk.tts.base import EngineUnavailableError
-from opal_talk.tts.registry import EngineRegistry
-from opal_talk.tts.runtime import EngineRuntime, EngineRuntimeManager
+from opal_say.tts.base import EngineUnavailableError
+from opal_say.tts.registry import EngineRegistry
+from opal_say.tts.runtime import EngineRuntime, EngineRuntimeManager
 
 
 @pytest.fixture
@@ -322,7 +322,7 @@ def test_double_release_is_idempotent(manager):
 
 
 def test_update_rolls_back_runtime_when_store_write_fails(config, monkeypatch):
-    from opal_talk.service.container import build_services
+    from opal_say.service.container import build_services
 
     services = build_services(config, engines=[FakeEngine("fake")])
     engine = services.runtime.get("fake")

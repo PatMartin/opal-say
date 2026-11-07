@@ -14,28 +14,28 @@ from contract_check import METHODS, SPEC, _deref, check_response
 from fastapi.routing import APIRoute
 
 from conftest import ContractClient, make_profile, make_voice
-from opal_talk import __version__
-from opal_talk.api.routes import router
-from opal_talk.contract import CONTRACT_RESOURCE, contract_operations, load_contract
+from opal_say import __version__
+from opal_say.api.routes import router
+from opal_say.contract import CONTRACT_RESOURCE, contract_operations, load_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 
 # The active contract lives in two byte-identical copies: the human-facing root
-# file `opal_talk_v{version}.yaml` and the packaged copy that the service loads
+# file `opal_say_v{version}.yaml` and the packaged copy that the service loads
 # and serves at /openapi.json (symlinks break on Windows checkouts and in built
-# wheels, so two real files are kept). Other `opal_talk_v*.yaml` files at the
+# wheels, so two real files are kept). Other `opal_say_v*.yaml` files at the
 # root are not-yet-adopted revisions and must never be selected as the active
 # contract until the implementation version matches their filename.
 ACTIVE_VERSION = __version__
-ROOT_CONTRACT = ROOT / f"opal_talk_v{ACTIVE_VERSION}.yaml"
+ROOT_CONTRACT = ROOT / f"opal_say_v{ACTIVE_VERSION}.yaml"
 PACKAGED = CONTRACT_RESOURCE
-TRACKED = "src/opal_talk/contract/opal_talk.yaml"
-CONTRACT_GLOB = "opal_talk_v*.yaml"
+TRACKED = "src/opal_say/contract/opal_say.yaml"
+CONTRACT_GLOB = "opal_say_v*.yaml"
 
 
 def test_packaged_contract_matches_repo_root():
-    """The root `opal_talk_v{version}.yaml` and the packaged copy must stay identical."""
-    assert ROOT_CONTRACT.read_bytes() == files("opal_talk").joinpath(PACKAGED).read_bytes()
+    """The root `opal_say_v{version}.yaml` and the packaged copy must stay identical."""
+    assert ROOT_CONTRACT.read_bytes() == files("opal_say").joinpath(PACKAGED).read_bytes()
 
 
 def test_active_contract_parses_at_active_version():
@@ -48,7 +48,7 @@ def test_active_contract_parses_at_active_version():
 
 
 def test_pending_contract_revisions_are_not_selected():
-    """`opal_talk_v*.yaml` files other than the active one are pending revisions —
+    """`opal_say_v*.yaml` files other than the active one are pending revisions —
     they must parse, must not match the implemented version and must not equal
     the packaged contract. Becomes a no-op once every pending revision is adopted."""
     for path in ROOT.glob(CONTRACT_GLOB):
@@ -62,7 +62,7 @@ def test_pending_contract_revisions_are_not_selected():
 
 def test_packaged_contract_is_a_readable_regular_file():
     """The packaged contract must exist as a regular file, not a missing or dangling entry."""
-    resource = files("opal_talk").joinpath(PACKAGED)
+    resource = files("opal_say").joinpath(PACKAGED)
     assert resource.is_file(), f"packaged contract {PACKAGED} is missing or not a regular file"
     assert resource.read_text(encoding="utf-8").startswith("openapi:")
 
@@ -76,7 +76,7 @@ def test_load_contract_returns_valid_v1_document():
 
 
 def test_package_metadata_version_matches_contract_version():
-    """pyproject metadata, `opal_talk.__version__` and the packaged OpenAPI document
+    """pyproject metadata, `opal_say.__version__` and the packaged OpenAPI document
     must move together — a release bump that misses one is drift.
 
     pyproject is read from the file rather than importlib.metadata: an editable
@@ -206,7 +206,7 @@ def recording(app):
 
 def test_walkthrough_exercises_every_operation_with_conformant_responses(recording, config):
     c = recording
-    assert c.get("/").json()["name"] == "opal-talk-svc"
+    assert c.get("/").json()["name"] == "opal-say-svc"
     assert c.get("/healthz").json() == {"status": "ok"}
     assert c.get("/api/v1/health/").status_code == 200
 

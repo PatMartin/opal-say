@@ -17,8 +17,8 @@ install:            ## create .venv and install service, CLI, engines and dev to
 install-spa:
 	cd spa && npm install
 
-run:                ## start opal-talk-svc using config/service.yaml
-	$(PY) -m opal_talk
+run:                ## start opal-say-svc using config/service.yaml
+	$(PY) -m opal_say
 
 spa-dev:            ## Vite dev server on http://127.0.0.1:5173 (API at http://127.0.0.1:8001)
 	cd spa && npm run dev

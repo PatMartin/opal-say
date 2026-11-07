@@ -187,7 +187,7 @@ def test_generation_failure_is_500(client, setup):
 def test_voice_test_endpoint(client, setup):
     resp = client.post("/api/v1/voices/v2/test")
     assert resp.status_code == 200 and resp.headers["content-type"] == "audio/wav"
-    assert setup.calls[-1]["text"] == "This is a test of the selected OPAL Talk voice."
+    assert setup.calls[-1]["text"] == "This is a test of the selected OPAL Say voice."
     resp = client.post("/api/v1/voices/v1/test", json={"text": "Hi", "output_format": "pcm", "sample_rate": 16000,
                                                        "speed": 2.0, "engine_options": {"pitch": 900}})
     assert resp.headers["x-opal-sample-rate"] == "16000"
