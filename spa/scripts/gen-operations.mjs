@@ -1,4 +1,5 @@
-// Generates src/api/operations.json from the authoritative contract (../../opal_talk.yaml).
+// Generates src/api/operations.json from the packaged contract (the single version-agnostic
+// source of truth served by the service).
 // Run automatically by the dev/test/build/typecheck npm scripts; the file is committed
 // so editors and CI see a stable artifact, and parity tests fail if it goes stale.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -7,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const spec = parse(readFileSync(resolve(root, '../opal_talk.yaml'), 'utf8'))
+const spec = parse(readFileSync(resolve(root, '../src/opal_say/contract/opal_say.yaml'), 'utf8'))
 const METHODS = new Set(['get', 'put', 'post', 'patch', 'delete'])
 
 const out = {}

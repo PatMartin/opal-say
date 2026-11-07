@@ -5,7 +5,7 @@ import { pcmToWav } from '../audio'
 import { AUDIO_HEADERS, ENGINE, PROFILE, VOICE, audio, json, mockApi } from './mockApi'
 
 const BASE_ROUTES = {
-  'GET /': { name: 'opal-talk-svc', version: '1.4.0', api_version: 'v1' },
+  'GET /': { name: 'opal-say-svc', version: '1.4.0', api_version: 'v1' },
   'GET /healthz': { status: 'ok' },
   'GET /api/v1/profiles/': [PROFILE],
   'GET /api/v1/voices/': [VOICE],
@@ -20,7 +20,7 @@ describe('App shell', () => {
   it('shows service identity and liveness', async () => {
     mockApi(BASE_ROUTES)
     render(<App />)
-    expect(await screen.findByText('opal-talk-svc 1.4.0 (API v1)')).toBeInTheDocument()
+    expect(await screen.findByText('opal-say-svc 1.4.0 (API v1)')).toBeInTheDocument()
     expect(screen.getByText('online')).toBeInTheDocument()
   })
 })
@@ -261,10 +261,10 @@ describe('Settings and backup', () => {
   it('creates backups and imports configuration', async () => {
     mockApi({
       ...BASE_ROUTES,
-      'GET /api/v1/backup/list': [{ filename: 'opal-talk-2026-10-04T230000Z.tar.gz', created_at: 'now', size_bytes: 10 }],
+      'GET /api/v1/backup/list': [{ filename: 'opal-say-2026-10-04T230000Z.tar.gz', created_at: 'now', size_bytes: 10 }],
       'POST /api/v1/backup/create': () => json(
-        { filename: 'opal-talk-2026-10-04T230000Z.tar.gz', message: 'Backup created successfully.' },
-        201, { Location: '/api/v1/backup/download/opal-talk-2026-10-04T230000Z.tar.gz' },
+        { filename: 'opal-say-2026-10-04T230000Z.tar.gz', message: 'Backup created successfully.' },
+        201, { Location: '/api/v1/backup/download/opal-say-2026-10-04T230000Z.tar.gz' },
       ),
       'POST /api/v1/backup/import': {
         success: false,
@@ -275,7 +275,7 @@ describe('Settings and backup', () => {
     render(<App />)
     await openTab('Backup')
     const link = await screen.findByRole('link', { name: 'Download' })
-    expect(link.getAttribute('href')).toContain('/api/v1/backup/download/opal-talk-2026-10-04T230000Z.tar.gz')
+    expect(link.getAttribute('href')).toContain('/api/v1/backup/download/opal-say-2026-10-04T230000Z.tar.gz')
     await userEvent.click(screen.getByRole('button', { name: 'Create backup' }))
     expect(await screen.findByRole('status')).toHaveTextContent('Backup created successfully.')
     await userEvent.click(screen.getByRole('button', { name: 'Import ./config' }))

@@ -1,4 +1,4 @@
-/** Types mirroring opal_talk.yaml component schemas used by the SPA. */
+/** Types mirroring opal_say.yaml component schemas used by the SPA. */
 export type AudioFormat = 'wav' | 'pcm'
 export type Options = Record<string, unknown>
 

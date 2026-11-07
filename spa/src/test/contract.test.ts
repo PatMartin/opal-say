@@ -5,7 +5,7 @@ import operations from '../api/operations.json'
 
 const root = resolve(__dirname, '../..')
 // The packaged contract is the single version-agnostic source of truth.
-const spec = parse(readFileSync(resolve(root, '../src/opal_talk/contract/opal_talk.yaml'), 'utf8'))
+const spec = parse(readFileSync(resolve(root, '../src/opal_say/contract/opal_say.yaml'), 'utf8'))
 
 function contractOperations(): Record<string, { method: string; path: string }> {
   const out: Record<string, { method: string; path: string }> = {}
@@ -26,7 +26,7 @@ function sources(dir: string): string[] {
 }
 
 describe('SPA / REST contract parity', () => {
-  it('operation map matches opal_talk.yaml exactly', () => {
+  it('operation map matches opal_say.yaml exactly', () => {
     expect(operations).toEqual(contractOperations())
   })
 

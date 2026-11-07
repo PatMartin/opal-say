@@ -42,7 +42,7 @@ export function BackupPanel() {
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
       const a = document.createElement('a')
       a.href = url
-      a.download = 'opal-talk-config.json'
+      a.download = 'opal-say-config.json'
       a.click()
       setMessage('Configuration exported.')
     })

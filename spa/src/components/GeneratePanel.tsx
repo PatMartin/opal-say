@@ -45,7 +45,7 @@ export function GeneratePanel() {
         const meta = audioMeta(resp)
         const raw = new Uint8Array(await resp.arrayBuffer())
         const blob = meta.format === 'pcm' ? pcmToWav(raw, meta.sampleRate) : new Blob([raw], { type: 'audio/wav' })
-        setClip({ url: URL.createObjectURL(blob), meta, bytes: raw.byteLength, filename: `opal-talk.${meta.format}` })
+        setClip({ url: URL.createObjectURL(blob), meta, bytes: raw.byteLength, filename: `opal-say.${meta.format}` })
         return
       }
 
@@ -66,7 +66,7 @@ export function GeneratePanel() {
         throw new Error(`stream terminated prematurely after ${total} bytes; generation failed (${String(err)})`)
       }
       const pcm = concatChunks(chunks)
-      setClip({ url: URL.createObjectURL(pcmToWav(pcm, meta.sampleRate)), meta, bytes: pcm.byteLength, filename: 'opal-talk-stream.wav' })
+      setClip({ url: URL.createObjectURL(pcmToWav(pcm, meta.sampleRate)), meta, bytes: pcm.byteLength, filename: 'opal-say-stream.wav' })
     })
   }
 

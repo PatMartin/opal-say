@@ -1,6 +1,6 @@
 import operations from './operations.json'
 
-/** REST operationId (from opal_talk.yaml). The SPA talks to the service only through these. */
+/** REST operationId (from opal_say.yaml). The SPA talks to the service only through these. */
 export type OpId = keyof typeof operations
 
 export interface ErrorResponse {
@@ -49,7 +49,7 @@ function describe(status: number, body: unknown): string {
 }
 
 export function apiBase(): string {
-  const configured = import.meta.env.VITE_OPAL_TALK_API_URL as string | undefined
+  const configured = import.meta.env.VITE_OPAL_SAY_API_URL as string | undefined
   if (configured) return configured.replace(/\/$/, '')
   return import.meta.env.DEV ? 'http://127.0.0.1:8001' : ''
 }

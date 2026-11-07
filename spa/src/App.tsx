@@ -29,7 +29,7 @@ export function App() {
   return (
     <div className="app">
       <header>
-        <h1>OPAL Talk</h1>
+        <h1>OPAL Say</h1>
         <span className="muted" data-testid="service-info">
           {info.data ? `${info.data.name} ${info.data.version} (API ${info.data.api_version})` : 'connecting…'}
         </span>

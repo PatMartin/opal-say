@@ -2,7 +2,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Built assets are served by opal-talk-svc at /ui (service.yaml: spa_dir).
+// Built assets are served by opal-say-svc at /ui (service.yaml: spa_dir).
 export default defineConfig({
   base: '/ui/',
   plugins: [react()],
