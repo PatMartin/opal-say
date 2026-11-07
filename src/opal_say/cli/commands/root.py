@@ -52,19 +52,19 @@ def register(say_app: typer.Typer) -> None:
                ready: bool = typer.Option(False, "--ready", help="Readiness probe.")) -> None:
         """Service readiness and engine state."""
         if live:
-            _emit(ctx, _call(ctx, "get_talk_health_live").json())
+            _emit(ctx, _call(ctx, "opal_health_live_get").json())
             return
         if ready:
             from opal_say.cli.client import ApiCallError
 
             try:
-                _emit(ctx, _call(ctx, "get_talk_health_ready").json())
+                _emit(ctx, _call(ctx, "opal_health_ready_get").json())
             except ApiCallError as e:
                 if e.status != 503:
                     raise
                 _emit(ctx, e.body)
             return
-        data = _call(ctx, "health_check_api_v1_health__get").json()
+        data = _call(ctx, "opal_health_get").json()
         if _state(ctx).json_output:
             _emit(ctx, data)
             return

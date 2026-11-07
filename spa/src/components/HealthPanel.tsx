@@ -3,11 +3,11 @@ import type { Health } from '../api/types'
 import { ErrorBanner, useLoad } from './common'
 
 export function HealthPanel() {
-  const health = useLoad(() => call<Health | null>('health_check_api_v1_health__get'), null)
+  const health = useLoad(() => call<Health | null>('opal_health_get'), null)
   const probes = useLoad(async () => {
     const [live, ready] = await Promise.all([
-      call<{ status: string; ready: boolean }>('get_talk_health_live'),
-      call<{ status: string; ready: boolean }>('get_talk_health_ready'),
+      call<{ status: string; ready: boolean }>('opal_health_live_get'),
+      call<{ status: string; ready: boolean }>('opal_health_ready_get'),
     ])
     return { live, ready }
   }, null)

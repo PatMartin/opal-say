@@ -4,7 +4,7 @@ import type { Engine, ValidationResult } from '../api/types'
 import { ErrorBanner, OptionsField, ValidationView, parseOptions, useAction, useLoad } from './common'
 
 export function EnginesPanel() {
-  const engines = useLoad(() => call<Engine[]>('list_engines_api_v1_engines__get'), [])
+  const engines = useLoad(() => call<Engine[]>('opal_engines_list'), [])
   const [selected, setSelected] = useState<Engine | null>(null)
   const [options, setOptions] = useState('')
   const [validation, setValidation] = useState<ValidationResult | null>(null)
@@ -12,13 +12,13 @@ export function EnginesPanel() {
 
   const open = (id: string) =>
     action.run(async () => {
-      const engine = await call<Engine>('get_engine_api_v1_engines__engine_id__get', { path: { engine_id: id } })
+      const engine = await call<Engine>('opal_engine_get', { path: { engine_id: id } })
       setSelected(engine)
       setOptions(JSON.stringify(engine.options, null, 2))
     })
 
   const patch = async (id: string, body: Record<string, unknown>) => {
-    const engine = await call<Engine>('update_engine_api_v1_engines__engine_id__patch', { path: { engine_id: id }, body })
+    const engine = await call<Engine>('opal_engine_patch', { path: { engine_id: id }, body })
     if (selected?.engine_id === id) setSelected(engine)
     await engines.reload()
   }

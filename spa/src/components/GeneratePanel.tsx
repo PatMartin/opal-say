@@ -6,9 +6,9 @@ import { AudioResult, ErrorBanner, OptionsField, parseOptions, useAction, useLoa
 
 /** Completed (/generate) and streamed (/generate/stream) speech generation. */
 export function GeneratePanel() {
-  const profiles = useLoad(() => call<Profile[]>('list_profiles_api_v1_profiles__get'), [])
+  const profiles = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
   const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get', { query: { enabled: true } }), [])
-  const engines = useLoad(() => call<Engine[]>('list_engines_api_v1_engines__get'), [])
+  const engines = useLoad(() => call<Engine[]>('opal_engines_list'), [])
 
   const [text, setText] = useState('')
   const [profileId, setProfileId] = useState('')

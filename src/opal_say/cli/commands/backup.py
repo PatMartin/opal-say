@@ -15,13 +15,13 @@ backup_app = typer.Typer(help="Backup, restore, import, export and validate conf
 @backup_app.command("list")
 def backup_list(ctx: typer.Context) -> None:
     """List backups."""
-    _emit(ctx, _call(ctx, "list_backups_api_v1_backup_list_get").json(), ["filename", "created_at", "size_bytes"])
+    _emit(ctx, _call(ctx, "opal_backup_list").json(), ["filename", "created_at", "size_bytes"])
 
 
 @backup_app.command("create")
 def backup_create(ctx: typer.Context) -> None:
     """Create a configuration backup."""
-    _emit(ctx, _call(ctx, "create_backup_api_v1_backup_create_post").json())
+    _emit(ctx, _call(ctx, "opal_backup_create").json())
 
 
 @backup_app.command("download")
@@ -31,7 +31,7 @@ def backup_download(
     output: str = typer.Option(None, "--output", "-o", help="Destination (default: ./FILENAME, '-' for stdout)"),
 ) -> None:
     """Download a backup file."""
-    resp = _call(ctx, "download_backup_api_v1_backup_download__filename__get", path_params={"filename": filename})
+    resp = _call(ctx, "opal_backup_download", path_params={"filename": filename})
     target = output or str(Path(filename).name)
     size = _write_audio(resp, target)
     typer.echo(f"wrote {size} bytes to {target}", err=True)
@@ -40,14 +40,14 @@ def backup_download(
 @backup_app.command("restore")
 def backup_restore(ctx: typer.Context, filename: str) -> None:
     """Restore configuration from a backup."""
-    _emit(ctx, _call(ctx, "restore_backup_api_v1_backup_restore__filename__post",
+    _emit(ctx, _call(ctx, "opal_backup_restore",
                      path_params={"filename": filename}).json())
 
 
 @backup_app.command("delete")
 def backup_delete(ctx: typer.Context, filename: str) -> None:
     """Delete a backup."""
-    _call(ctx, "delete_backup_api_v1_backup__filename__delete", path_params={"filename": filename})
+    _call(ctx, "opal_backup_delete", path_params={"filename": filename})
     typer.echo(f"backup '{filename}' deleted")
 
 
@@ -56,7 +56,7 @@ def backup_export(
     ctx: typer.Context, output: str = typer.Option(None, "--output", "-o", help="Write JSON to a file")
 ) -> None:
     """Export the full logical configuration as JSON."""
-    data = _call(ctx, "export_config_api_v1_backup_export_get").json()
+    data = _call(ctx, "opal_backup_export").json()
     if output:
         Path(output).write_text(json.dumps(data, indent=2), encoding="utf-8")
         typer.echo(f"exported configuration to {output}", err=True)
@@ -67,7 +67,7 @@ def backup_export(
 @backup_app.command("import")
 def backup_import(ctx: typer.Context) -> None:
     """Import configuration from the service's ./config/ YAML files."""
-    data = _call(ctx, "import_config_api_v1_backup_import_post").json()
+    data = _call(ctx, "opal_backup_import").json()
     _emit(ctx, data)
     if not data["success"]:
         raise typer.Exit(1)
@@ -79,9 +79,9 @@ def backup_validate(ctx: typer.Context, payload: Path | None = typer.Option(
 )) -> None:
     """Validate the current configuration, or a supplied payload file."""
     if payload is not None:
-        _validation(ctx, _call(ctx, "validate_talk_backup_payload", json=json.loads(payload.read_text(encoding="utf-8"))))
+        _validation(ctx, _call(ctx, "opal_backup_validate", json=json.loads(payload.read_text(encoding="utf-8"))))
     else:
-        _validation(ctx, _call(ctx, "validate_config_api_v1_backup_validate_get"))
+        _validation(ctx, _call(ctx, "opal_backup_validate_stored"))
 
 
 def register(say_app: typer.Typer) -> None:

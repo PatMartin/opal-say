@@ -66,7 +66,7 @@ class CandidateService:
 
     def export(self) -> dict[str, Any]:
         return {
-            "version": __version__,
+            "format_version": __version__,
             "exported_at": now_iso(),
             "engines": self.engines.list(),
             "voices": self.store.list_voices(),
@@ -318,6 +318,29 @@ class CandidateService:
         report, descriptions = self.validate_candidate(cand, resources_are_errors=False)
         report.errors[:0] = issues
         report.details["files"] = present
+        if not report.valid:
+            return {"success": False, "validation": report, "message": "Configuration is invalid; nothing was applied."}
+        try:
+            self.apply(cand, descriptions)
+        except Exception as exc:  # noqa: BLE001
+            raise OperationFailed(f"failed to apply configuration: {exc}", "import_failed") from exc
+        return {
+            "success": True,
+            "validation": report,
+            "message": f"Configuration imported successfully: {_apply_summary(cand)}.",
+        }
+
+    def import_bundle(self, dump: dict[str, Any]) -> dict[str, Any]:
+        """Atomically validate and apply a posted configuration bundle (export shape)."""
+        cand = Candidate(
+            engines={e["engine_id"]: {"enabled": e["enabled"], "options": e["options"]}
+                     for e in dump["engines"]},
+            voices=dump["voices"],
+            profiles=dump["profiles"],
+            settings=settings_to_str(dump["settings"]),
+        )
+        report, descriptions = self.validate_candidate(cand, resources_are_errors=False)
+        report.details["source"] = "request_body"
         if not report.valid:
             return {"success": False, "validation": report, "message": "Configuration is invalid; nothing was applied."}
         try:

@@ -72,14 +72,18 @@ export function buildUrl(op: OpId, opts: CallOptions = {}): string {
 
 /** Mutations on logical configuration carrying the mandatory If-Match precondition. */
 const PRECONDITION_OPS = new Set<OpId>([
-  'update_engine_api_v1_engines__engine_id__patch',
+  'opal_engine_patch',
   'update_voice_api_v1_voices__voice_id__patch',
   'delete_voice_api_v1_voices__voice_id__delete',
-  'update_profile_api_v1_profiles__profile_id__patch',
-  'delete_profile_api_v1_profiles__profile_id__delete',
-  'upsert_setting_api_v1_settings__key__put',
-  'delete_setting_api_v1_settings__key__delete',
-  'patch_talk_settings',
+  'opal_profile_patch',
+  'opal_profile_delete',
+  'opal_setting_put',
+  'opal_setting_delete',
+  'opal_settings_patch',
+  'opal_profiles_create',
+  'opal_profile_activate',
+  'opal_backup_restore',
+  'opal_backup_import',
 ])
 
 async function send(op: OpId, opts: CallOptions, ifMatch: string | null): Promise<Response> {
@@ -94,7 +98,7 @@ async function send(op: OpId, opts: CallOptions, ifMatch: string | null): Promis
 }
 
 async function configEtag(): Promise<string> {
-  const resp = await send('get_all_settings_api_v1_settings__get', {}, null)
+  const resp = await send('opal_settings_get', {}, null)
   return resp.headers.get('ETag') ?? ''
 }
 

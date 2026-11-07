@@ -24,7 +24,7 @@ export function VoicesPanel() {
     () => call<Voice[]>('list_voices_api_v1_voices__get', { query: { engine_id: engineFilter, enabled: enabledFilter } }),
     [],
   )
-  const engines = useLoad(() => call<Engine[]>('list_engines_api_v1_engines__get'), [])
+  const engines = useLoad(() => call<Engine[]>('opal_engines_list'), [])
   const { reload: reloadVoices } = voices
   useEffect(() => {
     void reloadVoices()

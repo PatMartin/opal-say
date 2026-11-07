@@ -851,9 +851,8 @@ components:
           type: number
           format: float
         output_format:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
+          type: string
+          description: Audio output format; values are service-defined (e.g. 'wav', 'pcm').
         sample_rate:
           anyOf:
           - type: integer
@@ -952,9 +951,8 @@ components:
           default: 1.0
         output_format:
           allOf:
-          - type: object
-            additionalProperties: true
-            description: Service-defined section.
+          - type: string
+            description: Audio output format; values are service-defined (e.g. 'wav', 'pcm').
           default: wav
           description: Default format for completed `/generate` requests using this profile.
         sample_rate:
@@ -1051,9 +1049,8 @@ components:
           minimum: 0.0
           maximum: 2.0
         output_format:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
+          type: string
+          description: Audio output format; values are service-defined (e.g. 'wav', 'pcm').
         sample_rate:
           anyOf:
           - type: integer

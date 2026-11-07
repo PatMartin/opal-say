@@ -38,6 +38,9 @@ class ConfigService:
     def import_config(self) -> dict[str, Any]:
         return self.candidates.import_config()
 
+    def import_bundle(self, dump: dict[str, Any]) -> dict[str, Any]:
+        return self.candidates.import_bundle(dump)
+
     # -- backups ----------------------------------------------------------------
 
     def list_backups(self) -> list[dict[str, Any]]:

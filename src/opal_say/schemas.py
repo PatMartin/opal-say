@@ -224,7 +224,8 @@ class BackupCreateResponse(BaseModel):
 
 
 class ConfigExport(BaseModel):
-    version: str
+    format_version: str
+    version: str | None = None  # legacy bundle field name; superseded by format_version
     exported_at: str
     engines: list[EngineRead]
     voices: list[VoiceRead]

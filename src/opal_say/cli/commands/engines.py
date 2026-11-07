@@ -14,13 +14,13 @@ engines_app = typer.Typer(help="Discover and configure installed TTS engines.", 
 @engines_app.command("list")
 def engines_list(ctx: typer.Context) -> None:
     """List installed engines."""
-    _emit(ctx, _call(ctx, "list_engines_api_v1_engines__get").json(), ENGINE_COLUMNS)
+    _emit(ctx, _call(ctx, "opal_engines_list").json(), ENGINE_COLUMNS)
 
 
 @engines_app.command("get")
 def engines_get(ctx: typer.Context, engine_id: str) -> None:
     """Show one engine."""
-    _emit(ctx, _call(ctx, "get_engine_api_v1_engines__engine_id__get", path_params={"engine_id": engine_id}).json())
+    _emit(ctx, _call(ctx, "opal_engine_get", path_params={"engine_id": engine_id}).json())
 
 
 @engines_app.command("update")
@@ -40,7 +40,7 @@ def engines_update(
         body["options"] = options
     if not body:
         raise typer.BadParameter("nothing to update: use --enable/--disable or --option")
-    resp = _call(ctx, "update_engine_api_v1_engines__engine_id__patch", path_params={"engine_id": engine_id}, json=body)
+    resp = _call(ctx, "opal_engine_patch", path_params={"engine_id": engine_id}, json=body)
     _emit(ctx, resp.json())
 
 

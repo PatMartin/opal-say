@@ -13,9 +13,8 @@ from opal_say.contract import load_contract
 SPEC = load_contract()
 METHODS = ("get", "put", "post", "patch", "delete")
 
-# Transitional: service errors already emit the contract-1.2 `OpalError` envelope
-# while the published contract is still v1.0, so error bodies are validated against
-# this shape rather than the v1.0 error schemas they will replace.
+# Service errors emit the canonical OpalError envelope: code/message/request_id/
+# transaction_id are required, the remaining fields are optional.
 OPAL_ERROR_SCHEMA = {
     "type": "object",
     "required": ["error"],

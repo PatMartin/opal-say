@@ -181,14 +181,14 @@ def report_dict(report: Report) -> dict[str, Any]:
 # -- engines ---------------------------------------------------------------------
 
 
-@router.get("/api/v1/engines/", tags=["engines"], operation_id="list_engines_api_v1_engines__get",
+@router.get("/api/v1/engines/", tags=["engines"], operation_id="opal_engines_list",
             response_model=list[EngineRead])
 def list_engines(response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.engines.list()
 
 
-@router.get("/api/v1/engines/{engine_id}", tags=["engines"], operation_id="get_engine_api_v1_engines__engine_id__get",
+@router.get("/api/v1/engines/{engine_id}", tags=["engines"], operation_id="opal_engine_get",
             response_model=EngineRead)
 def get_engine(engine_id: str, response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
@@ -196,7 +196,7 @@ def get_engine(engine_id: str, response: Response, svc: Services = Depends(servi
 
 
 @router.patch("/api/v1/engines/{engine_id}", tags=["engines"],
-              operation_id="update_engine_api_v1_engines__engine_id__patch", response_model=EngineRead)
+              operation_id="opal_engine_patch", response_model=EngineRead)
 def update_engine(engine_id: str, body: EngineUpdate, if_match: str | None = Header(None),
                   svc: Services = Depends(services)):
     return mutate_with_revision(svc.store, if_match, lambda: svc.engines.update(engine_id, body.changes()))
@@ -274,46 +274,48 @@ async def test_voice(voice_id: str, body: VoiceTestRequest | None = Body(None), 
 # -- profiles --------------------------------------------------------------------
 
 
-@router.get("/api/v1/profiles/", tags=["profiles"], operation_id="list_profiles_api_v1_profiles__get",
+@router.get("/api/v1/profiles/", tags=["profiles"], operation_id="opal_profiles_list",
             response_model=list[ProfileRead])
 def list_profiles(response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.profiles.list()
 
 
-@router.post("/api/v1/profiles/", tags=["profiles"], operation_id="create_profile_api_v1_profiles__post",
+@router.post("/api/v1/profiles/", tags=["profiles"], operation_id="opal_profiles_create",
              response_model=ProfileRead, status_code=201)
-def create_profile(body: ProfileCreate, response: Response, svc: Services = Depends(services)):
-    profile = svc.profiles.create(body)
+def create_profile(body: ProfileCreate, response: Response, if_match: str | None = Header(None),
+                   svc: Services = Depends(services)):
+    profile = mutate_with_revision(svc.store, if_match, lambda: svc.profiles.create(body))
     response.headers["Location"] = f"/api/v1/profiles/{profile['id']}"
     return profile
 
 
 @router.get("/api/v1/profiles/{profile_id}", tags=["profiles"],
-            operation_id="get_profile_api_v1_profiles__profile_id__get", response_model=ProfileRead)
+            operation_id="opal_profile_get", response_model=ProfileRead)
 def get_profile(response: Response, profile_id: int = ProfileId, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.profiles.get(profile_id)
 
 
 @router.patch("/api/v1/profiles/{profile_id}", tags=["profiles"],
-              operation_id="update_profile_api_v1_profiles__profile_id__patch", response_model=ProfileRead)
+              operation_id="opal_profile_patch", response_model=ProfileRead)
 def update_profile(body: ProfileUpdate, profile_id: int = ProfileId, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
     return mutate_with_revision(svc.store, if_match, lambda: svc.profiles.update(profile_id, body))
 
 
 @router.delete("/api/v1/profiles/{profile_id}", tags=["profiles"],
-               operation_id="delete_profile_api_v1_profiles__profile_id__delete", status_code=204)
+               operation_id="opal_profile_delete", status_code=204)
 def delete_profile(profile_id: int = ProfileId, if_match: str | None = Header(None), svc: Services = Depends(services)):
     mutate_with_revision(svc.store, if_match, lambda: svc.profiles.delete(profile_id))
     return Response(status_code=204)
 
 
 @router.post("/api/v1/profiles/{profile_id}/activate", tags=["profiles"],
-             operation_id="activate_profile_api_v1_profiles__profile_id__activate_post", response_model=ProfileRead)
-def activate_profile(profile_id: int = ProfileId, svc: Services = Depends(services)):
-    return svc.profiles.activate(profile_id)
+             operation_id="opal_profile_activate", response_model=ProfileRead)
+def activate_profile(profile_id: int = ProfileId, if_match: str | None = Header(None),
+                     svc: Services = Depends(services)):
+    return mutate_with_revision(svc.store, if_match, lambda: svc.profiles.activate(profile_id))
 
 
 # -- generate --------------------------------------------------------------------
@@ -348,33 +350,33 @@ async def stream_audio(request: Request, body: GenerateStreamRequest, svc: Servi
 # -- settings --------------------------------------------------------------------
 
 
-@router.get("/api/v1/settings/", tags=["settings"], operation_id="get_all_settings_api_v1_settings__get")
+@router.get("/api/v1/settings/", tags=["settings"], operation_id="opal_settings_get")
 def get_all_settings(response: Response, svc: Services = Depends(services)) -> dict[str, Any]:
     response.headers["ETag"] = config_etag(svc.store)
     return svc.settings.all()
 
 
-@router.patch("/api/v1/settings/", tags=["settings"], operation_id="patch_talk_settings")
+@router.patch("/api/v1/settings/", tags=["settings"], operation_id="opal_settings_patch")
 def patch_settings(body: dict[str, Any] = Body(min_length=1), if_match: str | None = Header(None),
                    svc: Services = Depends(services)) -> dict[str, Any]:
     return mutate_with_revision(svc.store, if_match, lambda: svc.settings.patch(body))
 
 
-@router.get("/api/v1/settings/{key}", tags=["settings"], operation_id="get_setting_api_v1_settings__key__get",
+@router.get("/api/v1/settings/{key}", tags=["settings"], operation_id="opal_setting_get",
             response_model=SettingRead)
 def get_setting(response: Response, key: str = SettingKey, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.settings.get(key)
 
 
-@router.put("/api/v1/settings/{key}", tags=["settings"], operation_id="upsert_setting_api_v1_settings__key__put",
+@router.put("/api/v1/settings/{key}", tags=["settings"], operation_id="opal_setting_put",
             response_model=SettingRead)
 def upsert_setting(body: SettingUpdate, key: str = SettingKey, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
     return mutate_with_revision(svc.store, if_match, lambda: svc.settings.upsert(key, body.value))
 
 
-@router.delete("/api/v1/settings/{key}", tags=["settings"], operation_id="delete_setting_api_v1_settings__key__delete",
+@router.delete("/api/v1/settings/{key}", tags=["settings"], operation_id="opal_setting_delete",
                status_code=204)
 def delete_setting(key: str = SettingKey, if_match: str | None = Header(None), svc: Services = Depends(services)):
     mutate_with_revision(svc.store, if_match, lambda: svc.settings.delete(key))
@@ -384,18 +386,18 @@ def delete_setting(key: str = SettingKey, if_match: str | None = Header(None), s
 # -- health ----------------------------------------------------------------------
 
 
-@router.get("/api/v1/health/", tags=["health"], operation_id="health_check_api_v1_health__get",
+@router.get("/api/v1/health/", tags=["health"], operation_id="opal_health_get",
             response_model=HealthRead)
 def health_check(svc: Services = Depends(services)):
     return svc.health()
 
 
-@router.get("/api/v1/health/live", tags=["health"], operation_id="get_talk_health_live")
+@router.get("/api/v1/health/live", tags=["health"], operation_id="opal_health_live_get")
 def health_live() -> dict[str, Any]:
     return {"status": "ok", "ready": True}
 
 
-@router.get("/api/v1/health/ready", tags=["health"], operation_id="get_talk_health_ready")
+@router.get("/api/v1/health/ready", tags=["health"], operation_id="opal_health_ready_get")
 def health_ready(svc: Services = Depends(services)):
     health = svc.health()
     usable = health["status"] != "error"
@@ -406,13 +408,13 @@ def health_ready(svc: Services = Depends(services)):
 # -- backup ----------------------------------------------------------------------
 
 
-@router.get("/api/v1/backup/list", tags=["backup"], operation_id="list_backups_api_v1_backup_list_get",
+@router.get("/api/v1/backup/list", tags=["backup"], operation_id="opal_backup_list",
             response_model=list[BackupRead])
 def list_backups(svc: Services = Depends(services)):
     return svc.config_ops.list_backups()
 
 
-@router.post("/api/v1/backup/create", tags=["backup"], operation_id="create_backup_api_v1_backup_create_post",
+@router.post("/api/v1/backup/create", tags=["backup"], operation_id="opal_backup_create",
              response_model=BackupCreateResponse, status_code=201)
 def create_backup(response: Response, svc: Services = Depends(services)):
     result = svc.config_ops.create_backup()
@@ -421,38 +423,45 @@ def create_backup(response: Response, svc: Services = Depends(services)):
 
 
 @router.get("/api/v1/backup/download/{filename}", tags=["backup"],
-            operation_id="download_backup_api_v1_backup_download__filename__get", response_class=FileResponse)
+            operation_id="opal_backup_download", response_class=FileResponse)
 def download_backup(filename: str = BackupFilename, svc: Services = Depends(services)):
     path = svc.config_ops.backup_path(filename)
     return FileResponse(path, media_type="application/octet-stream", filename=filename)
 
 
 @router.post("/api/v1/backup/restore/{filename}", tags=["backup"],
-             operation_id="restore_backup_api_v1_backup_restore__filename__post", response_model=OperationResult)
-def restore_backup(filename: str = BackupFilename, svc: Services = Depends(services)):
-    return svc.config_ops.restore_backup(filename)
+             operation_id="opal_backup_restore", response_model=OperationResult)
+def restore_backup(filename: str = BackupFilename, if_match: str | None = Header(None),
+                   svc: Services = Depends(services)):
+    return mutate_with_revision(svc.store, if_match, lambda: svc.config_ops.restore_backup(filename))
 
 
-@router.get("/api/v1/backup/export", tags=["backup"], operation_id="export_config_api_v1_backup_export_get",
+@router.get("/api/v1/backup/export", tags=["backup"], operation_id="opal_backup_export",
             response_model=ConfigExport)
 def export_config(svc: Services = Depends(services)):
     return svc.config_ops.export()
 
 
-@router.post("/api/v1/backup/import", tags=["backup"], operation_id="import_config_api_v1_backup_import_post",
+@router.post("/api/v1/backup/import", tags=["backup"], operation_id="opal_backup_import",
              response_model=ConfigImportResult)
-def import_config(svc: Services = Depends(services)):
-    result = svc.config_ops.import_config()
+def import_config(body: ConfigExport | None = None, if_match: str | None = Header(None),
+                  svc: Services = Depends(services)):
+    def do_import() -> dict[str, Any]:
+        if body is not None:
+            return svc.config_ops.import_bundle(body.model_dump(mode="json"))
+        return svc.config_ops.import_config()
+
+    result = mutate_with_revision(svc.store, if_match, do_import)
     return {**result, "validation": report_dict(result["validation"])}
 
 
-@router.get("/api/v1/backup/validate", tags=["backup"], operation_id="validate_config_api_v1_backup_validate_get",
+@router.get("/api/v1/backup/validate", tags=["backup"], operation_id="opal_backup_validate_stored",
             response_model=ValidationResult)
 def validate_config(svc: Services = Depends(services)):
     return report_dict(svc.config_ops.validate_current())
 
 
-@router.post("/api/v1/backup/validate", tags=["backup"], operation_id="validate_talk_backup_payload",
+@router.post("/api/v1/backup/validate", tags=["backup"], operation_id="opal_backup_validate",
              response_model=ValidationResult)
 def validate_backup_payload(body: ConfigExport, svc: Services = Depends(services)):
     """Validate a supplied configuration payload against host resources. No writes."""
@@ -468,7 +477,7 @@ def validate_backup_payload(body: ConfigExport, svc: Services = Depends(services
 
 # Registered after /backup/list etc. so the literal paths win for GET/POST.
 @router.delete("/api/v1/backup/{filename}", tags=["backup"],
-               operation_id="delete_backup_api_v1_backup__filename__delete", status_code=204)
+               operation_id="opal_backup_delete", status_code=204)
 def delete_backup(filename: str = BackupFilename, svc: Services = Depends(services)):
     svc.config_ops.delete_backup(filename)
     return Response(status_code=204)

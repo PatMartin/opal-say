@@ -20,7 +20,7 @@ const EMPTY: ProfileForm = {
 }
 
 export function ProfilesPanel() {
-  const profiles = useLoad(() => call<Profile[]>('list_profiles_api_v1_profiles__get'), [])
+  const profiles = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
   const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get'), [])
   const [form, setForm] = useState<ProfileForm>(EMPTY)
   const [editing, setEditing] = useState<number | null>(null)
@@ -43,9 +43,9 @@ export function ProfilesPanel() {
         engine_options: parseOptions(form.options) ?? {},
       }
       if (editing !== null) {
-        await call('update_profile_api_v1_profiles__profile_id__patch', { path: { profile_id: editing }, body })
+        await call('opal_profile_patch', { path: { profile_id: editing }, body })
       } else {
-        await call('create_profile_api_v1_profiles__post', { body })
+        await call('opal_profiles_create', { body })
       }
       setForm(EMPTY)
       setEditing(null)
@@ -69,17 +69,17 @@ export function ProfilesPanel() {
   }
 
   const show = (id: number) =>
-    action.run(async () => setSelected(await call<Profile>('get_profile_api_v1_profiles__profile_id__get', { path: { profile_id: id } })))
+    action.run(async () => setSelected(await call<Profile>('opal_profile_get', { path: { profile_id: id } })))
 
   const activate = (id: number) =>
     action.run(async () => {
-      await call('activate_profile_api_v1_profiles__profile_id__activate_post', { path: { profile_id: id } })
+      await call('opal_profile_activate', { path: { profile_id: id } })
       await profiles.reload()
     })
 
   const remove = (id: number) =>
     action.run(async () => {
-      await call('delete_profile_api_v1_profiles__profile_id__delete', { path: { profile_id: id } })
+      await call('opal_profile_delete', { path: { profile_id: id } })
       await profiles.reload()
     })
 

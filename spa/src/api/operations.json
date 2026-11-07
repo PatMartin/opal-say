@@ -1,13 +1,13 @@
 {
-  "list_engines_api_v1_engines__get": {
+  "opal_engines_list": {
     "method": "GET",
     "path": "/api/v1/engines/"
   },
-  "get_engine_api_v1_engines__engine_id__get": {
+  "opal_engine_get": {
     "method": "GET",
     "path": "/api/v1/engines/{engine_id}"
   },
-  "update_engine_api_v1_engines__engine_id__patch": {
+  "opal_engine_patch": {
     "method": "PATCH",
     "path": "/api/v1/engines/{engine_id}"
   },
@@ -43,27 +43,27 @@
     "method": "POST",
     "path": "/api/v1/voices/{voice_id}/test"
   },
-  "list_profiles_api_v1_profiles__get": {
+  "opal_profiles_list": {
     "method": "GET",
     "path": "/api/v1/profiles/"
   },
-  "create_profile_api_v1_profiles__post": {
+  "opal_profiles_create": {
     "method": "POST",
     "path": "/api/v1/profiles/"
   },
-  "get_profile_api_v1_profiles__profile_id__get": {
+  "opal_profile_get": {
     "method": "GET",
     "path": "/api/v1/profiles/{profile_id}"
   },
-  "update_profile_api_v1_profiles__profile_id__patch": {
+  "opal_profile_patch": {
     "method": "PATCH",
     "path": "/api/v1/profiles/{profile_id}"
   },
-  "delete_profile_api_v1_profiles__profile_id__delete": {
+  "opal_profile_delete": {
     "method": "DELETE",
     "path": "/api/v1/profiles/{profile_id}"
   },
-  "activate_profile_api_v1_profiles__profile_id__activate_post": {
+  "opal_profile_activate": {
     "method": "POST",
     "path": "/api/v1/profiles/{profile_id}/activate"
   },
@@ -75,64 +75,64 @@
     "method": "POST",
     "path": "/api/v1/generate/stream"
   },
-  "get_all_settings_api_v1_settings__get": {
+  "opal_settings_get": {
     "method": "GET",
     "path": "/api/v1/settings/"
   },
-  "patch_talk_settings": {
+  "opal_settings_patch": {
     "method": "PATCH",
     "path": "/api/v1/settings/"
   },
-  "get_setting_api_v1_settings__key__get": {
+  "opal_setting_get": {
     "method": "GET",
     "path": "/api/v1/settings/{key}"
   },
-  "upsert_setting_api_v1_settings__key__put": {
+  "opal_setting_put": {
     "method": "PUT",
     "path": "/api/v1/settings/{key}"
   },
-  "delete_setting_api_v1_settings__key__delete": {
+  "opal_setting_delete": {
     "method": "DELETE",
     "path": "/api/v1/settings/{key}"
   },
-  "health_check_api_v1_health__get": {
+  "opal_health_get": {
     "method": "GET",
     "path": "/api/v1/health/"
   },
-  "list_backups_api_v1_backup_list_get": {
+  "opal_backup_list": {
     "method": "GET",
     "path": "/api/v1/backup/list"
   },
-  "create_backup_api_v1_backup_create_post": {
+  "opal_backup_create": {
     "method": "POST",
     "path": "/api/v1/backup/create"
   },
-  "download_backup_api_v1_backup_download__filename__get": {
+  "opal_backup_download": {
     "method": "GET",
     "path": "/api/v1/backup/download/{filename}"
   },
-  "restore_backup_api_v1_backup_restore__filename__post": {
+  "opal_backup_restore": {
     "method": "POST",
     "path": "/api/v1/backup/restore/{filename}"
   },
-  "delete_backup_api_v1_backup__filename__delete": {
+  "opal_backup_delete": {
     "method": "DELETE",
     "path": "/api/v1/backup/{filename}"
   },
-  "export_config_api_v1_backup_export_get": {
+  "opal_backup_export": {
     "method": "GET",
     "path": "/api/v1/backup/export"
   },
-  "import_config_api_v1_backup_import_post": {
+  "opal_backup_import": {
     "method": "POST",
     "path": "/api/v1/backup/import"
   },
-  "validate_config_api_v1_backup_validate_get": {
-    "method": "GET",
+  "opal_backup_validate": {
+    "method": "POST",
     "path": "/api/v1/backup/validate"
   },
-  "validate_talk_backup_payload": {
-    "method": "POST",
+  "opal_backup_validate_stored": {
+    "method": "GET",
     "path": "/api/v1/backup/validate"
   },
   "root__get": {
@@ -143,11 +143,11 @@
     "method": "GET",
     "path": "/healthz"
   },
-  "get_talk_health_live": {
+  "opal_health_live_get": {
     "method": "GET",
     "path": "/api/v1/health/live"
   },
-  "get_talk_health_ready": {
+  "opal_health_ready_get": {
     "method": "GET",
     "path": "/api/v1/health/ready"
   }

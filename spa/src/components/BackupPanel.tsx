@@ -4,7 +4,7 @@ import type { Backup, ValidationResult } from '../api/types'
 import { ErrorBanner, ValidationView, useAction, useLoad } from './common'
 
 export function BackupPanel() {
-  const backups = useLoad(() => call<Backup[]>('list_backups_api_v1_backup_list_get'), [])
+  const backups = useLoad(() => call<Backup[]>('opal_backup_list'), [])
   const [message, setMessage] = useState('')
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const action = useAction()
@@ -18,7 +18,7 @@ export function BackupPanel() {
 
   const create = () =>
     run(async () => {
-      const result = await call<{ filename: string; message?: string }>('create_backup_api_v1_backup_create_post')
+      const result = await call<{ filename: string; message?: string }>('opal_backup_create')
       setMessage(`${result.message ?? 'Backup created'}: ${result.filename}`)
       await backups.reload()
     })
@@ -26,19 +26,19 @@ export function BackupPanel() {
   const restore = (filename: string) =>
     run(async () => {
       if (!window.confirm(`Restore configuration from ${filename}? Current configuration will be replaced.`)) return
-      const result = await call<{ message: string }>('restore_backup_api_v1_backup_restore__filename__post', { path: { filename } })
+      const result = await call<{ message: string }>('opal_backup_restore', { path: { filename } })
       setMessage(result.message)
     })
 
   const remove = (filename: string) =>
     run(async () => {
-      await call('delete_backup_api_v1_backup__filename__delete', { path: { filename } })
+      await call('opal_backup_delete', { path: { filename } })
       await backups.reload()
     })
 
   const exportConfig = () =>
     run(async () => {
-      const data = await call('export_config_api_v1_backup_export_get')
+      const data = await call('opal_backup_export')
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
       const a = document.createElement('a')
       a.href = url
@@ -50,18 +50,18 @@ export function BackupPanel() {
   const importConfig = () =>
     run(async () => {
       const result = await call<{ success: boolean; validation: ValidationResult; message?: string | null }>(
-        'import_config_api_v1_backup_import_post',
+        'opal_backup_import',
       )
       setMessage(result.message ?? (result.success ? 'Imported.' : 'Import failed.'))
       setValidation(result.validation)
     })
 
-  const validate = () => run(async () => setValidation(await call<ValidationResult>('validate_config_api_v1_backup_validate_get')))
+  const validate = () => run(async () => setValidation(await call<ValidationResult>('opal_backup_validate_stored')))
 
   const validatePayload = () =>
     run(async () => {
-      const payload = await call<Record<string, unknown>>('export_config_api_v1_backup_export_get')
-      setValidation(await call<ValidationResult>('validate_talk_backup_payload', { body: payload }))
+      const payload = await call<Record<string, unknown>>('opal_backup_export')
+      setValidation(await call<ValidationResult>('opal_backup_validate', { body: payload }))
     })
 
   return (
@@ -97,7 +97,7 @@ export function BackupPanel() {
               <td>{b.created_at}</td>
               <td>{b.size_bytes ?? '-'}</td>
               <td className="actions">
-                <a href={buildUrl('download_backup_api_v1_backup_download__filename__get', { path: { filename: b.filename } })} download>
+                <a href={buildUrl('opal_backup_download', { path: { filename: b.filename } })} download>
                   Download
                 </a>
                 <button onClick={() => void restore(b.filename)}>Restore</button>

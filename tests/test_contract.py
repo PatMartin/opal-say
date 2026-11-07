@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import sys
 from importlib.resources import files
 from pathlib import Path
 
@@ -20,44 +21,35 @@ from opal_say.contract import CONTRACT_RESOURCE, contract_operations, load_contr
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# The active contract lives in two byte-identical copies: the human-facing root
-# file `opal_say_v{version}.yaml` and the packaged copy that the service loads
-# and serves at /openapi.json (symlinks break on Windows checkouts and in built
-# wheels, so two real files are kept). Other `opal_say_v*.yaml` files at the
-# root are not-yet-adopted revisions and must never be selected as the active
-# contract until the implementation version matches their filename.
+# The authoritative contract is the decomposed spec at `openapi/opal_say_v{version}.yaml`
+# plus `openapi/shared/*.yaml`. The packaged copy that the service loads and serves at
+# /openapi.json is a generated artifact: `tools/bundle_contract.py` flattens the shared
+# $refs into one self-contained document. The packaged file must always equal a fresh
+# bundle of the source, so editing one without regenerating the other fails CI.
 ACTIVE_VERSION = __version__
-ROOT_CONTRACT = ROOT / f"opal_say_v{ACTIVE_VERSION}.yaml"
+SOURCE_CONTRACT = ROOT / "openapi" / f"opal_say_v{ACTIVE_VERSION}.yaml"
 PACKAGED = CONTRACT_RESOURCE
 TRACKED = "src/opal_say/contract/opal_say.yaml"
-CONTRACT_GLOB = "opal_say_v*.yaml"
 
 
-def test_packaged_contract_matches_repo_root():
-    """The root `opal_say_v{version}.yaml` and the packaged copy must stay identical."""
-    assert ROOT_CONTRACT.read_bytes() == files("opal_say").joinpath(PACKAGED).read_bytes()
+def _bundled() -> dict:
+    sys.path.insert(0, str(ROOT / "tools"))
+    try:
+        from bundle_contract import bundle
+    finally:
+        sys.path.remove(str(ROOT / "tools"))
+    return bundle(SOURCE_CONTRACT)
 
 
-def test_active_contract_parses_at_active_version():
-    """Root and packaged copies parse to one document at the implemented version."""
-    root = yaml.safe_load(ROOT_CONTRACT.read_text(encoding="utf-8"))
-    packaged = load_contract()
-    assert root == packaged
-    for doc in (root, packaged):
-        assert doc["info"]["version"] == ACTIVE_VERSION
+def test_source_contract_parses_at_active_version():
+    """The openapi/ source document declares the implemented version."""
+    doc = yaml.safe_load(SOURCE_CONTRACT.read_text(encoding="utf-8"))
+    assert doc["info"]["version"] == ACTIVE_VERSION
 
 
-def test_pending_contract_revisions_are_not_selected():
-    """`opal_say_v*.yaml` files other than the active one are pending revisions —
-    they must parse, must not match the implemented version and must not equal
-    the packaged contract. Becomes a no-op once every pending revision is adopted."""
-    for path in ROOT.glob(CONTRACT_GLOB):
-        if path == ROOT_CONTRACT:
-            continue
-        pending = yaml.safe_load(path.read_text(encoding="utf-8"))
-        assert pending["info"]["version"] != ACTIVE_VERSION, f"{path.name} claims the active version"
-        assert path.read_bytes() != ROOT_CONTRACT.read_bytes(), f"{path.name} duplicates the active contract"
-        assert load_contract() != pending
+def test_packaged_contract_matches_bundled_source():
+    """The packaged contract must equal a fresh bundle of the openapi/ source."""
+    assert _bundled() == load_contract()
 
 
 def test_packaged_contract_is_a_readable_regular_file():
@@ -108,7 +100,7 @@ _UniqueKeyLoader.add_constructor("tag:yaml.org,2002:map", _reject_duplicate_keys
 
 def test_contracts_have_no_duplicate_yaml_keys():
     """Duplicate keys (e.g. two `paths:` entries or a repeated path) must not parse silently."""
-    for path in sorted(ROOT.glob(CONTRACT_GLOB)):
+    for path in sorted((ROOT / "openapi").rglob("*.yaml")) + [ROOT / TRACKED]:
         yaml.load(path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)
 
 

@@ -27,7 +27,7 @@ def _profile_body(
 @profiles_app.command("list")
 def profiles_list(ctx: typer.Context) -> None:
     """List profiles."""
-    _emit(ctx, _call(ctx, "list_profiles_api_v1_profiles__get").json(), PROFILE_COLUMNS)
+    _emit(ctx, _call(ctx, "opal_profiles_list").json(), PROFILE_COLUMNS)
 
 
 @profiles_app.command("add")
@@ -47,13 +47,13 @@ def profiles_add(
     """Create a profile."""
     body = _profile_body(name, description, voice, speed, volume, output_format, sample_rate, active)
     body["engine_options"] = _parse_options(option, options_json) or {}
-    _emit(ctx, _call(ctx, "create_profile_api_v1_profiles__post", json=body).json())
+    _emit(ctx, _call(ctx, "opal_profiles_create", json=body).json())
 
 
 @profiles_app.command("get")
 def profiles_get(ctx: typer.Context, profile_id: int) -> None:
     """Show one profile."""
-    _emit(ctx, _call(ctx, "get_profile_api_v1_profiles__profile_id__get",
+    _emit(ctx, _call(ctx, "opal_profile_get",
                      path_params={"profile_id": profile_id}).json())
 
 
@@ -85,7 +85,7 @@ def profiles_update(
         body["engine_options"] = options
     if not body:
         raise typer.BadParameter("nothing to update")
-    resp = _call(ctx, "update_profile_api_v1_profiles__profile_id__patch", path_params={"profile_id": profile_id},
+    resp = _call(ctx, "opal_profile_patch", path_params={"profile_id": profile_id},
                  json=body)
     _emit(ctx, resp.json())
 
@@ -93,14 +93,14 @@ def profiles_update(
 @profiles_app.command("remove")
 def profiles_remove(ctx: typer.Context, profile_id: int) -> None:
     """Delete a (non-active) profile."""
-    _call(ctx, "delete_profile_api_v1_profiles__profile_id__delete", path_params={"profile_id": profile_id})
+    _call(ctx, "opal_profile_delete", path_params={"profile_id": profile_id})
     typer.echo(f"profile {profile_id} deleted")
 
 
 @profiles_app.command("activate")
 def profiles_activate(ctx: typer.Context, profile_id: int) -> None:
     """Make a profile the active one."""
-    resp = _call(ctx, "activate_profile_api_v1_profiles__profile_id__activate_post",
+    resp = _call(ctx, "opal_profile_activate",
                  path_params={"profile_id": profile_id})
     _emit(ctx, resp.json())
 
