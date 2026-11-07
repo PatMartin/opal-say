@@ -1,7 +1,7 @@
-# Installing Kokoro for OPAL Talk
+# Installing Kokoro for OPAL Say
 
 Kokoro-82M is the higher-fidelity engine: expressive, multi-lingual voices that still run
-comfortably on CPU. OPAL Talk wraps the [`kokoro-onnx`](https://github.com/thewh1teagle/kokoro-onnx)
+comfortably on CPU. OPAL Say wraps the [`kokoro-onnx`](https://github.com/thewh1teagle/kokoro-onnx)
 runtime — **the runtime and the model files are separate installs**. The service never
 downloads or manages model files; you place them on the host and point the engine at them.
 
@@ -14,7 +14,7 @@ Requires Python ≥ 3.11.
 pip install -e '.[kokoro]'
 
 # or, for a released package
-pip install 'opal-talk[kokoro]'
+pip install 'opal-say[kokoro]'
 ```
 
 Both engines at once: `pip install -e '.[engines]'`. Kokoro synthesis runs on CPU via
@@ -68,10 +68,10 @@ engines:
 Or update the running service instead of the file (persisted in SQLite):
 
 ```bash
-opal talk engines update kokoro -O model_path=~/kokoro/kokoro-v1.0.int8.onnx \
+opal say engines update kokoro -O model_path=~/kokoro/kokoro-v1.0.int8.onnx \
                                 -O voices_path=~/kokoro/voices-v1.0.bin \
                                 -O default_lang=en-us
-opal talk engines update kokoro --enable
+opal say engines update kokoro --enable
 ```
 
 Both paths are **required** — the engine reports unavailable until they point at real files.
@@ -79,11 +79,11 @@ Both paths are **required** — the engine reports unavailable until they point 
 ## 4. Verify
 
 ```bash
-opal talk engines validate kokoro         # runtime + model/voices file checks
-opal talk voices add heart --name Heart --engine kokoro --ref af_heart
-opal talk voices validate heart
-opal talk voices test heart               # synthesizes a short sample
-opal talk generate "Kokoro is installed." -o hello.wav
+opal say engines validate kokoro         # runtime + model/voices file checks
+opal say voices add heart --name Heart --engine kokoro --ref af_heart
+opal say voices validate heart
+opal say voices test heart               # synthesizes a short sample
+opal say generate "Kokoro is installed." -o hello.wav
 ```
 
 ## Voice references and options
@@ -114,7 +114,7 @@ the full list is on the kokoro-onnx release page.
 | engine | `default_lang` | Fallback language when the voice prefix doesn't imply one |
 | generation | `lang` | Per-request language override — one of `en-us`, `en-gb`, `es`, `fr-fr`, `hi`, `it`, `ja`, `pt-br`, `cmn` |
 
-Example: `opal talk generate "…" -O lang=fr-fr`.
+Example: `opal say generate "…" -O lang=fr-fr`.
 
 ## Constraints worth knowing
 
@@ -129,7 +129,7 @@ Example: `opal talk generate "…" -O lang=fr-fr`.
 
 | Symptom | Check |
 |---|---|
-| "kokoro-onnx runtime is not installed" | `pip install 'opal-talk[kokoro]'` in the service's environment |
+| "kokoro-onnx runtime is not installed" | `pip install 'opal-say[kokoro]'` in the service's environment |
 | "options 'model_path' and 'voices_path' must be configured" | set both engine options — neither is optional |
 | "model file '…' not found" | `model_path` typo — point at the `.onnx` you actually downloaded (int8 vs full) |
 | "voices file '…' not found" | `voices_path` typo — must be `voices-v1.0.bin` |

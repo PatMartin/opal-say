@@ -1,6 +1,6 @@
 # Contract notes
 
-`opal_talk_v1.4.0.yaml` is implemented unchanged. Ambiguities or under-specified behaviour found while implementing it, and the interpretation chosen, are recorded here.
+`openapi/opal_say_v1.5.0.yaml` together with `openapi/shared/opal_kernel.yaml` is implemented unchanged (served bundled as `src/opal_say/contract/opal_say.yaml`). Ambiguities or under-specified behaviour found while implementing it, and the interpretation chosen, are recorded here.
 
 | # | Area | Observation | Implementation choice |
 |---|------|-------------|-----------------------|
@@ -16,6 +16,6 @@
 | 10 | Voice update conflicts | `409` meaning for `PATCH /voices/{id}` is broad. | `409 voice_in_use` when disabling the voice of the active profile; `409 profile_options_incompatible` when re-assigning the engine would invalidate a referencing profile's `engine_options`. Unknown target engine → `404 engine_not_found` (as for create). |
 | 11 | Settings listing vs lookup | `GET /settings/` vs `GET /settings/{key}` 404 semantics. | Both reflect only stored settings; known keys fall back to built-in defaults internally when absent. Known keys are validated on upsert (`422`). |
 | 12 | Health `status` | Thresholds are informal. | `ok`: every enabled engine available; `degraded`: some enabled engine unavailable; `error`: no enabled engine available. |
-| 13 | `opal` CLI root | OPAL Listen also installs an `opal` console script, so both packages in one environment clash. | `opal talk …` is provided by this package (and mounts `opal listen` when `opal_listener` is importable); `opal-talk …` is an always-unambiguous alias. |
+| 13 | `opal` CLI root | OPAL Listen also installs an `opal` console script, so both packages in one environment clash. | `opal say …` is provided by this package (and mounts `opal listen` when `opal_listener` is importable); `opal-say …` is an always-unambiguous alias. |
 | 14 | Stream failure after headers | Contract requires premature termination without an in-band error. | The server aborts the chunked response (no terminating chunk); clients see an incomplete-read error. The first audio block is produced before headers are sent so that early failures are normal JSON errors. |
 | 15 | Import/restore apply semantics | The contract says import follows the OPAL Listen operational convention but doesn't define whether sections merge or replace. | Voices, profiles and settings are **replaced** (deleted then re-created) when their section is present; engines are **merged** (`enabled`/`options` applied to installed engines). Success `message` lists what each call replaced. |

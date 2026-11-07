@@ -1,7 +1,7 @@
-# Installing Piper for OPAL Talk
+# Installing Piper for OPAL Say
 
 Piper is the recommended first engine: small ONNX voices, fast on CPU, and happy on a
-Raspberry Pi. OPAL Talk wraps the [`piper-tts`](https://pypi.org/project/piper-tts/)
+Raspberry Pi. OPAL Say wraps the [`piper-tts`](https://pypi.org/project/piper-tts/)
 Python package — **the runtime and the voice models are separate installs**. The service
 never downloads or manages model files; you place them on the host and point the engine
 at them.
@@ -15,7 +15,7 @@ Requires Python ≥ 3.11 (the wheels ship for Linux x86_64/aarch64, Windows, and
 pip install -e '.[piper]'
 
 # or, for a released package
-pip install 'opal-talk[piper]'
+pip install 'opal-say[piper]'
 ```
 
 Both engines at once: `pip install -e '.[engines]'`.
@@ -69,18 +69,18 @@ engines:
 Or update the running service instead of the file (persisted in SQLite):
 
 ```bash
-opal talk engines update piper -O voices_dir=~/piper/voices
-opal talk engines update piper --enable
+opal say engines update piper -O voices_dir=~/piper/voices
+opal say engines update piper --enable
 ```
 
 ## 4. Verify
 
 ```bash
-opal talk engines validate piper          # runtime + options checks
-opal talk voices add amy --name Amy --engine piper --ref en_US-amy-low
-opal talk voices validate amy             # model + config resolve
-opal talk voices test amy                 # synthesizes a short sample
-opal talk generate "Piper is installed." -o hello.wav
+opal say engines validate piper          # runtime + options checks
+opal say voices add amy --name Amy --engine piper --ref en_US-amy-low
+opal say voices validate amy             # model + config resolve
+opal say voices test amy                 # synthesizes a short sample
+opal say generate "Piper is installed." -o hello.wav
 ```
 
 `voices_dir` is optional: a voice reference may also be an **absolute path** to a
@@ -99,7 +99,7 @@ absolute references resolve.
 | generation | `speaker` / `speaker_id` | Pick a speaker on multi-speaker models (`-O speaker=speaker_2`) |
 
 Engine options go on the engine (`engines update`) or a voice; generation options go on
-profiles or per-request: `opal talk generate "…" -O speaker=alan`.
+profiles or per-request: `opal say generate "…" -O speaker=alan`.
 
 ## Raspberry Pi notes
 
@@ -113,7 +113,7 @@ profiles or per-request: `opal talk generate "…" -O speaker=alan`.
 
 | Symptom | Check |
 |---|---|
-| `engines validate` says runtime unavailable | `pip install 'opal-talk[piper]'` in the service's environment |
+| `engines validate` says runtime unavailable | `pip install 'opal-say[piper]'` in the service's environment |
 | voice validation: model not found | ref must be a basename in `voices_dir` or an absolute `.onnx` path |
 | voice validation: config missing | the `NAME.onnx.json` file must sit beside `NAME.onnx` (or set `config_path`) |
 | warning `voices_dir_missing` | path typo — `~` is expanded, relative paths resolve against the service's working directory |

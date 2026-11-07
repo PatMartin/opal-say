@@ -1,6 +1,6 @@
 # Real-engine release validation
 
-`tests/test_release_validation.py` verifies OPAL Talk 1.4.0 against actual
+`tests/test_release_validation.py` verifies OPAL Say 1.5.0 against actual
 Piper and Kokoro engines: engine availability and model initialization, WAV
 generation, PCM streaming, output format headers, model caching across
 requests, configuration updates between requests, and performance measurement
@@ -22,8 +22,8 @@ pip install -e '.[engines]'   # both
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPAL_TALK_TEST_PIPER_MODEL` | Path to a Piper voice `.onnx`; its `.onnx.json` config must sit alongside | `~/piper/voices/en_US-amy-low.onnx` |
-| `OPAL_TALK_TEST_KOKORO_DIR` | Directory containing `kokoro-v1.0*.onnx` and `voices-v1.0.bin` | `~/kokoro` |
+| `OPAL_SAY_TEST_PIPER_MODEL` | Path to a Piper voice `.onnx`; its `.onnx.json` config must sit alongside | `~/piper/voices/en_US-amy-low.onnx` |
+| `OPAL_SAY_TEST_KOKORO_DIR` | Directory containing `kokoro-v1.0*.onnx` and `voices-v1.0.bin` | `~/kokoro` |
 
 Piper voices are published on the `rhasspy/piper-voices` Hugging Face repo —
 download the `.onnx` and `.onnx.json` for one voice (e.g. `en_US-amy-low`).
@@ -33,24 +33,24 @@ Kokoro release archives provide `kokoro-v1.0.onnx` and `voices-v1.0.bin`.
 
 ```sh
 # Linux / macOS
-OPAL_TALK_TEST_PIPER_MODEL=~/piper/voices/en_US-amy-low.onnx pytest -m piper
-OPAL_TALK_TEST_KOKORO_DIR=~/kokoro pytest -m kokoro
+OPAL_SAY_TEST_PIPER_MODEL=~/piper/voices/en_US-amy-low.onnx pytest -m piper
+OPAL_SAY_TEST_KOKORO_DIR=~/kokoro pytest -m kokoro
 pytest -m "piper or kokoro"        # whichever is available
 pytest tests/test_release_validation.py -v -s   # -s prints the measurements
 ```
 
 ```powershell
 # Windows (PowerShell)
-$env:OPAL_TALK_TEST_PIPER_MODEL="$HOME\piper\voices\en_US-amy-low.onnx"
+$env:OPAL_SAY_TEST_PIPER_MODEL="$HOME\piper\voices\en_US-amy-low.onnx"
 pytest -m piper
-$env:OPAL_TALK_TEST_KOKORO_DIR="$HOME\kokoro"
+$env:OPAL_SAY_TEST_KOKORO_DIR="$HOME\kokoro"
 pytest -m kokoro
 ```
 
 ```sh
 # Raspberry Pi (aarch64): piper-tts publishes ARM wheels; prefer a
 # `low`-quality voice. Kokoro is practical only on 64-bit systems.
-OPAL_TALK_TEST_PIPER_MODEL=~/piper/voices/en_US-amy-low.onnx pytest -m piper
+OPAL_SAY_TEST_PIPER_MODEL=~/piper/voices/en_US-amy-low.onnx pytest -m piper
 ```
 
 Timing and memory figures are printed for the operator's review (`-s`);

@@ -38,12 +38,12 @@ pip install -e '.[engines]'   # both
 
 | Variable                      | Meaning                                                              |
 |-------------------------------|----------------------------------------------------------------------|
-| `OPAL_TALK_TEST_PIPER_MODEL`  | Path to a Piper voice `.onnx` (its `.onnx.json` config must sit alongside). Default: `~/piper/voices/en_US-amy-low.onnx` |
-| `OPAL_TALK_TEST_KOKORO_DIR`   | Directory containing `kokoro-v1.0*.onnx` and `voices-v1.0.bin`. Default: `~/kokoro` |
+| `OPAL_SAY_TEST_PIPER_MODEL`  | Path to a Piper voice `.onnx` (its `.onnx.json` config must sit alongside). Default: `~/piper/voices/en_US-amy-low.onnx` |
+| `OPAL_SAY_TEST_KOKORO_DIR`   | Directory containing `kokoro-v1.0*.onnx` and `voices-v1.0.bin`. Default: `~/kokoro` |
 
 ```sh
-OPAL_TALK_TEST_PIPER_MODEL=/models/en_US-amy-low.onnx pytest -m piper
-OPAL_TALK_TEST_KOKORO_DIR=/models/kokoro pytest -m kokoro
+OPAL_SAY_TEST_PIPER_MODEL=/models/en_US-amy-low.onnx pytest -m piper
+OPAL_SAY_TEST_KOKORO_DIR=/models/kokoro pytest -m kokoro
 pytest -m "piper or kokoro"    # run whichever is available
 ```
 
@@ -64,9 +64,9 @@ ONNX regardless.
 
 piper-tts ships aarch64 wheels; piwheels supplies onnxruntime for common Pi
 OS images. Prefer a `low`-quality voice (e.g. `en_US-amy-low`) and pass its path
-through `OPAL_TALK_TEST_PIPER_MODEL`. Everything else is identical:
+through `OPAL_SAY_TEST_PIPER_MODEL`. Everything else is identical:
 
 ```sh
 pip install -e '.[piper]'
-OPAL_TALK_TEST_PIPER_MODEL=~/piper/voices/en_US-amy-low.onnx pytest -m piper
+OPAL_SAY_TEST_PIPER_MODEL=~/piper/voices/en_US-amy-low.onnx pytest -m piper
 ```

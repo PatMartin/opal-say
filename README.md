@@ -1,11 +1,11 @@
-![OPAL Talk — a voice for the OPAL ecosystem](opal-talk.png)
+![OPAL Say — a voice for the OPAL ecosystem](opal-say.png)
 
-# OPAL Talk
+# OPAL Say
 ### Turn ordinary text into a voice your projects can actually use.
 
 **Your camera sees someone at the door. Your assistant knows what to say. Now it needs a voice.**
 
-OPAL Talk is the **text-to-speech engine of [OPAL](https://github.com/PatMartin/opal)**: send text to a small REST service, choose a voice, and get real audio back—either a ready-to-use WAV file or **progressive PCM audio** that starts arriving while the rest of the sentence is still being synthesized.
+OPAL Say is the **text-to-speech engine of [OPAL](https://github.com/PatMartin/opal)**: send text to a small REST service, choose a voice, and get real audio back—either a ready-to-use WAV file or **progressive PCM audio** that starts arriving while the rest of the sentence is still being synthesized.
 
 It provides one consistent interface over local synthesis engines, including **Piper** and **Kokoro**. Change the engine, swap the voice, tune the delivery, and keep the same API.
 
@@ -13,7 +13,7 @@ It provides one consistent interface over local synthesis engines, including **P
      "Someone is at the front door."
                        │
                        ▼
-                  OPAL Talk
+                  OPAL Say
                        │
             REST API (FastAPI)
                        │
@@ -35,7 +35,7 @@ It provides one consistent interface over local synthesis engines, including **P
              alerts, or other services
 ~~~
 
-> **Important distinction:** OPAL Talk **generates audio; it does not play it**. A shell player such as `aplay`, your own application, or the browser provides playback. This separation lets the same service power a Raspberry Pi speaker, a dashboard, a phone system, and an automation pipeline.
+> **Important distinction:** OPAL Say **generates audio; it does not play it**. A shell player such as `aplay`, your own application, or the browser provides playback. This separation lets the same service power a Raspberry Pi speaker, a dashboard, a phone system, and an automation pipeline.
 
 ## What makes it interesting?
 
@@ -45,11 +45,11 @@ It provides one consistent interface over local synthesis engines, including **P
 - **Voices are resources.** Register installed voices once, validate them, and refer to stable IDs from scripts and profiles.
 - **Profiles make speech contextual.** Give a home assistant a friendly voice, an announcement system a distinct one, or a phone line 8 kHz PCM.
 - **Tune without changing applications.** Adjust engine-specific options, defaults, sentence chunking, and per-request overrides through REST or Typer.
-- **Three consistent interfaces.** FastAPI REST, a complete Typer CLI (`opal talk ...`), and a React web console all use the same backend.
-- **Extensible engines.** New TTS implementations can be registered through the `opal_talk.engines` Python entry-point group.
+- **Three consistent interfaces.** FastAPI REST, a complete Typer CLI (`opal say ...`), and a React web console all use the same backend.
+- **Extensible engines.** New TTS implementations can be registered through the `opal_say.engines` Python entry-point group.
 - **Inspectable by design.** Health checks, engine/voice validation, predictable errors, configuration export, and tests make voice infrastructure easier to operate.
 
-OPAL Talk complements [OPAL Listen](https://github.com/PatMartin/opal-listen), which understands speech, and [OPAL Event](https://github.com/PatMartin/opal-event), which routes events and executes actions. **Listen hears. Event reacts. Talk speaks.**
+OPAL Say complements [OPAL Listen](https://github.com/PatMartin/opal-listen), which understands speech, and [OPAL Event](https://github.com/PatMartin/opal-event), which routes events and executes actions. **Listen hears. Event reacts. Say speaks.**
 
 ## Installation
 
@@ -77,15 +77,15 @@ The package installs three commands:
 
 | Command | What it does |
 | --- | --- |
-| `opal-talk-svc` | Starts the REST service |
-| `opal talk ...` | OPAL Talk's Typer CLI beneath the shared `opal` root |
-| `opal-talk ...` | Standalone shortcut to the same Talk CLI |
+| `opal-say-svc` | Starts the REST service |
+| `opal say ...` | OPAL Say's Typer CLI beneath the shared `opal` root |
+| `opal-say ...` | Standalone shortcut to the same Say CLI |
 
-If you install multiple OPAL packages in the same Python environment, they may each install an `opal` entry point. The last installed script can win. **Use `opal-talk` in automation scripts** when you want an unambiguous executable; the examples below use `opal talk` for consistency across OPAL.
+If you install multiple OPAL packages in the same Python environment, they may each install an `opal` entry point. The last installed script can win. **Use `opal-say` in automation scripts** when you want an unambiguous executable; the examples below use `opal say` for consistency across OPAL.
 
 ### 2. Install at least one voice model
 
-**The Python engine package and its speech model are separate things.** OPAL Talk does **not** download, upload, or delete voice model files for you. Install those files on the **service host**.
+**The Python engine package and its speech model are separate things.** OPAL Say does **not** download, upload, or delete voice model files for you. Install those files on the **service host**.
 
 #### Piper: a great first voice on edge hardware
 
@@ -136,13 +136,13 @@ Practical rule: audit each voice/model file individually before commercial use, 
 From the repository root (so the relative `config/` paths resolve correctly):
 
 ~~~bash
-opal-talk-svc
+opal-say-svc
 
 # Equivalent:
-# python -m opal_talk
+# python -m opal_say
 
 # Explicit configuration, address, and port:
-# opal-talk-svc --config config/service.yaml --host 127.0.0.1 --port 8001
+# opal-say-svc --config config/service.yaml --host 127.0.0.1 --port 8001
 ~~~
 
 The default address is **`http://127.0.0.1:8001`**. Keep the service terminal running. Open a second terminal, enter the repository directory, activate your virtual environment, and check the server:
@@ -150,11 +150,11 @@ The default address is **`http://127.0.0.1:8001`**. Keep the service terminal ru
 ~~~bash
 source .venv/bin/activate
 
-opal talk ping
-opal talk info
-opal talk health
-opal talk engines list
-opal talk voices list
+opal say ping
+opal say info
+opal say health
+opal say engines list
+opal say voices list
 ~~~
 
 Useful URLs:
@@ -174,7 +174,7 @@ Once a Piper voice is installed and `en-us-amy-low` is registered and available:
 
 ~~~bash
 # Generate a finished, standard WAV file.
-opal talk generate "Hello from OPAL Talk. I finally have a voice!" \
+opal say generate "Hello from OPAL Say. I finally have a voice!" \
   --voice en-us-amy-low \
   -o hello.wav
 
@@ -182,7 +182,7 @@ opal talk generate "Hello from OPAL Talk. I finally have a voice!" \
 aplay hello.wav
 
 # Skip the saved file and stream a WAV to the player:
-opal talk generate "The future sounds pretty good." \
+opal say generate "The future sounds pretty good." \
   --voice en-us-amy-low -o - | aplay
 ~~~
 
@@ -210,14 +210,14 @@ The Vite development UI uses port 5173 by default.
 
 ## Complete Typer command tree
 
-This is the **implemented** command surface, checked against `src/opal_talk/cli/main.py` and the command modules. Everything under `opal talk` can also be invoked using `opal-talk`.
+This is the **implemented** command surface, checked against `src/opal_say/cli/main.py` and the command modules. Everything under `opal say` can also be invoked using `opal-say`.
 
 ~~~text
 opal
-└── talk                                        (alias: opal-talk)
+└── say                                         (alias: opal-say)
     │
-    │  GLOBAL OPTIONS (after "talk", before the command/group)
-    │  --api-url URL                            [env OPAL_TALK_API_URL]
+    │  GLOBAL OPTIONS (after "say", before the command/group)
+    │  --api-url URL                            [env OPAL_SAY_API_URL]
     │  --json                                   raw JSON output
     │  --timeout SECONDS                        default: 120
     │
@@ -307,19 +307,19 @@ opal
         └── validate                            [--payload JSON_FILE]
 ~~~
 
-`opal talk tree` (or `opal-talk tree`) prints this tree live — generated by introspecting the Typer app, so it always reflects the installed version. The full Typer help is always available:
+`opal say tree` (or `opal-say tree`) prints this tree live — generated by introspecting the Typer app, so it always reflects the installed version. The full Typer help is always available:
 
 ~~~bash
-opal talk --help
-opal talk generate --help
-opal talk voices add --help
-opal talk profiles update --help
+opal say --help
+opal say generate --help
+opal say voices add --help
+opal say profiles update --help
 
 # Standalone entry point:
-opal-talk --help
+opal-say --help
 ~~~
 
-**Global options belong immediately after `talk`:** `opal talk --json voices list` is correct; `opal talk voices list --json` is not. The root `--json` controls **output formatting**, while `settings patch --json` carries a JSON **input payload**.
+**Global options belong immediately after `say`:** `opal say --json voices list` is correct; `opal say voices list --json` is not. The root `--json` controls **output formatting**, while `settings patch --json` carries a JSON **input payload**.
 
 ## In-depth CLI guide: from first voice to real use cases
 
@@ -334,24 +334,24 @@ opal-talk --help
 | **Generation** | Turn text into a finished or streaming audio body | `generate "Hello" -o hello.wav` |
 | **Engine option** | A control relevant to a particular TTS runtime | `noise_scale`, `lang` |
 | **Setting** | A stored service-wide default or limit | `chunk_max_chars` |
-| **Backup** | Logical configuration archive; not the model files | `opal-talk-...tar.gz` |
+| **Backup** | Logical configuration archive; not the model files | `opal-say-...tar.gz` |
 
 The important boundary is **engine versus voice versus profile**. The engine knows *how* to synthesize; the voice tells it *which resources* to use; the profile says *how you want the result delivered*.
 
 ### Use case 1: Find out what your machine can speak
 
 ~~~bash
-opal talk engines list
-opal talk engines get piper
-opal talk engines get kokoro
+opal say engines list
+opal say engines get piper
+opal say engines get kokoro
 
 # An enabled engine isn't necessarily usable.
-opal talk engines validate piper
-opal talk engines validate kokoro
+opal say engines validate piper
+opal say engines validate kokoro
 
-opal talk voices list
-opal talk voices list --engine piper
-opal talk voices list --engine kokoro
+opal say voices list
+opal say voices list --engine piper
+opal say voices list --engine kokoro
 ~~~
 
 An engine has both `enabled` (your administrative setting) and `available` (the runtime and its required files can be used). A Piper adapter with no voice models or a Kokoro adapter with a missing ONNX file isn't ready simply because the package installed.
@@ -359,8 +359,8 @@ An engine has both `enabled` (your administrative setting) and `available` (the 
 Check each registered voice independently:
 
 ~~~bash
-opal talk voices validate en-us-amy-low
-opal talk voices get en-us-amy-low
+opal say voices validate en-us-amy-low
+opal say voices get en-us-amy-low
 ~~~
 
 If a seed entry is missing, register a voice after installing its model (next use case).
@@ -370,16 +370,16 @@ If a seed entry is missing, register a voice after installing its model (next us
 The system never uploads models during registration. First put `en_US-amy-low.onnx` and `en_US-amy-low.onnx.json` on the service host, as shown in Installation, and set the engine's voices directory:
 
 ~~~bash
-opal talk engines update piper -O voices_dir="$HOME/piper/voices"
-opal talk engines validate piper
+opal say engines update piper -O voices_dir="$HOME/piper/voices"
+opal say engines validate piper
 ~~~
 
 If the seed already created `en-us-amy-low`, **don't add the same ID again**. Instead:
 
 ~~~bash
-opal talk voices get en-us-amy-low
-opal talk voices validate en-us-amy-low
-opal talk voices test en-us-amy-low \
+opal say voices get en-us-amy-low
+opal say voices validate en-us-amy-low
+opal say voices test en-us-amy-low \
   --text "Hello. My name is Amy, and I'm running locally." \
   -o amy-test.wav
 aplay amy-test.wav
@@ -388,25 +388,25 @@ aplay amy-test.wav
 For an installation with no seeded voice, create it:
 
 ~~~bash
-opal talk voices add en-us-amy-low \
+opal say voices add en-us-amy-low \
   --name "Amy (low)" \
   --engine piper \
   --ref en_US-amy-low \
   --language en-US
 
-opal talk voices validate en-us-amy-low
+opal say voices validate en-us-amy-low
 ~~~
 
 Create and activate a profile using the registered voice:
 
 ~~~bash
-opal talk profiles add my-assistant \
+opal say profiles add my-assistant \
   --voice en-us-amy-low \
   --description "Default local assistant voice" \
   --speed 1.0 --volume 0.9 --active
 
-opal talk profiles list
-opal talk generate "Welcome home." -o welcome.wav
+opal say profiles list
+opal say generate "Welcome home." -o welcome.wav
 ~~~
 
 You can also refer directly to an **absolute model path** in `--ref` instead of configuring `voices_dir`. Piper still needs the matching model config file, or a registered `config_path` option.
@@ -416,18 +416,18 @@ You can also refer directly to an **absolute model path** in `--ref` instead of 
 Once the Kokoro model and voices file are on the host:
 
 ~~~bash
-opal talk engines update kokoro \
+opal say engines update kokoro \
   -O model_path="$HOME/kokoro/kokoro-v1.0.int8.onnx" \
   -O voices_path="$HOME/kokoro/voices-v1.0.bin"
 
-opal talk engines validate kokoro
-opal talk voices list --engine kokoro
+opal say engines validate kokoro
+opal say voices list --engine kokoro
 ~~~
 
 The seeded registration `kokoro-af-heart` is ready if it appears in `voices list` and validates. Otherwise register it yourself:
 
 ~~~bash
-opal talk voices add kokoro-af-heart \
+opal say voices add kokoro-af-heart \
   --name "Kokoro Heart" --engine kokoro --ref af_heart \
   --language en-US
 ~~~
@@ -435,11 +435,11 @@ opal talk voices add kokoro-af-heart \
 Try two distinct personalities (assuming both voices are registered and available):
 
 ~~~bash
-opal talk voices test kokoro-af-heart \
+opal say voices test kokoro-af-heart \
   --text "Attention, explorers. Our adventure begins right now." \
   -o heart.wav
 
-opal talk voices test kokoro-bm-george \
+opal say voices test kokoro-bm-george \
   --text "Attention, explorers. Our adventure begins right now." \
   -o george.wav
 ~~~
@@ -451,33 +451,33 @@ Run `aplay heart.wav` and `aplay george.wav` to compare them. A voice registrati
 Profiles are reusable output recipes. You might use a friendly voice for an assistant, an authoritative voice for alerts, and a different rate for a phone system.
 
 ~~~bash
-opal talk profiles list
+opal say profiles list
 
 # Make a narrator without changing the active profile:
-opal talk profiles add narrator \
+opal say profiles add narrator \
   --voice kokoro-bm-george \
   --description "Longer narration with a deliberate pace" \
   --speed 0.9 --volume 1.0 --format wav
 
 # Capture the numeric profile ID from the response or from the list.
-opal talk profiles list
+opal say profiles list
 
 # Use it for a specific utterance, without switching the default.
-opal talk generate "Chapter one. A new beginning." \
+opal say generate "Chapter one. A new beginning." \
   --voice kokoro-bm-george --speed 0.9 -o chapter-opening.wav
 ~~~
 
 For an existing numeric `PROFILE_ID`:
 
 ~~~bash
-opal talk profiles get PROFILE_ID
-opal talk profiles activate PROFILE_ID
+opal say profiles get PROFILE_ID
+opal say profiles activate PROFILE_ID
 
 # Now the active profile supplies defaults:
-opal talk generate "Your assistant is online." -o ready.wav
+opal say generate "Your assistant is online." -o ready.wav
 
 # Change this profile without changing other profiles.
-opal talk profiles update PROFILE_ID --volume 0.8 --speed 1.1
+opal say profiles update PROFILE_ID --volume 0.8 --speed 1.1
 ~~~
 
 Replace `PROFILE_ID` with the integer displayed by `profiles list`. A profile **must reference a registered voice**. Only one profile can be active; deleting an active profile is rejected. Switching to another profile before removal is the safe approach.
@@ -489,7 +489,7 @@ Request-level `--voice`, `--speed`, `--volume`, `--format`, and `--sample-rate` 
 Generate and play a WAV in one pipeline:
 
 ~~~bash
-opal talk generate \
+opal say generate \
   "The kitchen timer is finished. Dinner is ready!" \
   --voice en-us-amy-low \
   -o - | aplay
@@ -497,10 +497,10 @@ opal talk generate \
 
 Here `-o -` means **send audio to stdout**. The CLI prints its status summary to stderr so the binary audio stream stays clean.
 
-Want to play a particular PCM format instead of WAV? Tell **both** OPAL Talk and the player the sample rate:
+Want to play a particular PCM format instead of WAV? Tell **both** OPAL Say and the player the sample rate:
 
 ~~~bash
-opal talk generate "Someone is at the front door." \
+opal say generate "Someone is at the front door." \
   --voice en-us-amy-low \
   --format pcm --sample-rate 16000 -o - \
   | aplay -t raw -f S16_LE -c 1 -r 16000
@@ -513,7 +513,7 @@ The default sample rate is generally the voice's **native** rate. For arbitrary 
 For announcements, voice assistants, and long responses, waiting for a complete file makes the system feel sluggish. Use **`--stream`**.
 
 ~~~bash
-opal talk generate \
+opal say generate \
   "Attention please. The camera saw movement. Checking the front door now." \
   --voice en-us-amy-low \
   --stream --sample-rate 22050 -o - \
@@ -525,7 +525,7 @@ Unlike a regular WAV request, a stream is **always signed 16-bit little-endian m
 You can pipe a file into generation without loading all of it as a shell argument:
 
 ~~~bash
-opal talk generate - \
+opal say generate - \
   --voice en-us-amy-low \
   --stream --sample-rate 22050 -o - \
   < my-announcement.txt \
@@ -536,8 +536,8 @@ To influence how quickly the first chunk becomes available:
 
 ~~~bash
 # Smaller chunks often improve first-audio latency at the cost of more overhead.
-opal talk settings get chunk_max_chars
-opal talk settings set chunk_max_chars 200
+opal say settings get chunk_max_chars
+opal say settings set chunk_max_chars 200
 ~~~
 
 Text is chunked internally at sentence boundaries. It is **not** one independent audio file per sentence, and smaller chunks are not a guarantee of a particular latency. Model load, hardware, and engine affect first audio too.
@@ -548,10 +548,10 @@ Text is chunked internally at sentence boundaries. It is **not** one independent
 
 ~~~bash
 # Complete WAV, read from standard input.
-opal talk generate - --voice kokoro-af-heart -o article.wav < article.txt
+opal say generate - --voice kokoro-af-heart -o article.wav < article.txt
 
 # Or stream a long article to your speakers.
-opal talk generate - --voice kokoro-af-heart \
+opal say generate - --voice kokoro-af-heart \
   --stream --sample-rate 24000 -o - \
   < article.txt \
   | aplay -q -t raw -f S16_LE -c 1 -r 24000
@@ -560,22 +560,22 @@ opal talk generate - --voice kokoro-af-heart \
 The configured `max_text_chars` limits accepted text (default: 20,000). You can inspect and adjust it deliberately:
 
 ~~~bash
-opal talk settings list
-opal talk settings set max_text_chars 50000
+opal say settings list
+opal say settings set max_text_chars 50000
 ~~~
 
 The limit guards the service from unexpectedly large synthesis requests. For a full book, consider dividing it into chapters with one output file per chapter rather than one giant generation call.
 
 ### Use case 8: Make an 8 kHz voice prompt for a telephone system
 
-OPAL Talk can output at a chosen sample rate instead of leaving conversion to every downstream program.
+OPAL Say can output at a chosen sample rate instead of leaving conversion to every downstream program.
 
 ~~~bash
-opal talk profiles list
+opal say profiles list
 
 # The fresh seed includes a profile named "telephony"; use its numeric ID.
 # It normally supplies raw PCM at 8000 Hz.
-opal talk generate "Your call is important to us." \
+opal say generate "Your call is important to us." \
   --voice en-us-amy-low --format pcm --sample-rate 8000 \
   -o phone.raw
 ~~~
@@ -593,7 +593,7 @@ sox -t raw -r 8000 -e signed-integer -b 16 -c 1 \
 Raw `pcm` has **no WAV header**. If your target wants an ordinary WAV, request it directly:
 
 ~~~bash
-opal talk generate "Please hold." \
+opal say generate "Please hold." \
   --voice en-us-amy-low --format wav --sample-rate 8000 \
   -o hold.wav
 ~~~
@@ -605,7 +605,7 @@ This is useful for IVR prompts, embedded systems, constrained playback devices, 
 Some controls are **portable** (every engine understands them):
 
 ~~~bash
-opal talk generate "This is a quiet announcement." \
+opal say generate "This is a quiet announcement." \
   --voice en-us-amy-low --speed 0.85 --volume 0.65 \
   -o quiet.wav
 ~~~
@@ -614,19 +614,19 @@ Others are specific to an engine and are passed with repeatable `-O KEY=VALUE` o
 
 ~~~bash
 # Piper: adjust expressiveness and rhythm.
-opal talk generate "The workshop is ready." \
+opal say generate "The workshop is ready." \
   --voice en-us-amy-low \
   -O noise_scale=0.35 -O noise_w_scale=0.6 \
   -o piper-tuned.wav
 
 # Kokoro: choose a pronunciation language for this request.
-opal talk generate "Good evening." \
+opal say generate "Good evening." \
   --voice kokoro-bm-george \
   -O lang=en-gb \
   -o british.wav
 
 # JSON form for several options at once:
-opal talk engines update piper \
+opal say engines update piper \
   --options-json '{"voices_dir":"~/piper/voices","cache_size":4}'
 ~~~
 
@@ -641,7 +641,7 @@ Engine options are *scoped*:
 
 For synthesis, engine options layer as **voice → profile → request**, with more specific values winning. An engine override is advanced: the target engine must actually support the selected voice.
 
-**Mind the limits:** OPAL Talk validates options rather than guessing. Piper supports speed 0.25–4.0, while Kokoro supports 0.5–2.0; unsupported values cause a clear error.
+**Mind the limits:** OPAL Say validates options rather than guessing. Piper supports speed 0.25–4.0, while Kokoro supports 0.5–2.0; unsupported values cause a clear error.
 
 ### Use case 10: Run a voice comparison
 
@@ -650,15 +650,15 @@ Want to compare delivery without changing your default profile?
 ~~~bash
 mkdir -p comparisons
 
-opal talk voices test en-us-amy-low \
+opal say voices test en-us-amy-low \
   --text "The sky is clear and the journey begins." \
   --speed 1.0 -o comparisons/amy.wav
 
-opal talk voices test kokoro-af-heart \
+opal say voices test kokoro-af-heart \
   --text "The sky is clear and the journey begins." \
   --speed 1.0 -o comparisons/heart.wav
 
-opal talk voices test kokoro-bm-george \
+opal say voices test kokoro-bm-george \
   --text "The sky is clear and the journey begins." \
   --speed 1.0 -o comparisons/george.wav
 ~~~
@@ -672,7 +672,7 @@ mkdir -p batch
 n=0
 while IFS= read -r line; do
   n=$((n + 1))
-  opal talk generate "$line" --voice en-us-amy-low \
+  opal say generate "$line" --voice en-us-amy-low \
     -o "$(printf 'batch/line-%03d.wav' "$n")"
 done < announcements.txt
 ~~~
@@ -681,7 +681,7 @@ The batch uses the REST API for every line; it is not an offline bypass of the s
 
 ### Use case 11: Give OPAL a voice when something happens
 
-OPAL Listen detects commands. OPAL Look detects things. OPAL Event can match the resulting events and invoke actions. OPAL Talk turns an action's text response into audio.
+OPAL Listen detects commands. OPAL Look detects things. OPAL Event can match the resulting events and invoke actions. OPAL Say turns an action's text response into audio.
 
 ~~~text
     OPAL Look                    OPAL Listen
@@ -695,7 +695,7 @@ OPAL Listen detects commands. OPAL Look detects things. OPAL Event can match the
              trusted action/script
                      │
                      ▼
-          OPAL Talk REST / Typer CLI
+          OPAL Say REST / Typer CLI
                      │
                      ▼
                  WAV or PCM
@@ -706,7 +706,7 @@ OPAL Listen detects commands. OPAL Look detects things. OPAL Event can match the
 For example, this **shell-side** announcement is the final talking step a trusted automation could call:
 
 ~~~bash
-opal-talk generate "A person has been detected at the front door." \
+opal-say generate "A person has been detected at the front door." \
   --voice en-us-amy-low \
   --stream --sample-rate 16000 -o - \
   | aplay -q -t raw -f S16_LE -c 1 -r 16000
@@ -755,28 +755,28 @@ The service returns audio metadata in headers including `X-Opal-Audio-Format`, `
 A working voice catalog is worth keeping. Take a snapshot before importing configuration or experimenting with engine settings:
 
 ~~~bash
-opal talk backup validate
-opal talk backup create
-opal talk backup list
+opal say backup validate
+opal say backup create
+opal say backup list
 
 # Save a human-readable logical config export locally:
-opal talk backup export -o talk-config.json
+opal say backup export -o say-config.json
 
 # Check a saved export/backup payload:
-opal talk backup validate --payload talk-config.json
+opal say backup validate --payload say-config.json
 ~~~
 
 Backups are created **on the service host** and can be downloaded by the filename returned from `backup list`:
 
 ~~~bash
-opal talk backup download FILENAME -o ./my-talk-backup.tar.gz
+opal say backup download FILENAME -o ./my-say-backup.tar.gz
 ~~~
 
 For an existing server backup filename:
 
 ~~~bash
 # This replaces the service configuration immediately.
-opal talk backup restore FILENAME
+opal say backup restore FILENAME
 ~~~
 
 A backup captures logical configuration, **not** Piper/Kokoro model binaries. To migrate to another computer, you must install the needed voice/model files there too.
@@ -786,12 +786,12 @@ Want your YAML files to be the source of truth?
 ~~~bash
 # On the server, edit config/engines.yaml, voices.yaml,
 # profiles.yaml, or settings.yaml, then validate and back up.
-opal talk backup validate
-opal talk backup create
+opal say backup validate
+opal say backup create
 
 # Re-import server-side YAML:
-opal talk backup import
-opal talk backup validate
+opal say backup import
+opal say backup validate
 ~~~
 
 **Caution:** `backup import` reads the **server's** configured YAML directory; it does **not** upload a JSON export from the client's filesystem. It applies present sections as replacements and doesn't automatically create a safety backup first. Back up explicitly before importing. Restore also changes the live configuration without a confirmation prompt.
@@ -799,23 +799,23 @@ opal talk backup validate
 ### Use case 14: Know what broke before users hear silence
 
 ~~~bash
-opal talk ping
-opal talk info
-opal talk health
-opal talk health --live
-opal talk health --ready
+opal say ping
+opal say info
+opal say health
+opal say health --live
+opal say health --ready
 
-opal talk engines list
-opal talk engines validate piper
-opal talk voices validate en-us-amy-low
-opal talk backup validate
+opal say engines list
+opal say engines validate piper
+opal say voices validate en-us-amy-low
+opal say backup validate
 ~~~
 
 If your pipeline can't speak, troubleshoot from the bottom up:
 
 | Symptom | First place to look |
 | --- | --- |
-| Can't reach the service | `opal talk ping`, URL, port, process |
+| Can't reach the service | `opal say ping`, URL, port, process |
 | Engine reports unavailable | `engines validate`, installed Python extra, model paths |
 | Voice doesn't synthesize | `voices validate`, voice ref and model config |
 | No active default voice | `profiles list`, active profile or explicit `--voice` |
@@ -827,7 +827,7 @@ If your pipeline can't speak, troubleshoot from the bottom up:
 Remember: **the first request may load a model**. A quick warmup can help measure steady-state performance:
 
 ~~~bash
-opal talk voices test en-us-amy-low --text "Ready." -o /dev/null
+opal say voices test en-us-amy-low --text "Ready." -o /dev/null
 ~~~
 
 ## Settings and reference material
@@ -837,16 +837,16 @@ opal talk voices test en-us-amy-low --text "Ready." -o /dev/null
 Service-wide defaults can be set individually:
 
 ~~~bash
-opal talk settings list
-opal talk settings get chunk_max_chars
-opal talk settings set chunk_max_chars 200
-opal talk settings set default_speed 1.1
+opal say settings list
+opal say settings get chunk_max_chars
+opal say settings set chunk_max_chars 200
+opal say settings set default_speed 1.1
 
 # Remove a stored override; fall back to the built-in behavior.
-opal talk settings delete default_speed
+opal say settings delete default_speed
 
 # Atomic multi-key merge patch, when desired:
-opal talk settings patch --json '{"default_volume":0.85,"chunk_max_chars":250}'
+opal say settings patch --json '{"default_volume":0.85,"chunk_max_chars":250}'
 ~~~
 
 | Key | Built-in default | Purpose |
@@ -874,7 +874,7 @@ For low-latency pipelines, set `--sample-rate` to a known value, especially when
 
 ### Configuration and API philosophy
 
-The implemented API is **v1.4.0**. The authoritative copy is the packaged document `src/opal_talk/contract/opal_talk.yaml`: it is loaded by `opal_talk.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. The root [`opal_talk_v1.4.0.yaml`](opal_talk_v1.4.0.yaml) is a byte-identical human-facing copy; a test enforces that the two never drift. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
+The implemented API is **v1.5.0**. The contract's source of truth is decomposed under [`openapi/`](openapi/): [`opal_say_v1.5.0.yaml`](openapi/opal_say_v1.5.0.yaml) holds the Say-specific surface, and [`shared/opal_kernel.yaml`](openapi/shared/opal_kernel.yaml) holds the OPAL suite-standard operations shared across services. `tools/bundle_contract.py` flattens the two into the packaged document `src/opal_say/contract/opal_say.yaml`, which is loaded by `opal_say.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. A test enforces that the packaged copy never drifts from a fresh bundle of the source. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
 
 The full service is **API-first**:
 
@@ -896,9 +896,9 @@ The full service is **API-first**:
                                                   Piper                Kokoro
 ~~~
 
-The REST service coordinates profiles, registered voices, generation, validation, persistence, configuration imports, and streaming. The CLI and SPA **do not** duplicate engine logic. Custom engines integrate through the Python `TtsEngine` interface and the `opal_talk.engines` entry-point group.
+The REST service coordinates profiles, registered voices, generation, validation, persistence, configuration imports, and streaming. The CLI and SPA **do not** duplicate engine logic. Custom engines integrate through the Python `TtsEngine` interface and the `opal_say.engines` entry-point group.
 
-Process configuration lives in [`config/service.yaml`](config/service.yaml). The main environment overrides are `OPAL_TALK_CONFIG`, `OPAL_TALK_HOST`, `OPAL_TALK_PORT`, `OPAL_TALK_DATA_DIR`, `OPAL_TALK_CONFIG_DIR`, and `OPAL_TALK_SPA_DIR`. The CLI's target is controlled separately by `OPAL_TALK_API_URL` (default `http://127.0.0.1:8001`).
+Process configuration lives in [`config/service.yaml`](config/service.yaml). The main environment overrides are `OPAL_SAY_CONFIG`, `OPAL_SAY_HOST`, `OPAL_SAY_PORT`, `OPAL_SAY_DATA_DIR`, `OPAL_SAY_CONFIG_DIR`, and `OPAL_SAY_SPA_DIR`. The CLI's target is controlled separately by `OPAL_SAY_API_URL` (default `http://127.0.0.1:8001`).
 
 For security, keep the default loopback binding unless you intend to operate a network service. If you expose the API to other hosts, place it behind appropriate network access controls or an authenticated reverse proxy. Voice synthesis consumes CPU, memory, and potentially GPU resources; avoid unrestricted public access.
 
@@ -914,15 +914,18 @@ make test-spa       # React/Vitest and frontend type checking
 make spa-dev        # Vite development server
 ~~~
 
-Real-engine tests require installed model files — they look for `~/piper/voices/en_US-amy-low.onnx` and `~/kokoro/` (override with `OPAL_TALK_TEST_PIPER_MODEL` / `OPAL_TALK_TEST_KOKORO_DIR`) — and skip cleanly when the resources aren't available. Standard CI runs `make test-fast`; real-engine validation is a manual-dispatch job only, so no model downloads ever happen on push or PR. The test suite checks OpenAPI route alignment, CLI/SPA operation parity, output formats, error handling, and streaming behavior. See [docs/PERFORMANCE_TESTS.md](docs/PERFORMANCE_TESTS.md) for CPU/GPU/Raspberry Pi notes and [docs/RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md) for the real-engine release checklist.
+Real-engine tests require installed model files — they look for `~/piper/voices/en_US-amy-low.onnx` and `~/kokoro/` (override with `OPAL_SAY_TEST_PIPER_MODEL` / `OPAL_SAY_TEST_KOKORO_DIR`) — and skip cleanly when the resources aren't available. Standard CI runs `make test-fast`; real-engine validation is a manual-dispatch job only, so no model downloads ever happen on push or PR. The test suite checks OpenAPI route alignment, CLI/SPA operation parity, output formats, error handling, and streaming behavior. See [docs/PERFORMANCE_TESTS.md](docs/PERFORMANCE_TESTS.md) for CPU/GPU/Raspberry Pi notes and [docs/RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md) for the real-engine release checklist.
 
 ### Find your way around
 
 ~~~text
-opal-talk/
-├── opal-talk.png                       project artwork
+opal-say/
+├── opal-say.png                       project artwork
 ├── README.md                           this guide
-├── opal_talk_v1.4.0.yaml               authoritative OpenAPI contract (v1.4.0)
+├── openapi/
+│   ├── opal_say_v1.5.0.yaml            Say-specific OpenAPI contract (v1.5.0)
+│   └── shared/opal_kernel.yaml         OPAL suite-standard contract components
+├── tools/bundle_contract.py            flattens openapi/ into the packaged contract
 ├── pyproject.toml                      packaging and entry points
 ├── Makefile                            development commands
 ├── config/
@@ -931,7 +934,7 @@ opal-talk/
 │   ├── voices.yaml                     voice registrations
 │   ├── profiles.yaml                   generation profiles
 │   └── settings.yaml                   service defaults
-├── src/opal_talk/
+├── src/opal_say/
 │   ├── api/                            FastAPI routes and middleware
 │   ├── cli/                            Typer client and commands
 │   ├── service/                        generation, config, backup
@@ -943,15 +946,17 @@ opal-talk/
 │   ├── CLI.md                          exhaustive command reference
 │   ├── USER_GUIDE.md                   detailed operating manual
 │   ├── CONTRACT_NOTES.md               contract interpretation notes
+│   ├── PIPER_INSTALL.md                Piper engine installation guide
+│   ├── KOKORO_INSTALL.md               Kokoro engine installation guide
 │   ├── PERFORMANCE_TESTS.md            performance testing notes
 │   └── RELEASE_VALIDATION.md           real-engine release checklist
 └── tests/                              Python and contract tests
 ~~~
 
-For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs/USER_GUIDE.md), [Contract Notes](docs/CONTRACT_NOTES.md), [Performance Tests](docs/PERFORMANCE_TESTS.md), and [Release Validation](docs/RELEASE_VALIDATION.md).
+For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs/USER_GUIDE.md), [Contract Notes](docs/CONTRACT_NOTES.md), [Piper](docs/PIPER_INSTALL.md) and [Kokoro](docs/KOKORO_INSTALL.md) install guides, [Performance Tests](docs/PERFORMANCE_TESTS.md), and [Release Validation](docs/RELEASE_VALIDATION.md).
 
 ---
 
-**OPAL Talk doesn't decide what to say. It makes the words audible.** Put a local speech engine behind a simple REST contract, give it the voice that fits the moment, and let the rest of OPAL decide when it's time to speak.
+**OPAL Say doesn't decide what to say. It makes the words audible.** Put a local speech engine behind a simple REST contract, give it the voice that fits the moment, and let the rest of OPAL decide when it's time to speak.
 
 [Explore OPAL](https://github.com/PatMartin/opal) · [OPAL Listen](https://github.com/PatMartin/opal-listen) · [OPAL Event](https://github.com/PatMartin/opal-event) · [OPAL Look](https://github.com/PatMartin/opal-look) · [OPAL Think](https://github.com/PatMartin/opal-think)
