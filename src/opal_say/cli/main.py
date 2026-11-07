@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+import click
 import typer
+from typer.core import TyperGroup
 
 from opal_say.cli.client import api_url_from_env
 from opal_say.cli.commands import backup, engines, generate, profiles, root, settings, voices
 from opal_say.cli.common import CliState, client_factory  # noqa: F401 - re-exported; tests patch main.client_factory
+
+
+class SayGroup(TyperGroup):
+    """`opal say TEXT` speaks text aloud; unknown arguments route to the hidden `speak` command."""
+
+    def resolve_command(self, ctx: click.Context, args: list[str]) -> tuple[str | None, click.Command | None, list[str]]:
+        if args and args[0] not in self.commands and (args[0] == "-" or not args[0].startswith("-")):
+            return "speak", self.commands["speak"], args
+        return super().resolve_command(ctx, args)
 
 # REST operationId -> CLI command (relative to `opal say`). Verified by the parity tests.
 COMMANDS: dict[str, str] = {
@@ -52,7 +63,8 @@ COMMANDS: dict[str, str] = {
 
 
 say_app = typer.Typer(
-    help="OPAL Say text-to-speech (talks to the opal-say-svc REST API).",
+    cls=SayGroup,
+    help="OPAL Say text-to-speech (talks to the opal-say-svc REST API). 'opal say TEXT' speaks aloud.",
     epilog="Global options (--api-url, --json, --timeout) go before the command group, "
            "e.g. 'opal say --json voices list'.",
     no_args_is_help=True,
@@ -77,7 +89,7 @@ for _module in (engines, voices, profiles, generate, settings, backup, root):
 # -- `opal` root -----------------------------------------------------------------
 
 app = typer.Typer(help="OPAL command line.", no_args_is_help=True, pretty_exceptions_enable=False)
-app.add_typer(say_app, name="say")
+app.add_typer(say_app, name="say", cls=SayGroup)
 
 try:  # Share the `opal` root with the sister OPAL Listen CLI when it is installed.
     from opal_listener.cli.main import listen_app  # type: ignore[import-not-found]

@@ -3,7 +3,8 @@
 Kokoro-82M is the higher-fidelity engine: expressive, multi-lingual voices that still run
 comfortably on CPU. OPAL Say wraps the [`kokoro-onnx`](https://github.com/thewh1teagle/kokoro-onnx)
 runtime — **the runtime and the model files are separate installs**. The service never
-downloads or manages model files; you place them on the host and point the engine at them.
+downloads or manages model files; this guide installs them in this checkout's
+`resources/kokoro/` directory and points the engine at those files.
 
 ## 1. Install the runtime
 
@@ -20,7 +21,7 @@ pip install 'opal-say[kokoro]'
 Both engines at once: `pip install -e '.[engines]'`. Kokoro synthesis runs on CPU via
 ONNX Runtime — no GPU setup is needed.
 
-## 2. Download the model files
+## 2. Download the model files into this repository
 
 Kokoro needs **two files** from the
 [kokoro-onnx releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
@@ -32,19 +33,28 @@ Kokoro needs **two files** from the
 | `kokoro-v1.0.int8.onnx` | Int8-quantized model (~90 MB) — smaller, faster, near-identical for most uses |
 | `voices-v1.0.bin` | The voice pack — **all** voices live in this one file |
 
+Run these commands from the repository root. The downloaded files are intentionally local
+resources: they are required by the service, but are not part of the Python package.
+
 ```bash
-# Linux / macOS / Git Bash
-mkdir -p ~/kokoro && cd ~/kokoro
-curl -fLO https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx
-curl -fLO https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
+# Linux / macOS / Git Bash; run from the repository root.
+REPO_ROOT="$(pwd)"
+mkdir -p "$REPO_ROOT/resources/kokoro"
+curl -fL \
+  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx \
+  -o "$REPO_ROOT/resources/kokoro/kokoro-v1.0.int8.onnx"
+curl -fL \
+  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin \
+  -o "$REPO_ROOT/resources/kokoro/voices-v1.0.bin"
 ```
 
 ```powershell
-# Windows PowerShell
-mkdir ~\kokoro
-curl.exe -fLo ~\kokoro\kokoro-v1.0.int8.onnx `
+# Windows PowerShell; run from the repository root.
+$repoRoot = (Get-Location).Path
+New-Item -ItemType Directory -Force -Path "$repoRoot\resources\kokoro" | Out-Null
+curl.exe -fLo "$repoRoot\resources\kokoro\kokoro-v1.0.int8.onnx" `
   https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx
-curl.exe -fLo ~\kokoro\voices-v1.0.bin `
+curl.exe -fLo "$repoRoot\resources\kokoro\voices-v1.0.bin" `
   https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
 ```
 
@@ -53,28 +63,48 @@ Pick **one** model file — the int8 build is the sensible default; use the full
 
 ## 3. Point the engine at the files
 
-`config/service.yaml` already contains the conventional locations:
+When the service is started from the repository root, set the engine paths to the
+repository-relative locations in `config/engines.yaml` (and, if you use its initial engine
+configuration, `config/service.yaml`):
 
 ```yaml
 engines:
   kokoro:
     enabled: true
     options:
-      model_path: ~/kokoro/kokoro-v1.0.int8.onnx   # '~' is expanded; absolute paths work too
-      voices_path: ~/kokoro/voices-v1.0.bin
+      model_path: resources/kokoro/kokoro-v1.0.int8.onnx
+      voices_path: resources/kokoro/voices-v1.0.bin
       default_lang: en-us
 ```
 
-Or update the running service instead of the file (persisted in SQLite):
+Relative engine paths are resolved from the service process's working directory. If the
+service runs from another directory (for example, under a service manager), use absolute
+paths instead. Update a running service with absolute paths so its configuration remains
+valid regardless of where it is started:
 
 ```bash
-opal say engines update kokoro -O model_path=~/kokoro/kokoro-v1.0.int8.onnx \
-                                -O voices_path=~/kokoro/voices-v1.0.bin \
-                                -O default_lang=en-us
+# Run from the repository root.
+REPO_ROOT="$(pwd)"
+opal say engines update kokoro \
+  -O model_path="$REPO_ROOT/resources/kokoro/kokoro-v1.0.int8.onnx" \
+  -O voices_path="$REPO_ROOT/resources/kokoro/voices-v1.0.bin" \
+  -O default_lang=en-us
+opal say engines update kokoro --enable
+```
+
+```powershell
+# Windows PowerShell; run from the repository root.
+$repoRoot = (Get-Location).Path
+opal say engines update kokoro `
+  -O "model_path=$repoRoot\resources\kokoro\kokoro-v1.0.int8.onnx" `
+  -O "voices_path=$repoRoot\resources\kokoro\voices-v1.0.bin" `
+  -O default_lang=en-us
 opal say engines update kokoro --enable
 ```
 
 Both paths are **required** — the engine reports unavailable until they point at real files.
+If you edit the YAML files after the service has already started, apply them with
+`opal say backup import`; otherwise the persisted engine configuration continues to win.
 
 ## 4. Verify
 
@@ -82,7 +112,7 @@ Both paths are **required** — the engine reports unavailable until they point 
 opal say engines validate kokoro         # runtime + model/voices file checks
 opal say voices add heart --name Heart --engine kokoro --ref af_heart
 opal say voices validate heart
-opal say voices test heart               # synthesizes a short sample
+opal say voices test heart -o test.wav    # synthesizes a short sample
 opal say generate "Kokoro is installed." -o hello.wav
 ```
 

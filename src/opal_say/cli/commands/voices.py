@@ -6,11 +6,12 @@ from typing import Any
 
 import typer
 
+from opal_say.cli import audio
 from opal_say.cli.common import (
     VOICE_COLUMNS,
+    OptionalOutput,
     OptionPairs,
     OptionsJson,
-    Output,
     _audio_summary,
     _call,
     _emit,
@@ -116,7 +117,8 @@ def voices_validate(ctx: typer.Context, voice_id: str) -> None:
 def voices_test(
     ctx: typer.Context,
     voice_id: str,
-    output: str = Output,
+    output: str | None = OptionalOutput,
+    play: bool = typer.Option(False, "--play", help="Also play the sample locally (requires 'opal-say[audio]')"),
     text: str = typer.Option(None, "--text", help="Test phrase (service default if omitted)"),
     speed: float = typer.Option(None, "--speed", min=0.25, max=4.0),
     volume: float = typer.Option(None, "--volume", min=0.0, max=2.0),
@@ -126,6 +128,10 @@ def voices_test(
     options_json: str = OptionsJson,
 ) -> None:
     """Generate a short test utterance with a voice."""
+    if play and output == "-":
+        raise typer.BadParameter("cannot both write audio to stdout and play it locally")
+    if not play and output is None:
+        raise typer.BadParameter("supply -o/--output, or play the audio with --play")
     body: dict[str, Any] = {}
     for key, value in (("text", text), ("speed", speed), ("volume", volume), ("output_format", output_format),
                        ("sample_rate", sample_rate)):
@@ -136,7 +142,10 @@ def voices_test(
         body["engine_options"] = options
     resp = _call(ctx, "test_voice_api_v1_voices__voice_id__test_post", path_params={"voice_id": voice_id},
                  json=body or None)
-    _audio_summary(resp, output, _write_audio(resp, output))
+    size = _write_audio(resp, output) if output is not None else 0
+    if play:
+        size = audio.play_response(resp)
+    _audio_summary(resp, output if output is not None else "the local speaker", size)
 
 
 def register(say_app: typer.Typer) -> None:

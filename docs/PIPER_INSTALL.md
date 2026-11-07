@@ -3,8 +3,8 @@
 Piper is the recommended first engine: small ONNX voices, fast on CPU, and happy on a
 Raspberry Pi. OPAL Say wraps the [`piper-tts`](https://pypi.org/project/piper-tts/)
 Python package — **the runtime and the voice models are separate installs**. The service
-never downloads or manages model files; you place them on the host and point the engine
-at them.
+never downloads or manages model files; this guide installs them in this checkout's
+`resources/piper/` directory and points the engine at those files.
 
 ## 1. Install the runtime
 
@@ -54,24 +54,40 @@ Keep both files together; a `.onnx` without its `.onnx.json` won't validate.
 
 ## 3. Point the engine at the voices
 
-`config/service.yaml` already contains the conventional location:
+When the service is started from the repository root, set `voices_dir` to the
+repository-relative location in `config/engines.yaml` (and, if you use its initial engine
+configuration, `config/service.yaml`):
 
 ```yaml
 engines:
   piper:
     enabled: true
     options:
-      voices_dir: ~/piper/voices   # '~' is expanded; absolute paths work too
+      voices_dir: resources/piper   # flat dir; '~' expands, absolute paths work too
       use_cuda: false
-      cache_size: 4                # loaded models kept in memory (1..32)
+      cache_size: 4                 # loaded models kept in memory (1..32)
 ```
 
-Or update the running service instead of the file (persisted in SQLite):
+Relative engine paths are resolved from the service process's working directory. If the
+service runs from another directory (for example, under a service manager), use an
+absolute path — the safest way is to update the running service (persisted in SQLite):
 
 ```bash
-opal say engines update piper -O voices_dir=~/piper/voices
+# Run from the repository root.
+REPO_ROOT="$(pwd)"
+opal say engines update piper -O "voices_dir=$REPO_ROOT/resources/piper"
 opal say engines update piper --enable
 ```
+
+```powershell
+# Windows PowerShell; run from the repository root.
+$repoRoot = (Get-Location).Path
+opal say engines update piper -O "voices_dir=$repoRootesources\piper"
+opal say engines update piper --enable
+```
+
+If you edit the YAML files after the service has already started, apply them with
+`opal say backup import`; otherwise the persisted engine configuration continues to win.
 
 ## 4. Verify
 
@@ -79,8 +95,19 @@ opal say engines update piper --enable
 opal say engines validate piper          # runtime + options checks
 opal say voices add amy --name Amy --engine piper --ref en_US-amy-low
 opal say voices validate amy             # model + config resolve
-opal say voices test amy                 # synthesizes a short sample
+opal say voices test amy -o test.wav     # synthesizes a short sample
 opal say generate "Piper is installed." -o hello.wav
+```
+
+With the whole catalog installed, register every resolvable model in one loop (ids are
+the model basenames):
+
+```bash
+for onnx in resources/piper/*.onnx; do
+  ref="$(basename "${onnx%.onnx}")"
+  opal say voices add "$ref" --name "$ref" --engine piper --ref "$ref" || true
+done
+opal say voices list --engine piper | wc -l
 ```
 
 `voices_dir` is optional: a voice reference may also be an **absolute path** to a

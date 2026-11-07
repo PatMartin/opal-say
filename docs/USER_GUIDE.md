@@ -2038,8 +2038,10 @@ never be selected while their version differs from the implementation.
 ### 12.2 FAQ
 
 **Does OPAL Say play audio?**
-No. Playback, audio devices and job queues are deliberately outside the API. Pipe the output into
-`aplay`, `pacat` or `ffplay`, or play it in your application.
+The service never plays audio — playback, audio devices and job queues are deliberately outside the
+API. Pipe the output into `aplay`, `pacat` or `ffplay`, play it in your application, or let the CLI
+do it locally: `opal say TEXT` and `--play` use `simpleaudio` (`pip install 'opal-say[audio]'`) on
+the machine running the CLI.
 
 **Can I upload or download models through the API?**
 No. Install model files on the host, then register voices that point at them. Unregistering a voice never

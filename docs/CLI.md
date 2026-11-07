@@ -7,8 +7,9 @@ configuration.
 
 The CLI is a thin REST client. **Every command calls the OPAL Say REST API.** It never opens the
 database or loads an engine itself, so the service must be running, either locally or on another
-machine. The CLI never plays audio either. It writes audio to a file or to stdout, and you pipe it into a
-player such as `aplay`.
+machine. The service never plays audio: the CLI writes it to a file or to stdout for piping into a
+player such as `aplay`, and — when the optional `audio` extra is installed — `opal say TEXT` and
+`--play` play it through the machine where you run the CLI.
 
 ---
 
@@ -41,7 +42,7 @@ Installing the project installs the CLI together with the service:
 cd /gh/opal/opal-say
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e '.[engines,dev]'    # or '.[piper]', '.[kokoro]', or '.' for the core only
+pip install -e '.[engines,dev]'    # or '.[piper]', '.[kokoro]', '.[audio]', or '.' for the core only
 # or simply: make install
 ```
 
@@ -192,7 +193,7 @@ By default the CLI prints human-friendly output:
 | `remove`, `delete` | A one-line confirmation, e.g. `voice 'test-voice' unregistered` |
 | `validate` (engines, voices, backup) | `valid` or `INVALID`, followed by one line per error and warning |
 | `health` | A status line, then an engine table |
-| `generate`, `voices test` | Audio goes to the `-o` target. A summary line goes to **stderr**. |
+| `generate`, `voices test`, `say TEXT` | Audio goes to the `-o` target and/or the local speaker. A summary line goes to **stderr**. |
 
 In tables, `null` values are shown as `-`, booleans as `yes`/`no`, and nested lists and maps as compact
 JSON.
@@ -209,10 +210,19 @@ opal say --json engines validate kokoro  # the full ValidationResult object
 
 ### Audio output
 
-`generate` and `voices test` always need `-o/--output`:
+Every audio-producing command has two destinations:
 
-- `-o FILE` writes the audio to `FILE`.
-- `-o -` writes the audio to **stdout**, so you can pipe it into a player or converter.
+- `-o FILE` writes the audio to `FILE`; `-o -` writes it to **stdout** for piping into a player or converter.
+- `--play` plays the audio on the machine running the CLI via [`simpleaudio`](https://pypi.org/project/simpleaudio/)
+  (`pip install 'opal-say[audio]'`).
+
+`opal say TEXT` is the shortcut for speaking aloud: it generates and plays, needs no `-o`, and
+`opal say TEXT -o file.wav` saves a copy while playing. `-o -` on that path writes to stdout and
+skips playback. `--play` without `-o` also works on `generate` and `voices test`; `-o` is required
+only when nothing plays. `--play -o -` is rejected — pick one destination.
+
+Local playback runs on the client machine, not on the service host, and needs the `audio` extra
+installed there.
 
 The summary line always goes to stderr, so it never corrupts piped audio:
 
@@ -301,7 +311,9 @@ opal (or opal-say, which starts at 'say')
     ├── engines   list | get | update | validate
     ├── voices    list | get | add | update | remove | validate | test
     ├── profiles  list | get | add | update | remove | activate
-    ├── generate  TEXT -o OUT [--stream] ...
+    ├── TEXT      speaks aloud (shortcut for 'speak': generate + play)
+    ├── generate  TEXT [-o OUT] [--stream] [--play] ...
+    ├── speak     TEXT [-o OUT] [--stream] [--play/--no-play] ...   (hidden; 'say TEXT' routes here)
     ├── settings  list | get | set | delete
     ├── backup    list | create | download | restore | delete | export | import | validate
     ├── health
@@ -545,12 +557,13 @@ valid
 ### `voices test`
 
 ```
-opal say voices test VOICE_ID -o OUT [--text T] [--speed F] [--volume F] [--format wav|pcm] [--sample-rate HZ] [-O key=value]...
+opal say voices test VOICE_ID [-o OUT] [--play] [--text T] [--speed F] [--volume F] [--format wav|pcm] [--sample-rate HZ] [-O key=value]...
 ```
 
 | Option | Default | Meaning |
 |---|---|---|
-| `-o`, `--output OUT` | required | Output file, or `-` for stdout |
+| `-o`, `--output OUT` | required unless `--play` | Output file, or `-` for stdout |
+| `--play` | off | Play the sample on this machine (`opal-say[audio]`) |
 | `--text T` | `This is a test of the selected OPAL Say voice.` | Text to speak |
 | `--speed F` | `1.0` | `0.25`–`4.0` (Kokoro supports `0.5`–`2.0`) |
 | `--volume F` | `1.0` | Linear gain `0.0`–`2.0` |
@@ -569,7 +582,11 @@ opal say voices test kokoro-af-heart -o test.wav
 # Custom phrase, faster, as raw PCM
 opal say voices test en-us-amy-low -o test.pcm --format pcm --text "Testing one two" --speed 1.3
 
-# Listen straight away
+# Listen straight away — local playback, no pipe needed
+opal say voices test kokoro-bm-george --play
+# or write the file and play it
+opal say voices test kokoro-bm-george --play -o george.wav
+# or the classic pipe
 opal say voices test kokoro-bm-george -o - | aplay
 ```
 
@@ -679,8 +696,24 @@ opal say profiles remove 4
 
 ## 8. `generate`: speech generation and streaming
 
+`opal say TEXT` is the shortcut for the common case — it generates and **plays the audio locally**
+without `-o`. It accepts all the options below plus `--play/--no-play`. These are equivalent:
+
+```bash
+opal say "Build complete."                      # speak aloud
+opal say generate "Build complete." --play      # same, explicitly
+opal say "Build complete." -o done.wav          # save a copy while speaking
+opal say "Build complete." --no-play -o q.wav   # file only
+opal say "Pipe me." -o - | aplay                # stdout wins over playback
 ```
-opal say generate TEXT -o OUT [--stream] [--profile ID] [--voice V] [--engine E]
+
+Local playback needs the `audio` extra (`pip install 'opal-say[audio]'`) and plays on the machine
+running the CLI — useful when the service runs somewhere else.
+
+For the file/stdout-oriented command:
+
+```
+opal say generate TEXT [-o OUT] [--play] [--stream] [--profile ID] [--voice V] [--engine E]
                    [--speed F] [--volume F] [--format wav|pcm] [--sample-rate HZ]
                    [-O key=value]... [--options-json JSON]
 ```
@@ -688,7 +721,8 @@ opal say generate TEXT -o OUT [--stream] [--profile ID] [--voice V] [--engine E]
 | Option | Default | Meaning |
 |---|---|---|
 | `TEXT` | required | Plain text to speak. `-` reads the text from stdin. |
-| `-o`, `--output OUT` | required | Output file, or `-` for stdout |
+| `-o`, `--output OUT` | required unless `--play` | Output file, or `-` for stdout |
+| `--play` | off | Also play the audio locally. With `--stream`, PCM chunks play progressively |
 | `--stream` | off | Use `/generate/stream`: progressive raw PCM, written as it arrives |
 | `--profile ID` | active profile | Use this profile instead of the active one |
 | `--voice V` | from profile | Voice override |
@@ -1398,6 +1432,8 @@ See the [User Guide](USER_GUIDE.md#10-integrating-with-your-application) for str
 | `Error: cannot reach OPAL Say API: ...` (exit `2`) | The service isn't running, or the URL is wrong. Start `opal-say-svc`, or set `OPAL_SAY_API_URL` / `--api-url`. The default port is `8001`, not `8000`. |
 | `No such option: --json` | Global options must come right after `say`: `opal say --json voices list`. |
 | `opal: No such command 'say'` | Another package (OPAL Listen) owns the `opal` script. Use `opal-say ...`, or reinstall this package. |
+| `local playback requires simpleaudio` | Install the client-side extra on the machine running the CLI: `pip install 'opal-say[audio]'`. |
+| `playback failed: ...` | The OS audio device refused the stream (no output device, wrong user session) or the playback backend is broken. On Windows, a failing `simpleaudio` automatically falls back to the stdlib `winsound` player. Otherwise use `-o` and an external player. |
 | `Invalid value for 'profile_id': 'narrator' is not a valid int` | Profiles are addressed by id. Look it up with `opal say profiles list`. |
 | `Invalid value: nothing to update` | `update` was called without any change option. |
 | `422 ... engine_voice_ref: Piper voice model 'x' could not be resolved` | The model isn't in `voices_dir`, or the path is wrong. Check `opal say engines get piper` and the files on the **service** host. |

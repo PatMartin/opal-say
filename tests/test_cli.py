@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import json
 import shlex
+import sys
 import wave
 
 import pytest
+import typer
 from contract_check import check_response, match_operation
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
+from opal_say.cli import audio
 from opal_say.cli import main as cli
 from opal_say.cli.client import ApiClient
 from opal_say.contract import contract_operations
@@ -163,9 +166,119 @@ def test_tree_command_prints_command_surface():
     out = result.stdout
     for cmd in ("generate", "engines", "voices", "profiles", "settings", "backup", "health"):
         assert cmd in out
+    assert "speak" not in out  # hidden default command
     # Required args/options are bare; optional ones are bracketed.
-    assert "generate TEXT -o/--output" in out
+    assert "generate TEXT [-o/--output" in out
     assert "get ENGINE_ID" in out
     assert "set KEY VALUE" in out
     assert "[--stream]" in out and "[--enable/--disable]" in out
     assert "│   ├──" in out and "└──" in out
+
+
+def test_say_text_plays_by_default(run, monkeypatch):
+    played: list[int] = []
+    monkeypatch.setattr(audio, "play_response", lambda resp: played.append(len(resp.content)) or len(resp.content))
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    run('"Hello there." --voice v1')
+    assert played and played[0] > 0
+
+
+def test_say_text_writes_and_plays(run, monkeypatch, tmp_path):
+    played: list[int] = []
+    monkeypatch.setattr(audio, "play_response", lambda resp: played.append(len(resp.content)) or len(resp.content))
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    wav = tmp_path / "out.wav"
+    run(f'"Save and speak." --voice v1 -o {wav.as_posix()}')
+    assert wav.read_bytes()[:4] == b"RIFF" and played == [wav.stat().st_size]
+
+
+def test_say_text_no_play_writes_only(run, monkeypatch, tmp_path):
+    monkeypatch.setattr(audio, "play_response", lambda resp: pytest.fail("playback must not run"))
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    wav = tmp_path / "quiet.wav"
+    run(f'"Quiet export." --voice v1 --no-play -o {wav.as_posix()}')
+    assert wav.read_bytes()[:4] == b"RIFF"
+
+
+def test_say_text_stdout_disables_playback(run, monkeypatch):
+    monkeypatch.setattr(audio, "play_response", lambda resp: pytest.fail("playback must not run"))
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    result = run('"Pipe me." --voice v1 -o -')
+    assert result.stdout_bytes[:4] == b"RIFF"
+
+
+def test_say_text_requires_a_destination(run):
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    result = run('"No destination." --voice v1 --no-play', code=2)
+    assert "supply -o/--output" in result.stderr
+
+
+def test_say_text_stream_plays_progressively(run, monkeypatch):
+    chunks: list[bytes] = []
+    rates: list[int] = []
+
+    def fake_stream(iterable, rate, **kw):
+        rates.append(rate)
+        data = list(iterable)
+        chunks.extend(data)
+        return sum(len(c) for c in data)
+
+    monkeypatch.setattr(audio, "play_pcm_stream", fake_stream)
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    run('"Streaming speech." --voice v1 --stream')
+    assert chunks and rates == [rates[0]] * len(rates)
+
+
+def test_say_text_stream_writes_and_plays(run, monkeypatch, tmp_path):
+    chunks: list[bytes] = []
+
+    def fake_stream(iterable, rate, **kw):
+        data = list(iterable)
+        chunks.extend(data)
+        return sum(len(c) for c in data)
+
+    monkeypatch.setattr(audio, "play_pcm_stream", fake_stream)
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    pcm = tmp_path / "out.pcm"
+    run(f'"Stream and save." --voice v1 --stream -o {pcm.as_posix()}')
+    assert chunks and pcm.stat().st_size == sum(len(c) for c in chunks)
+
+
+def test_say_text_reads_stdin(run, monkeypatch):
+    monkeypatch.setattr(audio, "play_response", lambda resp: len(resp.content))
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    run("- --voice v1", stdin="stdin speech")
+
+
+def test_subcommands_still_win_over_text(run):
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    assert "v1" in run("voices list").stdout  # 'voices' resolves as a command, not text
+
+
+def test_generate_and_voice_test_play(run, monkeypatch, tmp_path):
+    played: list[int] = []
+    monkeypatch.setattr(audio, "play_response", lambda resp: played.append(len(resp.content)) or len(resp.content))
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    wav = tmp_path / "g.wav"
+    run(f'generate "played generate" --voice v1 --play -o {wav.as_posix()}')
+    run('voices test v1 --play --text "played test"')
+    assert len(played) == 2
+
+
+def test_generate_play_and_stdout_conflict(run):
+    run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
+    result = run('generate "x" --voice v1 --play -o -', code=2)
+    assert "stdout" in result.stderr
+
+
+def test_playback_requires_simpleaudio(monkeypatch):
+    monkeypatch.setitem(sys.modules, "simpleaudio", None)  # simulate the extra not being installed
+    with pytest.raises(typer.BadParameter, match=r"opal-say\[audio\]"):
+        audio._simpleaudio()
+
+
+def test_worker_crash_is_a_clean_error(monkeypatch):
+    """A worker that dies (even natively) must not crash the CLI process."""
+    monkeypatch.setattr(audio, "_worker_args", lambda *a: [sys.executable, "-c", "import sys; sys.exit(1)"])
+    with pytest.raises(typer.BadParameter, match="playback failed"):
+        audio.play_pcm(b"\x00" * 100, 24000)
