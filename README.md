@@ -58,8 +58,8 @@ OPAL Say complements [OPAL Listen](https://github.com/PatMartin/opal-listen), wh
 Requires **Python 3.11+**. Linux and Raspberry Pi OS are natural targets; macOS can also run the Python service with supported engine dependencies. Node.js **18+** is needed only for the optional web UI.
 
 ~~~bash
-git clone https://github.com/PatMartin/opal-talk.git
-cd opal-talk
+git clone https://github.com/PatMartin/opal-say.git
+cd opal-say
 
 python3 -m venv .venv
 source .venv/bin/activate
