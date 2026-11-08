@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: OPAL Say API
-  version: 1.5.0
+  version: 1.6.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides a stable REST\
     \ contract over one or more host-installed TTS\nengines such as Piper or Kokoro. Clients interact with OPAL concepts—engines,\n\
     voices, profiles, generation settings, and audio output—without depending on a\nspecific engine's command line, model\
@@ -75,6 +75,8 @@ tags:
     '
 - name: settings
   description: Service-wide key/value settings.
+- name: info
+  description: Service identity, version and liveness probes.
 - name: health
   description: Service readiness and health information. Playback devices are out of scope.
 - name: backup
@@ -1844,11 +1846,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /:
+  /api/v1/info/:
     get:
-      summary: Root
-      description: Return basic service identity and API version information.
-      operationId: root__get
+      summary: Service Info
+      description: 'Service identity: name, package version and API version.'
+      operationId: opal_info_get
+      tags:
+      - info
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1876,17 +1880,14 @@ paths:
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
     - $ref: '#/components/parameters/OpalRequestIdParameter'
     - $ref: '#/components/parameters/OpalCausationIdParameter'
-  /healthz:
+  /api/v1/info/ping:
     get:
-      summary: Healthz
-      description: 'Lightweight liveness endpoint suitable for process supervisors and container
-
-        probes. This endpoint indicates that the HTTP service is alive; callers needing
-
-        engine readiness should use `/api/v1/health/`.
-
-        '
-      operationId: healthz_healthz_get
+      summary: Ping
+      description: Lightweight liveness probe for process supervisors. Callers needing engine readiness use `/api/v1/health/`
+        or `/api/v1/health/ready` (OPAL suite standard).
+      operationId: opal_info_ping
+      tags:
+      - info
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'

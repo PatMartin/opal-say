@@ -1792,7 +1792,7 @@ set -euo pipefail
 export OPAL_SAY_API_URL=http://127.0.0.1:8001
 opal-say backup import                 # exit 1 if the YAML is invalid (nothing applied)
 opal-say backup validate               # exit 1 if a voice doesn't resolve on this host
-[ "$(opal-say --json health | jq -r .status)" = ok ]
+[ "$(opal-say --json info health | jq -r .status)" = ok ]
 for v in $(opal-say --json voices list --enabled | jq -r '.[].voice_id'); do
   opal-say voices test "$v" --text "ci" -o /dev/null
 done

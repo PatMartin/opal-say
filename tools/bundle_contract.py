@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "openapi" / "opal_say_v1.5.0.yaml"
+SOURCE = ROOT / "openapi" / "opal_say_v1.6.0.yaml"
 TARGET = ROOT / "src" / "opal_say" / "contract" / "opal_say.yaml"
 
 _docs: dict[Path, dict] = {}

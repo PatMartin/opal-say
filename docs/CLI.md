@@ -317,9 +317,7 @@ opal (or opal-say, which starts at 'say')
     ├── generate  TEXT [-o OUT] [--stream] [--play] ...
     ├── settings  list | get | set | delete
     ├── backup    list | create | download | restore | delete | export | import | validate
-    ├── health
-    ├── info
-    ├── ping
+    ├── info      version | health | live | ready | ping
     └── tree        prints the full command tree (introspected from the Typer app)
 ```
 

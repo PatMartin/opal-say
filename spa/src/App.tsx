@@ -25,8 +25,8 @@ type Tab = keyof typeof TABS
 
 export function App() {
   const [tab, setTab] = useState<Tab>('Generate')
-  const info = useLoad(() => call<ServiceInfo | null>('root__get'), null)
-  const live = useLoad(() => call<{ status: string } | null>('healthz_healthz_get'), null)
+  const info = useLoad(() => call<ServiceInfo | null>('opal_info_get'), null)
+  const live = useLoad(() => call<{ status: string } | null>('opal_info_ping'), null)
   const Panel = TABS[tab]
   return (
     <div className="app">

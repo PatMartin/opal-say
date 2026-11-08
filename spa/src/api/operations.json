@@ -155,13 +155,13 @@
     "method": "GET",
     "path": "/api/v1/backup/validate"
   },
-  "root__get": {
+  "opal_info_get": {
     "method": "GET",
-    "path": "/"
+    "path": "/api/v1/info/"
   },
-  "healthz_healthz_get": {
+  "opal_info_ping": {
     "method": "GET",
-    "path": "/healthz"
+    "path": "/api/v1/info/ping"
   },
   "opal_health_live_get": {
     "method": "GET",

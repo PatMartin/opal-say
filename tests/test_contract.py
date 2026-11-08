@@ -198,8 +198,8 @@ def recording(app):
 
 def test_walkthrough_exercises_every_operation_with_conformant_responses(recording, config):
     c = recording
-    assert c.get("/").json()["name"] == "opal-say-svc"
-    assert c.get("/healthz").json() == {"status": "ok"}
+    assert c.get("/api/v1/info/").json()["name"] == "opal-say-svc"
+    assert c.get("/api/v1/info/ping").json() == {"status": "ok"}
     assert c.get("/api/v1/health/").status_code == 200
 
     assert c.get("/api/v1/engines/").status_code == 200

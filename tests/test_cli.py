@@ -109,11 +109,11 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert json.loads(run("settings patch --json '{\"greeting\": \"hi\"}'").stdout)["greeting"] == "hi"
     run("settings patch --json '{\"greeting\": null}'")
 
-    assert "status:" in run("health").stdout
-    assert json.loads(run("--json health --live").stdout)["ready"] is True
-    assert json.loads(run("--json health --ready").stdout)["ready"] is True
-    assert json.loads(run("info").stdout)["name"] == "opal-say-svc"
-    assert run("ping").stdout.strip() == "ok"
+    assert "status:" in run("info health").stdout
+    assert json.loads(run("--json info live").stdout)["ready"] is True
+    assert json.loads(run("--json info ready").stdout)["ready"] is True
+    assert json.loads(run("info version").stdout)["name"] == "opal-say-svc"
+    assert run("info ping").stdout.strip() == "ok"
 
     filename = json.loads(run("backup create").stdout)["filename"]
     assert filename in run("backup list").stdout
@@ -165,7 +165,7 @@ def test_invalid_validation_result_exits_nonzero(run):
 
 def test_unreachable_server(monkeypatch):
     monkeypatch.setattr(cli, "client_factory", lambda url, timeout: ApiClient("http://127.0.0.1:9", 1))
-    result = CliRunner().invoke(cli.app, ["say", "ping"])
+    result = CliRunner().invoke(cli.app, ["say", "info", "ping"])
     assert result.exit_code == 2 and "cannot reach" in result.stderr
 
 

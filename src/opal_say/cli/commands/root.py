@@ -1,4 +1,4 @@
-"""Root-level commands: health, service info, liveness ping and the command tree."""
+"""Info-level commands: version, health, liveness ping and the command tree."""
 
 from __future__ import annotations
 
@@ -46,40 +46,62 @@ def _walk(group: click.Group, prefix: str) -> None:
             _walk(cmd, prefix + ("    " if last else "│   "))
 
 
+def _health(ctx: typer.Context) -> None:
+    data = _call(ctx, "opal_health_get").json()
+    if _state(ctx).json_output:
+        _emit(ctx, data)
+        return
+    typer.echo(f"status: {data['status']}  version: {data['version']}  active_profile_id: {data.get('active_profile_id')}")
+    _emit(ctx, data["engines"], ["engine_id", "enabled", "available", "message"])
+
+
 def register(say_app: typer.Typer) -> None:
-    @say_app.command("health")
-    def health(ctx: typer.Context, live: bool = typer.Option(False, "--live", help="Liveness probe."),
-               ready: bool = typer.Option(False, "--ready", help="Readiness probe.")) -> None:
+    info_app = typer.Typer(
+        help="Service identity: version, health and liveness probes.",
+        invoke_without_command=True,
+        no_args_is_help=False,
+    )
+
+    @info_app.callback(invoke_without_command=True)
+    def info_root(ctx: typer.Context) -> None:
+        """Service identity and API version (default for bare 'info')."""
+        if ctx.invoked_subcommand is None:
+            _emit(ctx, _call(ctx, "opal_info_get").json())
+            raise typer.Exit()
+
+    @info_app.command("version")
+    def info_version(ctx: typer.Context) -> None:
+        """Service identity and version."""
+        _emit(ctx, _call(ctx, "opal_info_get").json())
+
+    @info_app.command("health")
+    def info_health(ctx: typer.Context) -> None:
         """Service readiness and engine state."""
-        if live:
-            _emit(ctx, _call(ctx, "opal_health_live_get").json())
-            return
-        if ready:
-            from opal_say.cli.client import ApiCallError
+        _health(ctx)
 
-            try:
-                _emit(ctx, _call(ctx, "opal_health_ready_get").json())
-            except ApiCallError as e:
-                if e.status != 503:
-                    raise
-                _emit(ctx, e.body)
-            return
-        data = _call(ctx, "opal_health_get").json()
-        if _state(ctx).json_output:
-            _emit(ctx, data)
-            return
-        typer.echo(f"status: {data['status']}  version: {data['version']}  active_profile_id: {data.get('active_profile_id')}")
-        _emit(ctx, data["engines"], ["engine_id", "enabled", "available", "message"])
+    @info_app.command("live")
+    def info_live(ctx: typer.Context) -> None:
+        """Liveness probe."""
+        _emit(ctx, _call(ctx, "opal_health_live_get").json())
 
-    @say_app.command("info")
-    def info(ctx: typer.Context) -> None:
-        """Service identity and API version."""
-        _emit(ctx, _call(ctx, "root__get").json())
+    @info_app.command("ready")
+    def info_ready(ctx: typer.Context) -> None:
+        """Readiness probe (reports the body on 503)."""
+        from opal_say.cli.client import ApiCallError
 
-    @say_app.command("ping")
-    def ping(ctx: typer.Context) -> None:
+        try:
+            _emit(ctx, _call(ctx, "opal_health_ready_get").json())
+        except ApiCallError as e:
+            if e.status != 503:
+                raise
+            _emit(ctx, e.body)
+
+    @info_app.command("ping")
+    def info_ping(ctx: typer.Context) -> None:
         """Liveness check."""
-        typer.echo(_call(ctx, "healthz_healthz_get").json()["status"])
+        typer.echo(_call(ctx, "opal_info_ping").json()["status"])
+
+    say_app.add_typer(info_app, name="info")
 
     @say_app.command("tree")
     def tree() -> None:

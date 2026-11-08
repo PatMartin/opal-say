@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "opal-say"
-version = "1.5.0"
+version = "1.6.0"
 description = "OPAL Say: implementation-neutral text-to-speech service (opal-say-svc), CLI and SPA"
 readme = "README.md"
 requires-python = ">=3.11"

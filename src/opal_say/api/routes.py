@@ -530,7 +530,7 @@ def delete_backup(filename: str = BackupFilename, svc: Services = Depends(servic
 # -- service identity ---------------------------------------------------------------
 
 
-@router.get("/", operation_id="root__get", response_model=ServiceInfo)
+@router.get("/api/v1/info/", operation_id="opal_info_get", response_model=ServiceInfo)
 def root():
     return {
         "name": SERVICE_NAME,
@@ -540,6 +540,6 @@ def root():
     }
 
 
-@router.get("/healthz", operation_id="healthz_healthz_get", response_model=LivenessRead)
+@router.get("/api/v1/info/ping", operation_id="opal_info_ping", response_model=LivenessRead)
 def healthz():
     return {"status": "ok"}

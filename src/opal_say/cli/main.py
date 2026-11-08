@@ -38,9 +38,9 @@ COMMANDS: dict[str, str] = {
     "opal_setting_get": "settings get",
     "opal_setting_put": "settings set",
     "opal_setting_delete": "settings delete",
-    "opal_health_get": "health",
-    "opal_health_live_get": "health --live",
-    "opal_health_ready_get": "health --ready",
+    "opal_health_get": "info health",
+    "opal_health_live_get": "info live",
+    "opal_health_ready_get": "info ready",
     "opal_settings_patch": "settings patch",
     "opal_backup_validate": "backup validate --payload",
     "opal_backup_list": "backup list",
@@ -51,8 +51,8 @@ COMMANDS: dict[str, str] = {
     "opal_backup_export": "backup export",
     "opal_backup_import": "backup import",
     "opal_backup_validate_stored": "backup validate",
-    "root__get": "info",
-    "healthz_healthz_get": "ping",
+    "opal_info_get": "info version",
+    "opal_info_ping": "info ping",
 }
 
 
