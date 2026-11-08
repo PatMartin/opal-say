@@ -1,21 +1,39 @@
-# Contract notes
+# OPAL Say contract notes
 
-`openapi/opal_say_v1.5.0.yaml` together with `openapi/shared/opal_kernel.yaml` is implemented unchanged (served bundled as `src/opal_say/contract/opal_say.yaml`). Ambiguities or under-specified behaviour found while implementing it, and the interpretation chosen, are recorded here.
+Authoritative contract: `openapi/opal_say_v1.5.0.yaml` together with the shared
+OPAL kernel `openapi/shared/opal_kernel.yaml`.
 
-| # | Area | Observation | Implementation choice |
-|---|------|-------------|-----------------------|
-| 1 | Voice/engine path params | `VoiceId` declares a `pattern`/`maxLength`, but `GET/PATCH/DELETE /voices/{voice_id}`, `/validate` and `/test` document no `422`. | Path IDs are not pattern-validated; an unknown or malformed ID returns `404`. Request **bodies** (`VoiceCreate.voice_id`) are validated (`422`). |
-| 2 | `/generate`, `/generate/stream` | No `404` is documented, yet an explicit `profile_id` or `voice_id` may not exist. | Missing profile/voice/engine → `409` with codes `profile_not_found`, `voice_not_found`, `engine_not_found`; no resolvable voice → `409 no_voice`. |
-| 3 | Resolution order | "Service defaults" are not defined, and voice-level `engine_options` are not placed in the precedence list. | Service defaults are the settings `default_speed`, `default_volume`, `default_output_format` (built-in 1.0 / 1.0 / `wav`). `engine_options` layers: voice → profile → request (shallow, later wins). |
-| 4 | Profile `engine_options` with a voice override | A request may override the voice with one on a different engine; profile options are engine-specific and would be invalid there. | Profile `engine_options` are only applied when the resolved engine equals the profile voice's engine. |
-| 5 | Portable `speed` range | The contract allows 0.25–4.0 "with the same meaning on every engine"; Kokoro natively supports only 0.5–2.0. | Engines declare a supported range; out-of-range requests are rejected with `409 unsupported_speed` instead of being silently clamped. Piper supports the full range. |
-| 6 | `PATCH /engines/{id}` options | "replace/adjust" is ambiguous. | Top-level JSON merge-patch: supplied keys replace, `null` removes a key. |
-| 7 | Restore failures | `422` is typed as `HTTPValidationError` (request validation), which does not fit an invalid backup file. | Unreadable/invalid backup content → `409` (`invalid_backup`, `backup_invalid` with error list); nothing is applied. |
-| 8 | Import failures | `ConfigImportResult` carries `success` + `validation`, and `409` is also documented. | Invalid YAML/configuration → `200` with `success: false` and the validation result (nothing applied). `409 config_not_found` when `./config/` contains no importable files. |
-| 9 | Host resources during import/restore | Restores may target hosts without the referenced models. | Unresolvable voice resources are **warnings** during import/restore and **errors** in `GET /backup/validate` and voice validation. |
-| 10 | Voice update conflicts | `409` meaning for `PATCH /voices/{id}` is broad. | `409 voice_in_use` when disabling the voice of the active profile; `409 profile_options_incompatible` when re-assigning the engine would invalidate a referencing profile's `engine_options`. Unknown target engine → `404 engine_not_found` (as for create). |
-| 11 | Settings listing vs lookup | `GET /settings/` vs `GET /settings/{key}` 404 semantics. | Both reflect only stored settings; known keys fall back to built-in defaults internally when absent. Known keys are validated on upsert (`422`). |
-| 12 | Health `status` | Thresholds are informal. | `ok`: every enabled engine available; `degraded`: some enabled engine unavailable; `error`: no enabled engine available. |
-| 13 | `opal` CLI root | OPAL Listen also installs an `opal` console script, so both packages in one environment clash. | `opal say …` is provided by this package (and mounts `opal listen` when `opal_listener` is importable); `opal-say …` is an always-unambiguous alias. |
-| 14 | Stream failure after headers | Contract requires premature termination without an in-band error. | The server aborts the chunked response (no terminating chunk); clients see an incomplete-read error. The first audio block is produced before headers are sent so that early failures are normal JSON errors. |
-| 15 | Import/restore apply semantics | The contract says import follows the OPAL Listen operational convention but doesn't define whether sections merge or replace. | Voices, profiles and settings are **replaced** (deleted then re-created) when their section is present; engines are **merged** (`enabled`/`options` applied to installed engines). Success `message` lists what each call replaced. |
+## Kernel split
+
+The root contract defines the Say-specific operations inline (voices CRUD,
+voice validate/test, engine validate, generate/stream, root, healthz) and pulls
+the suite-standard routes — engines, profiles, settings, health, backup — in
+from the kernel via external `$ref` pathItems. The kernel is a superset shared
+across OPAL services; pathItems a service does not implement are simply not
+referenced.
+
+`src/opal_say/contract/opal_say.yaml` is the packaged, self-contained bundle
+produced by:
+
+```bash
+python tools/bundle_contract.py
+```
+
+`tests/test_contract.py` asserts the packaged file equals a fresh bundle of the
+`openapi/` sources, so regenerate it whenever the root contract or kernel
+changes.
+
+## Optimistic concurrency (If-Match)
+
+Mutable configuration writes require a strong `If-Match` header carrying the
+current ETag of the complete logical configuration (`"r<N>"`, where `N` is the
+SQLite `config_revision`). Any configuration mutation bumps the revision, so a
+tag goes stale after any write anywhere in the config.
+
+- Missing `If-Match` → `428 precondition_required`
+- Stale value → `412 precondition_failed`
+- Malformed (weak tag, `*`, list, unquoted) → `422`
+
+Reads of configuration resources return the current `ETag` header; the CLI
+client fetches it automatically for the preconditioned operations listed in
+`opal_say.cli.client.PRECONDITION_OPS` and retries once on `412`.
