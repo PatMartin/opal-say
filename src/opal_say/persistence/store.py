@@ -45,6 +45,15 @@ CREATE TABLE IF NOT EXISTS profiles (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS personas (
+    persona_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    voice_id TEXT NOT NULL,
+    enabled INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY,
     key TEXT NOT NULL UNIQUE,
@@ -227,6 +236,33 @@ class Store:
     def delete_profile(self, profile_id: int) -> None:
         with self.transaction() as conn:
             conn.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
+
+    # -- personas -------------------------------------------------------------
+
+    def list_personas(self, enabled: bool | None = None) -> list[dict[str, Any]]:
+        sql, params = "SELECT * FROM personas WHERE 1 = 1", []
+        if enabled is not None:
+            sql += " AND enabled = ?"
+            params.append(int(enabled))
+        return self._all(sql + " ORDER BY persona_id", tuple(params))
+
+    def get_persona(self, persona_id: str) -> dict[str, Any] | None:
+        return self._one("SELECT * FROM personas WHERE persona_id = ?", (persona_id,))
+
+    def personas_using_voice(self, voice_id: str) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM personas WHERE voice_id = ? ORDER BY persona_id", (voice_id,))
+
+    def insert_persona(self, values: dict[str, Any]) -> None:
+        with self.transaction() as conn:
+            self._insert(conn, "personas", values)
+
+    def update_persona(self, persona_id: str, values: dict[str, Any]) -> None:
+        with self.transaction() as conn:
+            self._update(conn, "personas", "persona_id", persona_id, values)
+
+    def delete_persona(self, persona_id: str) -> None:
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM personas WHERE persona_id = ?", (persona_id,))
 
     # -- settings -----------------------------------------------------------
 

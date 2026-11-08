@@ -9,7 +9,7 @@ from typing import Any
 from opal_say import __version__
 from opal_say.config import ServiceConfig
 from opal_say.persistence.store import Store
-from opal_say.service.catalog import EngineService, ProfileService, VoiceService
+from opal_say.service.catalog import EngineService, PersonaService, ProfileService, VoiceService
 from opal_say.service.config_ops import ConfigService
 from opal_say.service.errors import ApiError
 from opal_say.service.generation import GenerationService
@@ -29,6 +29,7 @@ class Services:
     engines: EngineService
     voices: VoiceService
     profiles: ProfileService
+    personas: PersonaService
     settings: SettingsService
     generation: GenerationService
     config_ops: ConfigService
@@ -75,6 +76,7 @@ def build_services(config: ServiceConfig, engines: list[TtsEngine] | None = None
         engines=engine_svc,
         voices=voice_svc,
         profiles=ProfileService(store, engine_svc, voice_svc),
+        personas=PersonaService(store, voice_svc),
         settings=settings_svc,
         generation=GenerationService(store, engine_svc, settings_svc),
         config_ops=ConfigService(store, engine_svc, config.config_dir, config.backup_dir),

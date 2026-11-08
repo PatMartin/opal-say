@@ -109,6 +109,34 @@ class VoiceTestRequest(_Request):
     engine_options: EngineOptions = Field(default_factory=dict)
 
 
+# -- personas ------------------------------------------------------------------
+
+
+class PersonaCreate(_Request):
+    persona_id: str = Field(min_length=1, max_length=200, pattern=VOICE_ID_PATTERN)
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=1000)
+    voice_id: str = Field(min_length=1)
+    enabled: bool = True
+
+
+class PersonaUpdate(_Patch):
+    name: NonNull[str] = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=1000)
+    voice_id: NonNull[str] = Field(default=None, min_length=1)
+    enabled: NonNull[bool] = None
+
+
+class PersonaRead(BaseModel):
+    persona_id: str
+    name: str
+    description: str | None = None
+    voice_id: str
+    enabled: bool
+    created_at: str
+    updated_at: str
+
+
 # -- profiles ------------------------------------------------------------------
 
 
@@ -157,6 +185,7 @@ class ProfileRead(BaseModel):
 class GenerateStreamRequest(_Request):
     text: str = Field(min_length=1)
     profile_id: Annotated[int, Field(ge=1)] | None = None
+    persona: Annotated[str, Field(min_length=1, max_length=200, pattern=VOICE_ID_PATTERN)] | None = None
     voice_id: Annotated[str, Field(min_length=1)] | None = None
     engine_id: Annotated[str, Field(min_length=1)] | None = None
     speed: Speed | None = None

@@ -57,6 +57,16 @@ tags:
     profile explicitly.
 
     '
+- name: personas
+  description: 'Manage named personas: identities that bind a registered voice so requests can
+
+    select a consistent character with a single `persona` field. The schema is kept
+
+    flat for Say v1; sister OPAL services may adopt the same persona identifiers for
+
+    their own resources in future contract versions.
+
+    '
 - name: generate
   description: 'Generate completed or progressively streamed speech audio from plain text.
 
@@ -892,6 +902,263 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+  /api/v1/personas/:
+    get:
+      tags:
+      - personas
+      summary: List Personas
+      description: 'List registered OPAL personas. A persona is a named character that binds a
+
+        registered voice (and, in future contract versions, per-service fragments for
+
+        sister OPAL services) so that generation requests can select a consistent
+
+        identity with a single `persona` field.
+
+
+        Return the complete bounded configuration collection; pagination is not supported.
+
+        '
+      operationId: list_personas_api_v1_personas__get
+      parameters:
+      - name: enabled
+        in: query
+        required: false
+        description: If supplied, filter by enabled state.
+        schema:
+          type: boolean
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Registered personas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PersonaRead'
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              description: Strong revision of logical portable configuration
+              schema:
+                type: string
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    post:
+      tags:
+      - personas
+      summary: Create Persona
+      description: 'Register a persona that binds a registered voice to a stable identity.
+
+        The referenced `voice_id` must already exist; implementations SHOULD reject a
+
+        persona whose voice cannot be resolved rather than registering a broken
+
+        binding. Strong If-Match is mandatory.
+
+        '
+      operationId: create_persona_api_v1_personas__post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonaCreate'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '201':
+          description: Persona created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaRead'
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+            Location:
+              description: Resource URL
+              schema:
+                type: string
+        '404':
+          description: The specified `voice_id` is not registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalError'
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+        '409':
+          description: The requested `persona_id` is already registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalError'
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+  /api/v1/personas/{persona_id}:
+    parameters:
+    - $ref: '#/components/parameters/PersonaId'
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    get:
+      tags:
+      - personas
+      summary: Get Persona
+      description: Return one registered persona.
+      operationId: get_persona_api_v1_personas__persona_id__get
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Persona.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaRead'
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              description: Strong revision of logical portable configuration
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    patch:
+      tags:
+      - personas
+      summary: Update Persona
+      description: Partially update a persona. If `voice_id` changes, the new voice must resolve. Strong If-Match is mandatory.
+      operationId: update_persona_api_v1_personas__persona_id__patch
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonaUpdate'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '200':
+          description: Updated persona.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaRead'
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+    delete:
+      tags:
+      - personas
+      summary: Delete Persona
+      description: Remove a persona. The bound voice registration is unaffected. Strong If-Match is mandatory.
+      operationId: delete_persona_api_v1_personas__persona_id__delete
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '204':
+          description: Persona deleted.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
   /api/v1/generate:
     post:
       tags:
@@ -901,17 +1168,19 @@ paths:
         \ engine calls, but it\nMUST preserve the original text order and return one logically continuous audio\nresult. Internal\
         \ chunk boundaries are not part of the public API.\n\nGeneration settings are resolved in this order, from lowest\
         \ to highest precedence:\n\n1. Service defaults.\n2. The active profile, when `profile_id` is omitted and an active\
-        \ profile exists.\n3. The explicitly selected `profile_id`, when present.\n4. Fields supplied directly in this request.\n\
-        \nRequest-level `engine_options` are shallow-merged over profile-level\n`engine_options`; request keys win. Other\
-        \ request fields directly replace their\ncorresponding profile defaults.\n\nVoice and engine selection:\n\n* A request-level\
-        \ `voice_id` overrides the profile voice.\n* The resolved voice normally determines the engine.\n* `engine_id` is\
-        \ an optional advanced override. The service MUST reject an\n  override that cannot use the resolved voice rather\
-        \ than silently substituting\n  another voice.\n* If no voice can be resolved from either the request or a profile,\
-        \ generation\n  fails with `409 Conflict`.\n\nOutput behavior:\n\n* `wav` returns a completed WAV container as `audio/wav`.\n\
-        * `pcm` returns headerless signed 16-bit little-endian mono PCM as\n  `application/octet-stream`.\n* The actual output\
-        \ sample rate is always returned in `X-Opal-Sample-Rate`.\n* When a `sample_rate` is explicitly requested, the service\
-        \ either returns audio\n  at that rate or rejects the request; it must not silently return another rate.\n* Plain\
-        \ text only is accepted. SSML markup has no special meaning and is not a\n  supported input mode.\n"
+        \ profile exists.\n3. The explicitly selected `profile_id`, when present.\n4. The `persona`'s bound voice, when `persona`\
+        \ is present (voice field only).\n5. Fields supplied directly in this request.\n\nRequest-level `engine_options` are\
+        \ shallow-merged over profile-level\n`engine_options`; request keys win. Other request fields directly replace their\n\
+        corresponding profile defaults.\n\nVoice and engine selection:\n\n* A request-level `voice_id` overrides the `persona`\
+        \ voice; the persona voice\n  overrides the profile voice.\n* An unknown or disabled `persona` is rejected with `422\
+        \ Unprocessable Entity`.\n* The resolved voice normally determines the engine.\n* `engine_id` is an optional advanced\
+        \ override. The service MUST reject an\n  override that cannot use the resolved voice rather than silently substituting\n\
+        \  another voice.\n* If no voice can be resolved from either the request or a profile, generation\n  fails with `409\
+        \ Conflict`.\n\nOutput behavior:\n\n* `wav` returns a completed WAV container as `audio/wav`.\n* `pcm` returns headerless\
+        \ signed 16-bit little-endian mono PCM as\n  `application/octet-stream`.\n* The actual output sample rate is always\
+        \ returned in `X-Opal-Sample-Rate`.\n* When a `sample_rate` is explicitly requested, the service either returns audio\n\
+        \  at that rate or rejects the request; it must not silently return another rate.\n* Plain text only is accepted.\
+        \ SSML markup has no special meaning and is not a\n  supported input mode.\n"
       operationId: generate_audio_api_v1_generate_post
       requestBody:
         required: true
@@ -1759,6 +2028,17 @@ components:
         maxLength: 200
         pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
       example: en-us-lessac-medium
+    PersonaId:
+      name: persona_id
+      in: path
+      required: true
+      description: Globally unique OPAL persona identifier.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+        pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
+      example: amy
     OpalSessionIdParameter:
       name: X-Opal-Session-Id
       in: header
@@ -2365,6 +2645,100 @@ components:
         updated_at:
           type: string
           format: date-time
+    PersonaCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - persona_id
+      - name
+      - voice_id
+      properties:
+        persona_id:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
+          description: Globally unique OPAL persona identifier.
+          example: amy
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Human-readable persona name.
+          example: Amy
+        description:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          description: Optional human-readable description or character notes.
+        voice_id:
+          type: string
+          minLength: 1
+          description: Registered voice this persona speaks with.
+          example: en-gb-alan-low
+        enabled:
+          type: boolean
+          default: true
+          description: Whether this persona may be selected for generation.
+      example:
+        persona_id: amy
+        name: Amy
+        voice_id: en-gb-alan-low
+        enabled: true
+    PersonaUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      description: Partial update to a persona.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+        voice_id:
+          type: string
+          minLength: 1
+          description: Rebind the persona to a different registered voice.
+        enabled:
+          type: boolean
+    PersonaRead:
+      type: object
+      required:
+      - persona_id
+      - name
+      - voice_id
+      - enabled
+      - created_at
+      - updated_at
+      properties:
+        persona_id:
+          type: string
+          example: amy
+        name:
+          type: string
+          example: Amy
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+        voice_id:
+          type: string
+          description: Registered voice this persona speaks with.
+          example: en-gb-alan-low
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     GenerateRequest:
       type: object
       additionalProperties: false
@@ -2400,16 +2774,24 @@ components:
           - type: 'null'
           description: Request-level voice override. Takes precedence over the profile voice.
           example: en-us-lessac-medium
-        engine_id:
+        persona:
           anyOf:
           - type: string
             minLength: 1
+            maxLength: 200
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
           - type: 'null'
-          description: 'Optional advanced engine override. Normally the resolved voice selects its
+          description: 'Named persona supplying a default voice. An explicit `voice_id` in this
 
-            registered engine. Incompatible overrides are rejected with `409 Conflict`.
+            request takes precedence over the persona voice; the persona voice takes
+
+            precedence over profile-supplied voice. An unknown or disabled persona is
+
+            rejected with `422 Unprocessable Entity`.
 
             '
+          example: amy
+        engine_id: null
         speed:
           anyOf:
           - type: number
@@ -2475,6 +2857,15 @@ components:
             minLength: 1
           - type: 'null'
           description: Request-level voice override.
+        persona:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 200
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
+          - type: 'null'
+          description: Named persona supplying a default voice; `voice_id` takes precedence.
+          example: amy
         engine_id:
           anyOf:
           - type: string

@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from opal_say.persistence.store import Store, now_iso
-from opal_say.schemas import ProfileCreate, ProfileUpdate, VoiceCreate, VoiceUpdate
+from opal_say.schemas import PersonaCreate, PersonaUpdate, ProfileCreate, ProfileUpdate, VoiceCreate, VoiceUpdate
 from opal_say.service.errors import Conflict, InvalidRequest, NotFound
 from opal_say.tts.base import EngineUnavailableError, Issue, Report, TtsEngine, VoiceResolutionError
 from opal_say.tts.runtime import RUNTIME_OPTION, EngineRuntimeManager, split_runtime_options
@@ -219,6 +219,13 @@ class VoiceService:
                 "voice_in_use",
                 {"profile_ids": [p["id"] for p in users]},
             )
+        personas = self.store.personas_using_voice(voice_id)
+        if personas:
+            raise Conflict(
+                f"voice '{voice_id}' is referenced by {len(personas)} persona(s)",
+                "voice_in_use",
+                {"persona_ids": [p["persona_id"] for p in personas]},
+            )
         self.store.delete_voice(voice_id)
 
     def validate(self, voice_id: str) -> Report:
@@ -313,3 +320,57 @@ class ProfileService:
         self._check_activatable(self._voice(profile["voice_id"]))
         self.store.update_profile(profile_id, {"is_active": True, "updated_at": now_iso()})
         return self.get(profile_id)
+
+
+class PersonaService:
+    """Named personas: stable identities bound to a registered voice (contract `personas`)."""
+
+    def __init__(self, store: Store, voices: VoiceService):
+        self.store = store
+        self.voices = voices
+
+    def get(self, persona_id: str) -> dict[str, Any]:
+        persona = self.store.get_persona(persona_id)
+        if persona is None:
+            raise NotFound(f"persona '{persona_id}' not found", "persona_not_found", {"persona_id": persona_id})
+        return persona
+
+    def list(self, enabled: bool | None) -> list[dict[str, Any]]:
+        return self.store.list_personas(enabled)
+
+    def _voice(self, voice_id: str) -> None:
+        if self.store.get_voice(voice_id) is None:
+            raise NotFound(f"voice '{voice_id}' is not registered", "voice_not_found", {"voice_id": voice_id})
+
+    def create(self, body: PersonaCreate) -> dict[str, Any]:
+        if self.store.get_persona(body.persona_id) is not None:
+            raise Conflict(
+                f"persona '{body.persona_id}' is already registered", "persona_exists", {"persona_id": body.persona_id}
+            )
+        self._voice(body.voice_id)
+        stamp = now_iso()
+        self.store.insert_persona(
+            {
+                "persona_id": body.persona_id,
+                "name": body.name,
+                "description": body.description,
+                "voice_id": body.voice_id,
+                "enabled": body.enabled,
+                "created_at": stamp,
+                "updated_at": stamp,
+            }
+        )
+        return self.get(body.persona_id)
+
+    def update(self, persona_id: str, body: PersonaUpdate) -> dict[str, Any]:
+        self.get(persona_id)
+        changes = body.changes()
+        if "voice_id" in changes:
+            self._voice(changes["voice_id"])
+        changes["updated_at"] = now_iso()
+        self.store.update_persona(persona_id, changes)
+        return self.get(persona_id)
+
+    def delete(self, persona_id: str) -> None:
+        self.get(persona_id)
+        self.store.delete_persona(persona_id)

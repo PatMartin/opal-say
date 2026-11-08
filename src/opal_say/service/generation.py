@@ -206,7 +206,16 @@ class GenerationService:
             profile = self.store.active_profile()
         p = profile or {}
 
-        voice_id = _first(req.voice_id, p.get("voice_id"))
+        persona_voice: str | None = None
+        if req.persona is not None:
+            persona = self.store.get_persona(req.persona)
+            if persona is None:
+                raise InvalidRequest.single(["body", "persona"], f"persona '{req.persona}' is not registered")
+            if not persona["enabled"]:
+                raise InvalidRequest.single(["body", "persona"], f"persona '{req.persona}' is disabled")
+            persona_voice = persona["voice_id"]
+
+        voice_id = _first(req.voice_id, persona_voice, p.get("voice_id"))
         if voice_id is None:
             raise Conflict(
                 "no voice could be resolved: supply voice_id or a profile (or activate a profile)", "no_voice"
