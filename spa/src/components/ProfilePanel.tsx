@@ -20,8 +20,8 @@ const EMPTY: ProfileForm = {
 }
 
 export function ProfilePanel() {
-  const profile = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
-  const voices = useLoad(() => call<Voice[]>('list_voice_api_v1_voice__get'), [])
+  const profile = useLoad(() => call<Profile[]>('opal_profile_list'), [])
+  const voices = useLoad(() => call<Voice[]>('opal_voice_list'), [])
   const [form, setForm] = useState<ProfileForm>(EMPTY)
   const [editing, setEditing] = useState<number | null>(null)
   const [selected, setSelected] = useState<Profile | null>(null)
@@ -45,7 +45,7 @@ export function ProfilePanel() {
       if (editing !== null) {
         await call('opal_profile_patch', { path: { profile_id: editing }, body })
       } else {
-        await call('opal_profiles_create', { body })
+        await call('opal_profile_create', { body })
       }
       setForm(EMPTY)
       setEditing(null)

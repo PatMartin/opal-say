@@ -21,10 +21,10 @@ export function VoicePanel() {
   const [engineFilter, setEngineFilter] = useState('')
   const [enabledFilter, setEnabledFilter] = useState('')
   const voice = useLoad(
-    () => call<Voice[]>('list_voice_api_v1_voice__get', { query: { engine_id: engineFilter, enabled: enabledFilter } }),
+    () => call<Voice[]>('opal_voice_list', { query: { engine_id: engineFilter, enabled: enabledFilter } }),
     [],
   )
-  const engines = useLoad(() => call<Engine[]>('opal_engines_list'), [])
+  const engines = useLoad(() => call<Engine[]>('opal_engine_list'), [])
   const { reload: reloadVoice } = voice
   useEffect(() => {
     void reloadVoice()
@@ -51,9 +51,9 @@ export function VoicePanel() {
         engine_options: parseOptions(form.options) ?? {},
       }
       if (editing) {
-        await call('update_voice_api_v1_voice__voice_id__patch', { path: { voice_id: editing }, body })
+        await call('opal_voice_patch', { path: { voice_id: editing }, body })
       } else {
-        await call('create_voice_api_v1_voice__post', { body: { voice_id: form.voice_id, ...body } })
+        await call('opal_voice_create', { body: { voice_id: form.voice_id, ...body } })
       }
       setForm(EMPTY)
       setEditing(null)
@@ -77,23 +77,23 @@ export function VoicePanel() {
 
   const show = (id: string) =>
     action.run(async () => {
-      setSelected(await call<Voice>('get_voice_api_v1_voice__voice_id__get', { path: { voice_id: id } }))
+      setSelected(await call<Voice>('opal_voice_get', { path: { voice_id: id } }))
     })
 
   const remove = (id: string) =>
     action.run(async () => {
-      await call('delete_voice_api_v1_voice__voice_id__delete', { path: { voice_id: id } })
+      await call('opal_voice_delete', { path: { voice_id: id } })
       await voice.reload()
     })
 
   const validate = (id: string) =>
     action.run(async () => {
-      setValidation(await call<ValidationResult>('validate_voice_api_v1_voice__voice_id__validate_post', { path: { voice_id: id } }))
+      setValidation(await call<ValidationResult>('opal_voice_validate', { path: { voice_id: id } }))
     })
 
   const test = (id: string) =>
     action.run(async () => {
-      const resp = await callRaw('test_voice_api_v1_voice__voice_id__test_post', { path: { voice_id: id }, body: {} })
+      const resp = await callRaw('opal_voice_test', { path: { voice_id: id }, body: {} })
       const meta = audioMeta(resp)
       const raw = new Uint8Array(await resp.arrayBuffer())
       const blob = meta.format === 'pcm' ? pcmToWav(raw, meta.sampleRate) : new Blob([raw], { type: 'audio/wav' })

@@ -1,5 +1,5 @@
 {
-  "opal_engines_list": {
+  "opal_engine_list": {
     "method": "GET",
     "path": "/api/v1/engine/"
   },
@@ -11,43 +11,43 @@
     "method": "PATCH",
     "path": "/api/v1/engine/{engine_id}"
   },
-  "validate_engine_api_v1_engine__engine_id__validate_post": {
+  "opal_engine_validate": {
     "method": "POST",
     "path": "/api/v1/engine/{engine_id}/validate"
   },
-  "list_voice_api_v1_voice__get": {
+  "opal_voice_list": {
     "method": "GET",
     "path": "/api/v1/voice/"
   },
-  "create_voice_api_v1_voice__post": {
+  "opal_voice_create": {
     "method": "POST",
     "path": "/api/v1/voice/"
   },
-  "get_voice_api_v1_voice__voice_id__get": {
+  "opal_voice_get": {
     "method": "GET",
     "path": "/api/v1/voice/{voice_id}"
   },
-  "update_voice_api_v1_voice__voice_id__patch": {
+  "opal_voice_patch": {
     "method": "PATCH",
     "path": "/api/v1/voice/{voice_id}"
   },
-  "delete_voice_api_v1_voice__voice_id__delete": {
+  "opal_voice_delete": {
     "method": "DELETE",
     "path": "/api/v1/voice/{voice_id}"
   },
-  "validate_voice_api_v1_voice__voice_id__validate_post": {
+  "opal_voice_validate": {
     "method": "POST",
     "path": "/api/v1/voice/{voice_id}/validate"
   },
-  "test_voice_api_v1_voice__voice_id__test_post": {
+  "opal_voice_test": {
     "method": "POST",
     "path": "/api/v1/voice/{voice_id}/test"
   },
-  "opal_profiles_list": {
+  "opal_profile_list": {
     "method": "GET",
     "path": "/api/v1/profile/"
   },
-  "opal_profiles_create": {
+  "opal_profile_create": {
     "method": "POST",
     "path": "/api/v1/profile/"
   },
@@ -67,39 +67,39 @@
     "method": "POST",
     "path": "/api/v1/profile/{profile_id}/activate"
   },
-  "list_persona_api_v1_persona__get": {
+  "opal_persona_list": {
     "method": "GET",
     "path": "/api/v1/persona/"
   },
-  "create_persona_api_v1_persona__post": {
+  "opal_persona_create": {
     "method": "POST",
     "path": "/api/v1/persona/"
   },
-  "get_persona_api_v1_persona__persona_id__get": {
+  "opal_persona_get": {
     "method": "GET",
     "path": "/api/v1/persona/{persona_id}"
   },
-  "update_persona_api_v1_persona__persona_id__patch": {
+  "opal_persona_patch": {
     "method": "PATCH",
     "path": "/api/v1/persona/{persona_id}"
   },
-  "delete_persona_api_v1_persona__persona_id__delete": {
+  "opal_persona_delete": {
     "method": "DELETE",
     "path": "/api/v1/persona/{persona_id}"
   },
-  "generate_audio_api_v1_generate_post": {
+  "opal_generate": {
     "method": "POST",
     "path": "/api/v1/generate"
   },
-  "stream_audio_api_v1_generate_stream_post": {
+  "opal_generate_stream": {
     "method": "POST",
     "path": "/api/v1/generate/stream"
   },
-  "opal_settings_get": {
+  "opal_setting_list": {
     "method": "GET",
     "path": "/api/v1/setting/"
   },
-  "opal_settings_patch": {
+  "opal_setting_patch": {
     "method": "PATCH",
     "path": "/api/v1/setting/"
   },

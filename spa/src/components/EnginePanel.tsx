@@ -4,7 +4,7 @@ import type { Engine, ValidationResult } from '../api/types'
 import { ErrorBanner, OptionsField, ValidationView, parseOptions, useAction, useLoad } from './common'
 
 export function EnginePanel() {
-  const engine = useLoad(() => call<Engine[]>('opal_engines_list'), [])
+  const engines = useLoad(() => call<Engine[]>('opal_engine_list'), [])
   const [selected, setSelected] = useState<Engine | null>(null)
   const [options, setOptions] = useState('')
   const [validation, setValidation] = useState<ValidationResult | null>(null)
@@ -20,19 +20,19 @@ export function EnginePanel() {
   const patch = async (id: string, body: Record<string, unknown>) => {
     const engine = await call<Engine>('opal_engine_patch', { path: { engine_id: id }, body })
     if (selected?.engine_id === id) setSelected(engine)
-    await engine.reload()
+    await engines.reload()
   }
   const update = (id: string, body: Record<string, unknown>) => action.run(() => patch(id, body))
 
   const validate = (id: string) =>
     action.run(async () => {
-      setValidation(await call<ValidationResult>('validate_engine_api_v1_engine__engine_id__validate_post', { path: { engine_id: id } }))
+      setValidation(await call<ValidationResult>('opal_engine_validate', { path: { engine_id: id } }))
     })
 
   return (
     <section>
       <h2>Engine</h2>
-      <ErrorBanner error={engine.error} />
+      <ErrorBanner error={engines.error} />
       <table>
         <thead>
           <tr>
@@ -44,7 +44,7 @@ export function EnginePanel() {
           </tr>
         </thead>
         <tbody>
-          {engine.data.map((e) => (
+          {engines.data.map((e) => (
             <tr key={e.engine_id}>
               <td>{e.engine_id}</td>
               <td title={e.description ?? ''}>{e.name}</td>

@@ -27,7 +27,7 @@ def _profile_body(
 @profile_app.command("list")
 def profile_list(ctx: typer.Context) -> None:
     """List profile."""
-    _emit(ctx, _call(ctx, "opal_profiles_list").json(), PROFILE_COLUMNS)
+    _emit(ctx, _call(ctx, "opal_profile_list").json(), PROFILE_COLUMNS)
 
 
 @profile_app.command("add")
@@ -47,7 +47,7 @@ def profile_add(
     """Create a profile."""
     body = _profile_body(name, description, voice, speed, volume, output_format, sample_rate, active)
     body["engine_options"] = _parse_options(option, options_json) or {}
-    _emit(ctx, _call(ctx, "opal_profiles_create", json=body).json())
+    _emit(ctx, _call(ctx, "opal_profile_create", json=body).json())
 
 
 @profile_app.command("get")

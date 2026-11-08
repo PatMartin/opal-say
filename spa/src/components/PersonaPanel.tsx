@@ -14,8 +14,8 @@ interface PersonaForm {
 const EMPTY: PersonaForm = { persona_id: '', name: '', description: '', voice_id: '', enabled: true }
 
 export function PersonaPanel() {
-  const persona = useLoad(() => call<Persona[]>('list_persona_api_v1_persona__get'), [])
-  const voice = useLoad(() => call<Voice[]>('list_voice_api_v1_voice__get'), [])
+  const persona = useLoad(() => call<Persona[]>('opal_persona_list'), [])
+  const voice = useLoad(() => call<Voice[]>('opal_voice_list'), [])
   const [form, setForm] = useState<PersonaForm>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [selected, setSelected] = useState<Persona | null>(null)
@@ -32,9 +32,9 @@ export function PersonaPanel() {
         enabled: form.enabled,
       }
       if (editing !== null) {
-        await call('update_persona_api_v1_persona__persona_id__patch', { path: { persona_id: editing }, body })
+        await call('opal_persona_patch', { path: { persona_id: editing }, body })
       } else {
-        await call('create_persona_api_v1_persona__post', { body: { persona_id: form.persona_id, ...body } })
+        await call('opal_persona_create', { body: { persona_id: form.persona_id, ...body } })
       }
       setForm(EMPTY)
       setEditing(null)
@@ -54,11 +54,11 @@ export function PersonaPanel() {
   }
 
   const show = (id: string) =>
-    action.run(async () => setSelected(await call<Persona>('get_persona_api_v1_persona__persona_id__get', { path: { persona_id: id } })))
+    action.run(async () => setSelected(await call<Persona>('opal_persona_get', { path: { persona_id: id } })))
 
   const remove = (id: string) =>
     action.run(async () => {
-      await call('delete_persona_api_v1_persona__persona_id__delete', { path: { persona_id: id } })
+      await call('opal_persona_delete', { path: { persona_id: id } })
       await persona.reload()
     })
 

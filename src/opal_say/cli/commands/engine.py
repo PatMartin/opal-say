@@ -14,7 +14,7 @@ engine_app = typer.Typer(help="Discover and configure installed TTS engine.", no
 @engine_app.command("list")
 def engine_list(ctx: typer.Context) -> None:
     """List installed engine."""
-    _emit(ctx, _call(ctx, "opal_engines_list").json(), ENGINE_COLUMNS)
+    _emit(ctx, _call(ctx, "opal_engine_list").json(), ENGINE_COLUMNS)
 
 
 @engine_app.command("get")
@@ -48,7 +48,7 @@ def engine_update(
 def engine_validate(ctx: typer.Context, engine_id: str) -> None:
     """Validate an engine's runtime and configuration."""
     _validation(
-        ctx, _call(ctx, "validate_engine_api_v1_engine__engine_id__validate_post", path_params={"engine_id": engine_id})
+        ctx, _call(ctx, "opal_engine_validate", path_params={"engine_id": engine_id})
     )
 
 

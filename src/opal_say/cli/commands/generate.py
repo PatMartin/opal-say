@@ -70,7 +70,7 @@ def _synthesize(ctx: typer.Context, body: dict[str, Any], output: str | None, st
         raise typer.BadParameter("supply -o/--output, or play the audio locally")
     if stream:
         try:
-            with _state(ctx).client.stream("stream_audio_api_v1_generate_stream_post", json=body) as resp:
+            with _state(ctx).client.stream("opal_generate_stream", json=body) as resp:
                 size = _stream_response(resp, output, play)
         except ApiCallError as exc:
             typer.echo(f"Error: {exc.describe()}", err=True)
@@ -79,7 +79,7 @@ def _synthesize(ctx: typer.Context, body: dict[str, Any], output: str | None, st
             typer.echo(f"Error: stream terminated prematurely; generation failed ({exc})", err=True)
             raise typer.Exit(1) from None
     else:
-        resp = _call(ctx, "generate_audio_api_v1_generate_post", json=body)
+        resp = _call(ctx, "opal_generate", json=body)
         size = _write_audio(resp, output) if output is not None else 0
         if play:
             size = audio.play_response(resp)

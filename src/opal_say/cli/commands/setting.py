@@ -15,7 +15,7 @@ setting_app = typer.Typer(help="Service-wide key/value setting.", no_args_is_hel
 @setting_app.command("list")
 def setting_list(ctx: typer.Context) -> None:
     """Show all stored setting."""
-    _emit(ctx, _call(ctx, "opal_settings_get").json())
+    _emit(ctx, _call(ctx, "opal_setting_list").json())
 
 
 @setting_app.command("get")
@@ -48,7 +48,7 @@ def setting_patch(ctx: typer.Context, payload: str = typer.Option(
     ..., "--json", help='JSON object of changes, e.g. \'{"default_speed": 1.2}\' (null deletes a key).'
 )) -> None:
     """Atomically merge-patch the whole setting document."""
-    _emit(ctx, _call(ctx, "opal_settings_patch", json=json.loads(payload)).json())
+    _emit(ctx, _call(ctx, "opal_setting_patch", json=json.loads(payload)).json())
 
 
 def register(say_app: typer.Typer) -> None:

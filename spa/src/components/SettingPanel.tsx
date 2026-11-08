@@ -18,7 +18,7 @@ function formatValue(v: unknown): string {
 }
 
 export function SettingPanel() {
-  const setting = useLoad(() => call<Record<string, unknown>>('opal_settings_get'), {})
+  const setting = useLoad(() => call<Record<string, unknown>>('opal_setting_list'), {})
   const [key, setKey] = useState('')
   const [value, setValue] = useState('')
   const [detail, setDetail] = useState<Setting | null>(null)
@@ -51,7 +51,7 @@ export function SettingPanel() {
         <button
           onClick={() =>
             void action.run(async () => {
-              await call('opal_settings_patch', {
+              await call('opal_setting_patch', {
                 body: {
                   max_text_chars: 20000,
                   max_audio_bytes: 134217728,

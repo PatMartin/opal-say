@@ -6,10 +6,10 @@ import { AudioResult, ErrorBanner, OptionsField, parseOptions, useAction, useLoa
 
 /** Completed (/generate) and streamed (/generate/stream) speech generation. */
 export function GeneratePanel() {
-  const profile = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
-  const voice = useLoad(() => call<Voice[]>('list_voice_api_v1_voice__get', { query: { enabled: true } }), [])
-  const engine = useLoad(() => call<Engine[]>('opal_engines_list'), [])
-  const persona = useLoad(() => call<Persona[]>('list_persona_api_v1_persona__get', { query: { enabled: true } }), [])
+  const profile = useLoad(() => call<Profile[]>('opal_profile_list'), [])
+  const voice = useLoad(() => call<Voice[]>('opal_voice_list', { query: { enabled: true } }), [])
+  const engine = useLoad(() => call<Engine[]>('opal_engine_list'), [])
+  const persona = useLoad(() => call<Persona[]>('opal_persona_list', { query: { enabled: true } }), [])
 
   const [text, setText] = useState('')
   const [profileId, setProfileId] = useState('')
@@ -44,7 +44,7 @@ export function GeneratePanel() {
 
       if (!stream) {
         if (format) body.output_format = format
-        const resp = await callRaw('generate_audio_api_v1_generate_post', { body })
+        const resp = await callRaw('opal_generate', { body })
         const meta = audioMeta(resp)
         const raw = new Uint8Array(await resp.arrayBuffer())
         const blob = meta.format === 'pcm' ? pcmToWav(raw, meta.sampleRate) : new Blob([raw], { type: 'audio/wav' })
@@ -52,7 +52,7 @@ export function GeneratePanel() {
         return
       }
 
-      const resp = await callRaw('stream_audio_api_v1_generate_stream_post', { body })
+      const resp = await callRaw('opal_generate_stream', { body })
       const meta = audioMeta(resp)
       const chunks: Uint8Array[] = []
       let total = 0

@@ -1501,13 +1501,13 @@ contract. The parity tests check that the CLI covers every operation.
 | `profile update` | `PATCH /api/v1/profile/{profile_id}` | `update_profile_api_v1_profiles__profile_id__patch` |
 | `profile remove` | `DELETE /api/v1/profile/{profile_id}` | `delete_profile_api_v1_profiles__profile_id__delete` |
 | `profile activate` | `POST /api/v1/profile/{profile_id}/activate` | `activate_profile_api_v1_profiles__profile_id__activate_post` |
-| `persona list` | `GET /api/v1/persona/` | `list_persona_api_v1_persona__get` |
-| `persona add` | `POST /api/v1/persona/` | `create_persona_api_v1_persona__post` |
-| `persona get` | `GET /api/v1/persona/{persona_id}` | `get_persona_api_v1_persona__persona_id__get` |
-| `persona update` | `PATCH /api/v1/persona/{persona_id}` | `update_persona_api_v1_persona__persona_id__patch` |
-| `persona remove` | `DELETE /api/v1/persona/{persona_id}` | `delete_persona_api_v1_persona__persona_id__delete` |
-| `generate` | `POST /api/v1/generate` | `generate_audio_api_v1_generate_post` |
-| `generate --stream` | `POST /api/v1/generate/stream` | `stream_audio_api_v1_generate_stream_post` |
+| `persona list` | `GET /api/v1/persona/` | `opal_persona_list` |
+| `persona add` | `POST /api/v1/persona/` | `opal_persona_create` |
+| `persona get` | `GET /api/v1/persona/{persona_id}` | `opal_persona_get` |
+| `persona update` | `PATCH /api/v1/persona/{persona_id}` | `opal_persona_patch` |
+| `persona remove` | `DELETE /api/v1/persona/{persona_id}` | `opal_persona_delete` |
+| `generate` | `POST /api/v1/generate` | `opal_generate` |
+| `generate --stream` | `POST /api/v1/generate/stream` | `opal_generate_stream` |
 | `setting list` | `GET /api/v1/setting/` | `get_all_settings_api_v1_settings__get` |
 | `setting get` | `GET /api/v1/setting/{key}` | `get_setting_api_v1_settings__key__get` |
 | `setting set` | `PUT /api/v1/setting/{key}` | `upsert_setting_api_v1_settings__key__put` |

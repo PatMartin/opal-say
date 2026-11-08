@@ -95,7 +95,7 @@ paths:
       tags:
       - engines
       summary: List engines
-      operationId: opal_engines_list
+      operationId: opal_engine_list
       description: Return all engines known to the service implementation. An engine can be known but unavailable. `enabled`
         is administrative configuration; `available` reports whether the implementation can currently use the engine. Returns
         the complete bounded catalog; pagination is not supported.
@@ -229,7 +229,7 @@ paths:
         diagnostic messages because the validation operation itself completed normally.
 
         '
-      operationId: validate_engine_api_v1_engine__engine_id__validate_post
+      operationId: opal_engine_validate
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -268,7 +268,7 @@ paths:
         sizes over an advertised deployment cap, rather than silently truncate.
 
         '
-      operationId: list_voice_api_v1_voice__get
+      operationId: opal_voice_list
       parameters:
       - name: engine_id
         in: query
@@ -334,7 +334,7 @@ paths:
         resolved before accepting the registration.
 
         '
-      operationId: create_voice_api_v1_voice__post
+      operationId: opal_voice_create
       requestBody:
         required: true
         content:
@@ -420,7 +420,7 @@ paths:
       - voice
       summary: Get Voice
       description: Return one registered voice.
-      operationId: get_voice_api_v1_voice__voice_id__get
+      operationId: opal_voice_get
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -460,7 +460,7 @@ paths:
         never modified by this API.
 
         '
-      operationId: update_voice_api_v1_voice__voice_id__patch
+      operationId: opal_voice_patch
       requestBody:
         required: true
         content:
@@ -528,7 +528,7 @@ paths:
         is changed or removed.
 
         '
-      operationId: delete_voice_api_v1_voice__voice_id__delete
+      operationId: opal_voice_delete
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -588,7 +588,7 @@ paths:
         lightweight engine-specific load check but does not return generated speech.
 
         '
-      operationId: validate_voice_api_v1_voice__voice_id__validate_post
+      operationId: opal_voice_validate
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -634,7 +634,7 @@ paths:
         returns completed WAV or PCM audio.
 
         '
-      operationId: test_voice_api_v1_voice__voice_id__test_post
+      operationId: opal_voice_test
       requestBody:
         required: false
         content:
@@ -666,7 +666,7 @@ paths:
       tags:
       - profiles
       summary: List profiles
-      operationId: opal_profiles_list
+      operationId: opal_profile_list
       description: Return the complete bounded profile collection; pagination is not supported. An implementation may reject
         catalog sizes over an advertised deployment cap rather than silently truncate.
       responses:
@@ -699,7 +699,7 @@ paths:
       tags:
       - profiles
       summary: Create profile
-      operationId: opal_profiles_create
+      operationId: opal_profile_create
       description: Create a reusable named profile. If `is_active` is true, the new profile becomes the only active profile.
         Strong If-Match on the current collection revision is mandatory.
       parameters:
@@ -921,7 +921,7 @@ paths:
         Return the complete bounded configuration collection; pagination is not supported.
 
         '
-      operationId: list_persona_api_v1_persona__get
+      operationId: opal_persona_list
       parameters:
       - name: enabled
         in: query
@@ -970,7 +970,7 @@ paths:
         binding. Strong If-Match is mandatory.
 
         '
-      operationId: create_persona_api_v1_persona__post
+      operationId: opal_persona_create
       requestBody:
         required: true
         content:
@@ -1056,7 +1056,7 @@ paths:
       - persona
       summary: Get Persona
       description: Return one registered persona.
-      operationId: get_persona_api_v1_persona__persona_id__get
+      operationId: opal_persona_get
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1090,7 +1090,7 @@ paths:
       - persona
       summary: Update Persona
       description: Partially update a persona. If `voice_id` changes, the new voice must resolve. Strong If-Match is mandatory.
-      operationId: update_persona_api_v1_persona__persona_id__patch
+      operationId: opal_persona_patch
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -1134,7 +1134,7 @@ paths:
       - persona
       summary: Delete Persona
       description: Remove a persona. The bound voice registration is unaffected. Strong If-Match is mandatory.
-      operationId: delete_persona_api_v1_persona__persona_id__delete
+      operationId: opal_persona_delete
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       responses:
@@ -1183,7 +1183,7 @@ paths:
         \ returned in `X-Opal-Sample-Rate`.\n* When a `sample_rate` is explicitly requested, the service either returns audio\n\
         \  at that rate or rejects the request; it must not silently return another rate.\n* Plain text only is accepted.\
         \ SSML markup has no special meaning and is not a\n  supported input mode.\n"
-      operationId: generate_audio_api_v1_generate_post
+      operationId: opal_generate
       requestBody:
         required: true
         content:
@@ -1230,7 +1230,7 @@ paths:
         * If generation fails after a 200 response has begun, the service terminates the\n  stream. Clients MUST treat premature\
         \ termination as a failed generation; the\n  protocol does not inject an error object into the audio byte stream.\n\
         * Service-side text chunking MUST NOT reset sample format or sample rate between\n  internal chunks.\n"
-      operationId: stream_audio_api_v1_generate_stream_post
+      operationId: opal_generate_stream
       requestBody:
         required: true
         content:
@@ -1269,7 +1269,7 @@ paths:
       tags:
       - settings
       summary: List settings
-      operationId: opal_settings_get
+      operationId: opal_setting_list
       description: Return the complete portable settings map with values; never returns secret material. ETag carries the
         current revision for subsequent If-Match writes.
       responses:
@@ -1300,7 +1300,7 @@ paths:
       tags:
       - settings
       summary: Patch settings
-      operationId: opal_settings_patch
+      operationId: opal_setting_patch
       description: Atomically apply a partial update to the portable settings map. Strong If-Match is mandatory.
       parameters:
       - $ref: '#/components/parameters/IfMatch'
@@ -1847,17 +1847,18 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
   /api/v1/info/:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
     get:
+      tags:
+      - info
       summary: Service Info
       description: 'Service identity: name, package version and API version.'
       operationId: opal_info_get
-      tags:
-      - info
       responses:
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '200':
           description: Service identity.
           content:
@@ -1873,26 +1874,25 @@ paths:
               $ref: '#/components/headers/OpalRequestIdHeader'
             X-Opal-Causation-Id:
               $ref: '#/components/headers/OpalCausationIdHeader'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /api/v1/info/ping:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
     - $ref: '#/components/parameters/OpalRequestIdParameter'
     - $ref: '#/components/parameters/OpalCausationIdParameter'
-  /api/v1/info/ping:
     get:
-      summary: Ping
-      description: Lightweight liveness probe for process supervisors. Callers needing engine readiness use `/api/v1/health/`
-        or `/api/v1/health/ready` (OPAL suite standard).
-      operationId: opal_info_ping
       tags:
       - info
+      summary: Ping
+      description: Lightweight liveness probe for process supervisors.
+      operationId: opal_info_ping
       responses:
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '200':
           description: Service process is alive.
           content:
@@ -1908,13 +1908,12 @@ paths:
               $ref: '#/components/headers/OpalRequestIdHeader'
             X-Opal-Causation-Id:
               $ref: '#/components/headers/OpalCausationIdHeader'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
   /api/v1/health/live:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -2941,35 +2940,6 @@ components:
           default: null
         engine_options:
           $ref: '#/components/schemas/EngineOptions'
-    ServiceInfo:
-      type: object
-      required:
-      - name
-      - version
-      - api_version
-      properties:
-        name:
-          type: string
-          example: opal-say-svc
-        version:
-          type: string
-          example: 1.0.0
-        api_version:
-          type: string
-          example: v1
-        description:
-          type: string
-          example: Implementation-neutral OPAL text-to-speech service
-    LivenessRead:
-      type: object
-      required:
-      - status
-      properties:
-        status:
-          type: string
-          enum:
-          - ok
-          example: ok
     OpalEngine:
       type: object
       properties:
@@ -3747,6 +3717,37 @@ components:
       additionalProperties: true
       description: Portable logical configuration bundle. `format_version` and `settings` are the only suite-standard members;
         all other sections are service-defined. Secrets and history are never included.
+    ServiceInfo:
+      type: object
+      required:
+      - name
+      - version
+      - api_version
+      properties:
+        name:
+          type: string
+          description: Service implementation name.
+          example: opal-say-svc
+        version:
+          type: string
+          description: Package version.
+          example: 1.0.0
+        api_version:
+          type: string
+          description: OPAL API contract version.
+          example: v1
+        description:
+          type: string
+    LivenessRead:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          example: ok
     OpalHealthProbe:
       type: object
       required:
@@ -3771,24 +3772,6 @@ components:
 x-opal-context-standard:
   version: '1.2'
   headers:
-  - X-Opal-Session-Id
-  - X-Opal-Transaction-Id
-  - X-Opal-Request-Id
-  - X-Opal-Causation-Id
-  session_mode: context-only
-  id_format: opaque-printable-ascii-1-to-128
-  transaction_atomicity: false
-  events:
-    propagate:
-    - session_id
-    - transaction_id
-    - request_id
-    - causation_id
-    zero_mq_frames: 2
-    compatibility: metadata_schema_version versions the optional data.metadata block only; the two-frame wire envelope (topic
-      + JSON with topic/data) is unchanged across versions. Consumers extract known correlation keys (session_id, transaction_id,
-      request_id, causation_id) and MUST ignore unknown metadata fields; producers may emit any metadata_schema_version without
-      breaking the wire contract.
     metadata_schema_version: '1.0'
   pagination:
     history: cursor

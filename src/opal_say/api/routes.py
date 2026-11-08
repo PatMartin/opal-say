@@ -184,7 +184,7 @@ def report_dict(report: Report) -> dict[str, Any]:
 # -- engine ---------------------------------------------------------------------
 
 
-@router.get("/api/v1/engine/", tags=["engine"], operation_id="opal_engines_list",
+@router.get("/api/v1/engine/", tags=["engine"], operation_id="opal_engine_list",
             response_model=list[EngineRead])
 def list_engine(response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
@@ -206,7 +206,7 @@ def update_engine(engine_id: str, body: EngineUpdate, if_match: str | None = Hea
 
 
 @router.post("/api/v1/engine/{engine_id}/validate", tags=["engine"],
-             operation_id="validate_engine_api_v1_engine__engine_id__validate_post", response_model=ValidationResult)
+             operation_id="opal_engine_validate", response_model=ValidationResult)
 def validate_engine(engine_id: str, svc: Services = Depends(services)):
     return report_dict(svc.engine.validate(engine_id))
 
@@ -214,7 +214,7 @@ def validate_engine(engine_id: str, svc: Services = Depends(services)):
 # -- voice ----------------------------------------------------------------------
 
 
-@router.get("/api/v1/voice/", tags=["voice"], operation_id="list_voice_api_v1_voice__get",
+@router.get("/api/v1/voice/", tags=["voice"], operation_id="opal_voice_list",
             response_model=list[VoiceRead])
 def list_voice(
     response: Response,
@@ -226,7 +226,7 @@ def list_voice(
     return svc.voice.list(engine_id, enabled)
 
 
-@router.post("/api/v1/voice/", tags=["voice"], operation_id="create_voice_api_v1_voice__post",
+@router.post("/api/v1/voice/", tags=["voice"], operation_id="opal_voice_create",
              response_model=VoiceRead, status_code=201)
 def create_voice(body: VoiceCreate, response: Response, if_match: str | None = Header(None),
                  svc: Services = Depends(services)):
@@ -235,14 +235,14 @@ def create_voice(body: VoiceCreate, response: Response, if_match: str | None = H
     return voice
 
 
-@router.get("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="get_voice_api_v1_voice__voice_id__get",
+@router.get("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="opal_voice_get",
             response_model=VoiceRead)
 def get_voice(voice_id: str, response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.voice.get(voice_id)
 
 
-@router.patch("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="update_voice_api_v1_voice__voice_id__patch",
+@router.patch("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="opal_voice_patch",
               response_model=VoiceRead)
 def update_voice(voice_id: str, body: VoiceUpdate, if_match: str | None = Header(None),
                 svc: Services = Depends(services)):
@@ -250,14 +250,14 @@ def update_voice(voice_id: str, body: VoiceUpdate, if_match: str | None = Header
 
 
 @router.delete("/api/v1/voice/{voice_id}", tags=["voice"],
-               operation_id="delete_voice_api_v1_voice__voice_id__delete", status_code=204)
+               operation_id="opal_voice_delete", status_code=204)
 def delete_voice(voice_id: str, if_match: str | None = Header(None), svc: Services = Depends(services)):
     mutate_with_revision(svc.store, if_match, lambda: svc.voice.delete(voice_id))
     return Response(status_code=204)
 
 
 @router.post("/api/v1/voice/{voice_id}/validate", tags=["voice"],
-             operation_id="validate_voice_api_v1_voice__voice_id__validate_post", response_model=ValidationResult)
+             operation_id="opal_voice_validate", response_model=ValidationResult)
 def validate_voice(voice_id: str, svc: Services = Depends(services)):
     return report_dict(svc.voice.validate(voice_id))
 
@@ -267,7 +267,7 @@ def validate_voice(voice_id: str, svc: Services = Depends(services)):
 # is dispatched — generate/voice-test produce the first block before 200 is committed, and
 # stream keeps a generator alive for the response body.
 @router.post("/api/v1/voice/{voice_id}/test", tags=["voice"],
-             operation_id="test_voice_api_v1_voice__voice_id__test_post", response_class=Response)
+             operation_id="opal_voice_test", response_class=Response)
 async def test_voice(voice_id: str, body: VoiceTestRequest | None = Body(None), svc: Services = Depends(services)):
     plan, data, media_type = await run_in_threadpool(
         svc.generation.test_voice, voice_id, body or VoiceTestRequest()
@@ -278,14 +278,14 @@ async def test_voice(voice_id: str, body: VoiceTestRequest | None = Body(None), 
 # -- persona --------------------------------------------------------------------
 
 
-@router.get("/api/v1/persona/", tags=["persona"], operation_id="list_persona_api_v1_persona__get",
+@router.get("/api/v1/persona/", tags=["persona"], operation_id="opal_persona_list",
             response_model=list[PersonaRead])
 def list_persona(response: Response, enabled: bool | None = Query(None), svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.persona.list(enabled)
 
 
-@router.post("/api/v1/persona/", tags=["persona"], operation_id="create_persona_api_v1_persona__post",
+@router.post("/api/v1/persona/", tags=["persona"], operation_id="opal_persona_create",
              response_model=PersonaRead, status_code=201)
 def create_persona(body: PersonaCreate, response: Response, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
@@ -295,21 +295,21 @@ def create_persona(body: PersonaCreate, response: Response, if_match: str | None
 
 
 @router.get("/api/v1/persona/{persona_id}", tags=["persona"],
-            operation_id="get_persona_api_v1_persona__persona_id__get", response_model=PersonaRead)
+            operation_id="opal_persona_get", response_model=PersonaRead)
 def get_persona(persona_id: str, response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.persona.get(persona_id)
 
 
 @router.patch("/api/v1/persona/{persona_id}", tags=["persona"],
-              operation_id="update_persona_api_v1_persona__persona_id__patch", response_model=PersonaRead)
+              operation_id="opal_persona_patch", response_model=PersonaRead)
 def update_persona(persona_id: str, body: PersonaUpdate, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
     return mutate_with_revision(svc.store, if_match, lambda: svc.persona.update(persona_id, body))
 
 
 @router.delete("/api/v1/persona/{persona_id}", tags=["persona"],
-               operation_id="delete_persona_api_v1_persona__persona_id__delete", status_code=204)
+               operation_id="opal_persona_delete", status_code=204)
 def delete_persona(persona_id: str, if_match: str | None = Header(None), svc: Services = Depends(services)):
     mutate_with_revision(svc.store, if_match, lambda: svc.persona.delete(persona_id))
     return Response(status_code=204)
@@ -318,14 +318,14 @@ def delete_persona(persona_id: str, if_match: str | None = Header(None), svc: Se
 # -- profile --------------------------------------------------------------------
 
 
-@router.get("/api/v1/profile/", tags=["profile"], operation_id="opal_profiles_list",
+@router.get("/api/v1/profile/", tags=["profile"], operation_id="opal_profile_list",
             response_model=list[ProfileRead])
 def list_profile(response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.profile.list()
 
 
-@router.post("/api/v1/profile/", tags=["profile"], operation_id="opal_profiles_create",
+@router.post("/api/v1/profile/", tags=["profile"], operation_id="opal_profile_create",
              response_model=ProfileRead, status_code=201)
 def create_profile(body: ProfileCreate, response: Response, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
@@ -365,7 +365,7 @@ def activate_profile(profile_id: int = ProfileId, if_match: str | None = Header(
 # -- generate --------------------------------------------------------------------
 
 
-@router.post("/api/v1/generate", tags=["generate"], operation_id="generate_audio_api_v1_generate_post",
+@router.post("/api/v1/generate", tags=["generate"], operation_id="opal_generate",
              response_class=Response)
 async def generate_audio(body: GenerateRequest, svc: Services = Depends(services)):
     plan = await run_in_threadpool(svc.generation.plan, body)
@@ -373,7 +373,7 @@ async def generate_audio(body: GenerateRequest, svc: Services = Depends(services
     return Response(data, media_type=media_type, headers=plan.headers())
 
 
-@router.post("/api/v1/generate/stream", tags=["generate"], operation_id="stream_audio_api_v1_generate_stream_post",
+@router.post("/api/v1/generate/stream", tags=["generate"], operation_id="opal_generate_stream",
              response_class=StreamingResponse)
 async def stream_audio(request: Request, body: GenerateStreamRequest, svc: Services = Depends(services)):
     plan = await run_in_threadpool(svc.generation.plan, body)
@@ -394,13 +394,13 @@ async def stream_audio(request: Request, body: GenerateStreamRequest, svc: Servi
 # -- setting --------------------------------------------------------------------
 
 
-@router.get("/api/v1/setting/", tags=["setting"], operation_id="opal_settings_get")
+@router.get("/api/v1/setting/", tags=["setting"], operation_id="opal_setting_list")
 def get_all_setting(response: Response, svc: Services = Depends(services)) -> dict[str, Any]:
     response.headers["ETag"] = config_etag(svc.store)
     return svc.setting.all()
 
 
-@router.patch("/api/v1/setting/", tags=["setting"], operation_id="opal_settings_patch")
+@router.patch("/api/v1/setting/", tags=["setting"], operation_id="opal_setting_patch")
 def patch_setting(body: dict[str, Any] = Body(min_length=1), if_match: str | None = Header(None),
                    svc: Services = Depends(services)) -> dict[str, Any]:
     return mutate_with_revision(svc.store, if_match, lambda: svc.setting.patch(body))
