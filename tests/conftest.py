@@ -110,7 +110,8 @@ def _needs_if_match(method: str, url: str) -> bool:
         return True
     if m == "POST":
         return (
-            url == "/api/v1/profiles/"
+            url == "/api/v1/voices/"
+            or url == "/api/v1/profiles/"
             or url == "/api/v1/backup/import"
             or url.startswith("/api/v1/backup/restore/")
             or (url.startswith("/api/v1/profiles/") and url.endswith("/activate"))

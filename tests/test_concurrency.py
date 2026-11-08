@@ -61,10 +61,10 @@ def test_stale_if_match_is_412(client, method, url, kw):
     assert resp.json()["error"]["code"] == "precondition_failed"
 
 
-def test_malformed_if_match_is_412(client):
+def test_malformed_if_match_is_422(client):
     client.skip_contract = True
     resp = client.patch("/api/v1/engines/fake", json={"enabled": True}, headers={"If-Match": "nonsense"})
-    assert resp.status_code == 412
+    assert resp.status_code == 422
 
 
 def test_fresh_if_match_succeeds_and_bumps_revision(client):
