@@ -85,21 +85,21 @@ valid regardless of where it is started:
 ```bash
 # Run from the repository root.
 REPO_ROOT="$(pwd)"
-opal say engines update kokoro \
+opal say engine update kokoro \
   -O model_path="$REPO_ROOT/resources/kokoro/kokoro-v1.0.int8.onnx" \
   -O voices_path="$REPO_ROOT/resources/kokoro/voices-v1.0.bin" \
   -O default_lang=en-us
-opal say engines update kokoro --enable
+opal say engine update kokoro --enable
 ```
 
 ```powershell
 # Windows PowerShell; run from the repository root.
 $repoRoot = (Get-Location).Path
-opal say engines update kokoro `
+opal say engine update kokoro `
   -O "model_path=$repoRoot\resources\kokoro\kokoro-v1.0.int8.onnx" `
   -O "voices_path=$repoRoot\resources\kokoro\voices-v1.0.bin" `
   -O default_lang=en-us
-opal say engines update kokoro --enable
+opal say engine update kokoro --enable
 ```
 
 Both paths are **required** — the engine reports unavailable until they point at real files.
@@ -109,10 +109,10 @@ If you edit the YAML files after the service has already started, apply them wit
 ## 4. Verify
 
 ```bash
-opal say engines validate kokoro         # runtime + model/voices file checks
-opal say voices add heart --name Heart --engine kokoro --ref af_heart
-opal say voices validate heart
-opal say voices test heart -o test.wav    # synthesizes a short sample
+opal say engine validate kokoro         # runtime + model/voices file checks
+opal say voice add heart --name Heart --engine kokoro --ref af_heart
+opal say voice validate heart
+opal say voice test heart -o test.wav    # synthesizes a short sample
 opal say generate "Kokoro is installed." -o hello.wav
 ```
 

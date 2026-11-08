@@ -9,7 +9,7 @@ renderers that provide a copy control show a **copy button** for the complete sn
 Start OPAL Say, install an engine and at least one voice model, register that model as a
 voice, and make sure its health check succeeds. The examples use the seeded
 `en-us-amy-low` Piper voice and `kokoro-af-heart` Kokoro voice; substitute IDs from
-`opal say voices list` when your installation differs. If `voices list` prints `(none)`,
+`opal say voice list` when your installation differs. If `voice list` prints `(none)`,
 generation cannot work yet: follow [PIPER_INSTALL.md](PIPER_INSTALL.md) or
 [KOKORO_INSTALL.md](KOKORO_INSTALL.md), then register and validate a voice before using
 the recipes.
@@ -19,8 +19,8 @@ opal-say-svc
 
 # Run these in another shell after activating the project's virtual environment.
 opal say health
-opal say voices list
-opal say voices validate en-us-amy-low
+opal say voice list
+opal say voice validate en-us-amy-low
 ```
 
 The service writes audio; it does not play it. Recipes that play audio either use `opal say generate --play`
@@ -122,17 +122,17 @@ opal say generate "Bonjour et bienvenue." \
 
 ## 9. Build an A/B voice audition pack
 
-`voices test` bypasses active-profile selection, which makes it reliable for comparing
+`voice test` bypasses active-profile selection, which makes it reliable for comparing
 registered voices against the same phrase.
 
 ```bash
 mkdir -p auditions
-opal say voices test en-us-amy-low --text "The sky is clear and the journey begins." -o auditions/amy.wav
-opal say voices test kokoro-af-heart --text "The sky is clear and the journey begins." -o auditions/heart.wav
+opal say voice test en-us-amy-low --text "The sky is clear and the journey begins." -o auditions/amy.wav
+opal say voice test kokoro-af-heart --text "The sky is clear and the journey begins." -o auditions/heart.wav
 
 # Or listen without writing files at all:
-opal say voices test en-us-amy-low --text "The sky is clear and the journey begins." --play
-opal say voices test kokoro-af-heart --text "The sky is clear and the journey begins." --play
+opal say voice test en-us-amy-low --text "The sky is clear and the journey begins." --play
+opal say voice test kokoro-af-heart --text "The sky is clear and the journey begins." --play
 ```
 
 ## 10. Define a focused profile for announcements
@@ -141,18 +141,18 @@ Profiles package a voice and delivery settings under a numerical ID. Create one,
 ID printed by the command, then select it explicitly in future generation.
 
 ```bash
-opal say profiles add announcements \
+opal say profile add announcements \
   --voice en-us-amy-low --speed 1.1 --volume 1.2 --sample-rate 16000
-opal say profiles list
+opal say profile list
 ```
 
 ## 11. Switch the default voice context for an entire deployment
 
 Activate a profile once to make it the fallback for calls that do not specify a profile or
-voice. Replace `2` with the ID shown by `profiles list`.
+voice. Replace `2` with the ID shown by `profile list`.
 
 ```bash
-opal say profiles activate 2
+opal say profile activate 2
 opal say generate "This message uses the newly active profile." -o active-profile.wav
 ```
 
@@ -189,9 +189,9 @@ Voice registration stores a stable name for an existing model; it does not uploa
 Validate immediately so a broken model path is discovered before use.
 
 ```bash
-opal say voices add en-us-ryan-medium \
+opal say voice add en-us-ryan-medium \
   --name "Ryan (medium)" --engine piper --ref en_US-ryan-medium --language en-US
-opal say voices validate en-us-ryan-medium
+opal say voice validate en-us-ryan-medium
 ```
 
 ## 15. Disable an engine during maintenance
@@ -200,9 +200,9 @@ Disabling routing prevents new requests from selecting an engine while preservin
 configuration. Validate and re-enable it when maintenance is complete.
 
 ```bash
-opal say engines update kokoro --disable
-opal say engines update kokoro --enable
-opal say engines validate kokoro
+opal say engine update kokoro --disable
+opal say engine update kokoro --enable
+opal say engine validate kokoro
 ```
 
 ## 16. Tune the Piper model cache for a voice-heavy installation
@@ -211,8 +211,8 @@ Engine options are engine-specific and merged with existing options. This raises
 model cache size without overwriting the configured voice directory.
 
 ```bash
-opal say engines update piper -O cache_size=8
-opal say engines get piper
+opal say engine update piper -O cache_size=8
+opal say engine get piper
 ```
 
 ## 17. Reduce time-to-first-audio for streamed notices
@@ -221,8 +221,8 @@ Smaller chunks can start the first stream sooner. This is a service-wide trade-o
 inspect the existing setting and choose a value appropriate to your hardware.
 
 ```bash
-opal say settings get chunk_max_chars
-opal say settings set chunk_max_chars 200
+opal say setting get chunk_max_chars
+opal say setting set chunk_max_chars 200
 ```
 
 ## 18. Give a large deployment a consistent default speaking pace
@@ -231,8 +231,8 @@ Service settings are fallbacks only: an explicit profile or generation option st
 This is a good way to adjust behavior of simple callers without editing each caller.
 
 ```bash
-opal say settings set default_speed 1.08
-opal say settings set default_volume 0.9
+opal say setting set default_speed 1.08
+opal say setting set default_volume 0.9
 ```
 
 ## 19. Export configuration for review or version control

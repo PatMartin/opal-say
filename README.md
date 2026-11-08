@@ -64,7 +64,7 @@ cd opal-say
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Both speech engines plus developer/testing tools:
+# Both speech engine plus developer/testing tools:
 pip install -e '.[engines,dev]'
 
 # Alternatives:
@@ -117,7 +117,7 @@ mkdir -p ~/kokoro
 
 # Put the downloaded files here with these names:
 # ~/kokoro/kokoro-v1.0.int8.onnx
-# ~/kokoro/voices-v1.0.bin
+# ~/kokoro/voice-v1.0.bin
 ~~~
 
 Kokoro voice references such as `af_heart` and `bm_george` live inside that voices file; you do **not** need a separate ONNX model for each voice. The shipped catalog registers examples under `kokoro-af-heart` and `kokoro-bm-george`.
@@ -154,8 +154,8 @@ source .venv/bin/activate
 opal say ping
 opal say info
 opal say health
-opal say engines list
-opal say voices list
+opal say engine list
+opal say voice list
 ~~~
 
 Useful URLs:
@@ -167,7 +167,7 @@ Useful URLs:
 | OpenAPI contract | `http://127.0.0.1:8001/openapi.json` |
 | Web console | `http://127.0.0.1:8001/ui/` **after building the SPA** |
 
-On a fresh database, the service attempts to seed engines, voices, profiles, and settings from `config/*.yaml`. If those seed resources are invalid or model files are missing, the service may start without importing the entire seed catalog. Use `engines validate`, `voices list`, and `backup validate` to diagnose this before attempting generation.
+On a fresh database, the service attempts to seed engines, voices, profiles, and settings from `config/*.yaml`. If those seed resources are invalid or model files are missing, the service may start without importing the entire seed catalog. Use `engine validate`, `voice list`, and `backup validate` to diagnose this before attempting generation.
 
 ### 4. Make it say something
 
@@ -227,7 +227,7 @@ opal
     ├── ping
     ├── tree                                    prints this command tree
     │
-    ├── engines
+    ├── engine
     │   ├── list
     │   ├── get ENGINE_ID
     │   ├── update ENGINE_ID                    [--enable/--disable]
@@ -235,7 +235,7 @@ opal
     │   │                                       [--options-json JSON]
     │   └── validate ENGINE_ID
     │
-    ├── voices
+    ├── voice
     │   ├── list                                [--engine ENGINE_ID]
     │   │                                       [--enabled/--disabled]
     │   ├── get VOICE_ID
@@ -261,7 +261,7 @@ opal
     │                                           [-O KEY=VALUE]...
     │                                           [--options-json JSON]
     │
-    ├── profiles
+    ├── profile
     │   ├── list
     │   ├── get PROFILE_ID
     │   ├── add NAME                             --voice VOICE_ID [--active]
@@ -291,7 +291,7 @@ opal
     │                                           [-O KEY=VALUE]...
     │                                           [--options-json JSON]
     │
-    ├── settings
+    ├── setting
     │   ├── list
     │   ├── get KEY
     │   ├── set KEY VALUE
@@ -314,14 +314,14 @@ opal
 ~~~bash
 opal say --help
 opal say generate --help
-opal say voices add --help
-opal say profiles update --help
+opal say voice add --help
+opal say profile update --help
 
 # Standalone entry point:
 opal-say --help
 ~~~
 
-**Global options belong immediately after `say`:** `opal say --json voices list` is correct; `opal say voices list --json` is not. The root `--json` controls **output formatting**, while `settings patch --json` carries a JSON **input payload**.
+**Global options belong immediately after `say`:** `opal say --json voice list` is correct; `opal say voice list --json` is not. The root `--json` controls **output formatting**, while `setting patch --json` carries a JSON **input payload**.
 
 ## In-depth CLI guide: from first voice to real use cases
 
@@ -343,17 +343,17 @@ The important boundary is **engine versus voice versus profile**. The engine kno
 ### Use case 1: Find out what your machine can speak
 
 ~~~bash
-opal say engines list
-opal say engines get piper
-opal say engines get kokoro
+opal say engine list
+opal say engine get piper
+opal say engine get kokoro
 
 # An enabled engine isn't necessarily usable.
-opal say engines validate piper
-opal say engines validate kokoro
+opal say engine validate piper
+opal say engine validate kokoro
 
-opal say voices list
-opal say voices list --engine piper
-opal say voices list --engine kokoro
+opal say voice list
+opal say voice list --engine piper
+opal say voice list --engine kokoro
 ~~~
 
 An engine has both `enabled` (your administrative setting) and `available` (the runtime and its required files can be used). A Piper adapter with no voice models or a Kokoro adapter with a missing ONNX file isn't ready simply because the package installed.
@@ -361,8 +361,8 @@ An engine has both `enabled` (your administrative setting) and `available` (the 
 Check each registered voice independently:
 
 ~~~bash
-opal say voices validate en-us-amy-low
-opal say voices get en-us-amy-low
+opal say voice validate en-us-amy-low
+opal say voice get en-us-amy-low
 ~~~
 
 If a seed entry is missing, register a voice after installing its model (next use case).
@@ -372,16 +372,16 @@ If a seed entry is missing, register a voice after installing its model (next us
 The system never uploads models during registration. First put `en_US-amy-low.onnx` and `en_US-amy-low.onnx.json` on the service host, as shown in Installation, and set the engine's voices directory:
 
 ~~~bash
-opal say engines update piper -O voices_dir="$HOME/piper/voices"
-opal say engines validate piper
+opal say engine update piper -O voices_dir="$HOME/piper/voices"
+opal say engine validate piper
 ~~~
 
 If the seed already created `en-us-amy-low`, **don't add the same ID again**. Instead:
 
 ~~~bash
-opal say voices get en-us-amy-low
-opal say voices validate en-us-amy-low
-opal say voices test en-us-amy-low \
+opal say voice get en-us-amy-low
+opal say voice validate en-us-amy-low
+opal say voice test en-us-amy-low \
   --text "Hello. My name is Amy, and I'm running locally." \
   -o amy-test.wav
 aplay amy-test.wav
@@ -390,24 +390,24 @@ aplay amy-test.wav
 For an installation with no seeded voice, create it:
 
 ~~~bash
-opal say voices add en-us-amy-low \
+opal say voice add en-us-amy-low \
   --name "Amy (low)" \
   --engine piper \
   --ref en_US-amy-low \
   --language en-US
 
-opal say voices validate en-us-amy-low
+opal say voice validate en-us-amy-low
 ~~~
 
 Create and activate a profile using the registered voice:
 
 ~~~bash
-opal say profiles add my-assistant \
+opal say profile add my-assistant \
   --voice en-us-amy-low \
   --description "Default local assistant voice" \
   --speed 1.0 --volume 0.9 --active
 
-opal say profiles list
+opal say profile list
 opal say generate "Welcome home." -o welcome.wav
 ~~~
 
@@ -418,18 +418,18 @@ You can also refer directly to an **absolute model path** in `--ref` instead of 
 Once the Kokoro model and voices file are on the host:
 
 ~~~bash
-opal say engines update kokoro \
+opal say engine update kokoro \
   -O model_path="$HOME/kokoro/kokoro-v1.0.int8.onnx" \
   -O voices_path="$HOME/kokoro/voices-v1.0.bin"
 
-opal say engines validate kokoro
-opal say voices list --engine kokoro
+opal say engine validate kokoro
+opal say voice list --engine kokoro
 ~~~
 
-The seeded registration `kokoro-af-heart` is ready if it appears in `voices list` and validates. Otherwise register it yourself:
+The seeded registration `kokoro-af-heart` is ready if it appears in `voice list` and validates. Otherwise register it yourself:
 
 ~~~bash
-opal say voices add kokoro-af-heart \
+opal say voice add kokoro-af-heart \
   --name "Kokoro Heart" --engine kokoro --ref af_heart \
   --language en-US
 ~~~
@@ -437,32 +437,32 @@ opal say voices add kokoro-af-heart \
 Try two distinct personalities (assuming both voices are registered and available):
 
 ~~~bash
-opal say voices test kokoro-af-heart \
+opal say voice test kokoro-af-heart \
   --text "Attention, explorers. Our adventure begins right now." \
   -o heart.wav
 
-opal say voices test kokoro-bm-george \
+opal say voice test kokoro-bm-george \
   --text "Attention, explorers. Our adventure begins right now." \
   -o george.wav
 ~~~
 
 Run `aplay heart.wav` and `aplay george.wav` to compare them. A voice registration is **a pointer**, not a copy of the voice weights. You can change models on the host independently of the CLI's output locations.
 
-### Use case 4: Give different jobs different voices
+### Use case 4: Give different jobs different voice
 
 Profiles are reusable output recipes. You might use a friendly voice for an assistant, an authoritative voice for alerts, and a different rate for a phone system.
 
 ~~~bash
-opal say profiles list
+opal say profile list
 
 # Make a narrator without changing the active profile:
-opal say profiles add narrator \
+opal say profile add narrator \
   --voice kokoro-bm-george \
   --description "Longer narration with a deliberate pace" \
   --speed 0.9 --volume 1.0 --format wav
 
 # Capture the numeric profile ID from the response or from the list.
-opal say profiles list
+opal say profile list
 
 # Use it for a specific utterance, without switching the default.
 opal say generate "Chapter one. A new beginning." \
@@ -472,17 +472,17 @@ opal say generate "Chapter one. A new beginning." \
 For an existing numeric `PROFILE_ID`:
 
 ~~~bash
-opal say profiles get PROFILE_ID
-opal say profiles activate PROFILE_ID
+opal say profile get PROFILE_ID
+opal say profile activate PROFILE_ID
 
 # Now the active profile supplies defaults:
 opal say generate "Your assistant is online." -o ready.wav
 
-# Change this profile without changing other profiles.
-opal say profiles update PROFILE_ID --volume 0.8 --speed 1.1
+# Change this profile without changing other profile.
+opal say profile update PROFILE_ID --volume 0.8 --speed 1.1
 ~~~
 
-Replace `PROFILE_ID` with the integer displayed by `profiles list`. A profile **must reference a registered voice**. Only one profile can be active; deleting an active profile is rejected. Switching to another profile before removal is the safe approach.
+Replace `PROFILE_ID` with the integer displayed by `profile list`. A profile **must reference a registered voice**. Only one profile can be active; deleting an active profile is rejected. Switching to another profile before removal is the safe approach.
 
 Request-level `--voice`, `--speed`, `--volume`, `--format`, and `--sample-rate` override the profile's settings for that generation. This means you can have stable defaults without giving up flexibility.
 
@@ -538,8 +538,8 @@ To influence how quickly the first chunk becomes available:
 
 ~~~bash
 # Smaller chunks often improve first-audio latency at the cost of more overhead.
-opal say settings get chunk_max_chars
-opal say settings set chunk_max_chars 200
+opal say setting get chunk_max_chars
+opal say setting set chunk_max_chars 200
 ~~~
 
 Text is chunked internally at sentence boundaries. It is **not** one independent audio file per sentence, and smaller chunks are not a guarantee of a particular latency. Model load, hardware, and engine affect first audio too.
@@ -562,8 +562,8 @@ opal say generate - --voice kokoro-af-heart \
 The configured `max_text_chars` limits accepted text (default: 20,000). You can inspect and adjust it deliberately:
 
 ~~~bash
-opal say settings list
-opal say settings set max_text_chars 50000
+opal say setting list
+opal say setting set max_text_chars 50000
 ~~~
 
 The limit guards the service from unexpectedly large synthesis requests. For a full book, consider dividing it into chapters with one output file per chapter rather than one giant generation call.
@@ -573,7 +573,7 @@ The limit guards the service from unexpectedly large synthesis requests. For a f
 OPAL Say can output at a chosen sample rate instead of leaving conversion to every downstream program.
 
 ~~~bash
-opal say profiles list
+opal say profile list
 
 # The fresh seed includes a profile named "telephony"; use its numeric ID.
 # It normally supplies raw PCM at 8000 Hz.
@@ -628,7 +628,7 @@ opal say generate "Good evening." \
   -o british.wav
 
 # JSON form for several options at once:
-opal say engines update piper \
+opal say engine update piper \
   --options-json '{"voices_dir":"~/piper/voices","cache_size":4}'
 ~~~
 
@@ -636,10 +636,10 @@ Engine options are *scoped*:
 
 | Where you set it | Applies to | Example |
 | --- | --- | --- |
-| `engines update` | Runtime-wide options | Piper `voices_dir`, `use_cuda`, `cache_size` |
-| `voices add/update` | Registered voice's options/defaults | Piper `config_path` |
-| `profiles add/update` | A reusable synthesis profile | `noise_scale`, Kokoro `lang` |
-| `generate` / `voices test` | One request only | Temporary expressiveness change |
+| `engine update` | Runtime-wide options | Piper `voices_dir`, `use_cuda`, `cache_size` |
+| `voice add/update` | Registered voice's options/defaults | Piper `config_path` |
+| `profile add/update` | A reusable synthesis profile | `noise_scale`, Kokoro `lang` |
+| `generate` / `voice test` | One request only | Temporary expressiveness change |
 
 For synthesis, engine options layer as **voice → profile → request**, with more specific values winning. An engine override is advanced: the target engine must actually support the selected voice.
 
@@ -652,20 +652,20 @@ Want to compare delivery without changing your default profile?
 ~~~bash
 mkdir -p comparisons
 
-opal say voices test en-us-amy-low \
+opal say voice test en-us-amy-low \
   --text "The sky is clear and the journey begins." \
   --speed 1.0 -o comparisons/amy.wav
 
-opal say voices test kokoro-af-heart \
+opal say voice test kokoro-af-heart \
   --text "The sky is clear and the journey begins." \
   --speed 1.0 -o comparisons/heart.wav
 
-opal say voices test kokoro-bm-george \
+opal say voice test kokoro-bm-george \
   --text "The sky is clear and the journey begins." \
   --speed 1.0 -o comparisons/george.wav
 ~~~
 
-For `voices test`, the specified voice is used **without active-profile fallbacks**. That's ideal for A/B listening. Use `voices validate VOICE_ID` to diagnose failures before comparing.
+For `voice test`, the specified voice is used **without active-profile fallbacks**. That's ideal for A/B listening. Use `voice validate VOICE_ID` to diagnose failures before comparing.
 
 A simple batch of different text lines (one file per line):
 
@@ -752,7 +752,7 @@ with httpx.Client(base_url="http://127.0.0.1:8001", timeout=120) as client:
 
 The service returns audio metadata in headers including `X-Opal-Audio-Format`, `X-Opal-Sample-Rate`, `X-Opal-Channels`, `X-Opal-Engine-Id`, and `X-Opal-Voice-Id`. Use those values when you write a player or converter rather than assuming every engine has the same native rate.
 
-### Use case 13: Back up your favorite voices and profiles
+### Use case 13: Back up your favorite voice and profile
 
 A working voice catalog is worth keeping. Take a snapshot before importing configuration or experimenting with engine settings:
 
@@ -786,8 +786,8 @@ A backup captures logical configuration, **not** Piper/Kokoro model binaries. To
 Want your YAML files to be the source of truth?
 
 ~~~bash
-# On the server, edit config/engines.yaml, voices.yaml,
-# profiles.yaml, or settings.yaml, then validate and back up.
+# On the server, edit config/engine.yaml, voice.yaml,
+# profile.yaml, or setting.yaml, then validate and back up.
 opal say backup validate
 opal say backup create
 
@@ -807,9 +807,9 @@ opal say health
 opal say health --live
 opal say health --ready
 
-opal say engines list
-opal say engines validate piper
-opal say voices validate en-us-amy-low
+opal say engine list
+opal say engine validate piper
+opal say voice validate en-us-amy-low
 opal say backup validate
 ~~~
 
@@ -818,9 +818,9 @@ If your pipeline can't speak, troubleshoot from the bottom up:
 | Symptom | First place to look |
 | --- | --- |
 | Can't reach the service | `opal say ping`, URL, port, process |
-| Engine reports unavailable | `engines validate`, installed Python extra, model paths |
-| Voice doesn't synthesize | `voices validate`, voice ref and model config |
-| No active default voice | `profiles list`, active profile or explicit `--voice` |
+| Engine reports unavailable | `engine validate`, installed Python extra, model paths |
+| Voice doesn't synthesize | `voice validate`, voice ref and model config |
+| No active default voice | `profile list`, active profile or explicit `--voice` |
 | Voice works but a pipe sounds like noise | Raw PCM sample rate, sample format, channels |
 | Stream starts then cuts off | Engine logs and incomplete-read error |
 | Changes to config YAML seem ignored | `backup import` or persisted engine/settings state |
@@ -829,26 +829,26 @@ If your pipeline can't speak, troubleshoot from the bottom up:
 Remember: **the first request may load a model**. A quick warmup can help measure steady-state performance:
 
 ~~~bash
-opal say voices test en-us-amy-low --text "Ready." -o /dev/null
+opal say voice test en-us-amy-low --text "Ready." -o /dev/null
 ~~~
 
 ## Settings and reference material
 
-### A quick settings reference
+### A quick setting reference
 
 Service-wide defaults can be set individually:
 
 ~~~bash
-opal say settings list
-opal say settings get chunk_max_chars
-opal say settings set chunk_max_chars 200
-opal say settings set default_speed 1.1
+opal say setting list
+opal say setting get chunk_max_chars
+opal say setting set chunk_max_chars 200
+opal say setting set default_speed 1.1
 
 # Remove a stored override; fall back to the built-in behavior.
-opal say settings delete default_speed
+opal say setting delete default_speed
 
 # Atomic multi-key merge patch, when desired:
-opal say settings patch --json '{"default_volume":0.85,"chunk_max_chars":250}'
+opal say setting patch --json '{"default_volume":0.85,"chunk_max_chars":250}'
 ~~~
 
 | Key | Built-in default | Purpose |
@@ -860,7 +860,7 @@ opal say settings patch --json '{"default_volume":0.85,"chunk_max_chars":250}'
 | `default_volume` | 1.0 | Service-wide fallback gain |
 | `default_output_format` | `wav` | Service-wide fallback output |
 
-`settings list` returns **stored** settings, not every built-in default. A missing `settings get KEY` result doesn't mean the default doesn't exist. Streaming responses are governed by text and runtime resource limits, not `max_audio_bytes`.
+`setting list` returns **stored** settings, not every built-in default. A missing `setting get KEY` result doesn't mean the default doesn't exist. Streaming responses are governed by text and runtime resource limits, not `max_audio_bytes`.
 
 For a generation request, the precedence is: **explicit request → selected/active profile → service setting → built-in default**. The voice usually determines the engine and its native sample rate.
 

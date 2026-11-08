@@ -52,7 +52,7 @@ curl.exe -fLo ~\piper\voices\en_US-amy-low.onnx.json `
 The **voice reference** is the model basename without extension — `en_US-amy-low` here.
 Keep both files together; a `.onnx` without its `.onnx.json` won't validate.
 
-## 3. Point the engine at the voices
+## 3. Point the engine at the voice
 
 When the service is started from the repository root, set `voices_dir` to the
 repository-relative location in `config/engines.yaml` (and, if you use its initial engine
@@ -75,15 +75,16 @@ absolute path — the safest way is to update the running service (persisted in 
 ```bash
 # Run from the repository root.
 REPO_ROOT="$(pwd)"
-opal say engines update piper -O "voices_dir=$REPO_ROOT/resources/piper"
-opal say engines update piper --enable
+opal say engine update piper -O "voices_dir=$REPO_ROOT/resources/piper"
+opal say engine update piper --enable
 ```
 
 ```powershell
 # Windows PowerShell; run from the repository root.
 $repoRoot = (Get-Location).Path
-opal say engines update piper -O "voices_dir=$repoRootesources\piper"
-opal say engines update piper --enable
+opal say engine update piper -O "voices_dir=$repoRoot
+esources\piper"
+opal say engine update piper --enable
 ```
 
 If you edit the YAML files after the service has already started, apply them with
@@ -92,10 +93,10 @@ If you edit the YAML files after the service has already started, apply them wit
 ## 4. Verify
 
 ```bash
-opal say engines validate piper          # runtime + options checks
-opal say voices add amy --name Amy --engine piper --ref en_US-amy-low
-opal say voices validate amy             # model + config resolve
-opal say voices test amy -o test.wav     # synthesizes a short sample
+opal say engine validate piper          # runtime + options checks
+opal say voice add amy --name Amy --engine piper --ref en_US-amy-low
+opal say voice validate amy             # model + config resolve
+opal say voice test amy -o test.wav     # synthesizes a short sample
 opal say generate "Piper is installed." -o hello.wav
 ```
 
@@ -105,9 +106,9 @@ the model basenames):
 ```bash
 for onnx in resources/piper/*.onnx; do
   ref="$(basename "${onnx%.onnx}")"
-  opal say voices add "$ref" --name "$ref" --engine piper --ref "$ref" || true
+  opal say voice add "$ref" --name "$ref" --engine piper --ref "$ref" || true
 done
-opal say voices list --engine piper | wc -l
+opal say voice list --engine piper | wc -l
 ```
 
 `voices_dir` is optional: a voice reference may also be an **absolute path** to a
@@ -125,7 +126,7 @@ absolute references resolve.
 | voice | `config_path` | Explicit `.onnx.json` path when the config isn't beside the model |
 | generation | `speaker` / `speaker_id` | Pick a speaker on multi-speaker models (`-O speaker=speaker_2`) |
 
-Engine options go on the engine (`engines update`) or a voice; generation options go on
+Engine options go on the engine (`engine update`) or a voice; generation options go on
 profiles or per-request: `opal say generate "…" -O speaker=alan`.
 
 ## Raspberry Pi notes
@@ -133,14 +134,14 @@ profiles or per-request: `opal say generate "…" -O speaker=alan`.
 - Use `low`-quality voices — `medium`/`high` models are noticeably slower and memory-hungry.
 - aarch64 wheels of `piper-tts`/`onnxruntime` install normally on 64-bit Raspberry Pi OS;
   on unusual distros you may need to build ONNX Runtime or use a Debian container.
-- First synthesis of a voice loads the model; warm it with `voices test` or keep
+- First synthesis of a voice loads the model; warm it with `voice test` or keep
   `cache_size` low on 1 GB boards.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| `engines validate` says runtime unavailable | `pip install 'opal-say[piper]'` in the service's environment |
+| `engine validate` says runtime unavailable | `pip install 'opal-say[piper]'` in the service's environment |
 | voice validation: model not found | ref must be a basename in `voices_dir` or an absolute `.onnx` path |
 | voice validation: config missing | the `NAME.onnx.json` file must sit beside `NAME.onnx` (or set `config_path`) |
 | warning `voices_dir_missing` | path typo — `~` is expanded, relative paths resolve against the service's working directory |

@@ -188,7 +188,7 @@ individual fields:
 | `OPAL_SAY_SPA_DIR` | `spa_dir` | none (`./spa/dist` in the shipped YAML) | Built web GUI, served at `/ui` |
 | | `log_level` | `info` | Python/uvicorn log level |
 | | `cors_origins` | `http://localhost:5173`, `http://127.0.0.1:5173` | Browser origins allowed to call the API |
-| | `engines` | none | Initial engine state, applied only when an engine is first seen |
+| | `engine` | none | Initial engine state, applied only when an engine is first seen |
 | `OPAL_SAY_API_URL` | | `http://127.0.0.1:8001` | API URL used by the **CLI** |
 | `VITE_OPAL_SAY_API_URL` | | same origin (dev: `http://127.0.0.1:8001`) | API URL compiled into the **web GUI** at build time |
 
@@ -235,7 +235,7 @@ Useful URLs:
 ```bash
 opal say ping                      # ok
 opal say health                    # status: ok, both engines available
-opal say voices list               # native_sample_rate is filled in when a voice resolves
+opal say voice list               # native_sample_rate is filled in when a voice resolves
 opal say backup validate           # valid
 opal say generate "Hello from OPAL Say." -o hello.wav && aplay hello.wav
 opal say generate "Streaming works too." --stream -o - | aplay -r 16000 -f S16_LE -c 1 -t raw
@@ -488,10 +488,10 @@ One SQLite database (default `var/opal_say.db`). The schema is created on startu
 
 | Table | Holds |
 |---|---|
-| `engines` | `engine_id`, `enabled`, `options` (JSON) |
-| `voices` | registration fields, `native_sample_rate`, `engine_options` and `metadata` (JSON), timestamps |
-| `profiles` | `id`, unique `name`, `is_active`, voice, speed, volume, format, sample rate, `engine_options` (JSON), timestamps |
-| `settings` | unique `key`, `value` (native JSON), `updated_at` |
+| `engine` | `engine_id`, `enabled`, `options` (JSON) |
+| `voice` | registration fields, `native_sample_rate`, `engine_options` and `metadata` (JSON), timestamps |
+| `profile` | `id`, unique `name`, `is_active`, voice, speed, volume, format, sample rate, `engine_options` (JSON), timestamps |
+| `setting` | unique `key`, `value` (native JSON), `updated_at` |
 
 There's no request log, synthesis history or audio cache. Generated audio is never stored.
 
@@ -538,7 +538,7 @@ service:
     - http://127.0.0.1:5173
 
   # Initial engine state, applied only when an engine is first seen. Later changes are made
-  # through PATCH /api/v1/engines/{engine_id} and persisted.
+  # through PATCH /api/v1/engine/{engine_id} and persisted.
   engines:
     piper:
       enabled: true
@@ -560,17 +560,17 @@ The top-level `service:` key is optional; a flat mapping works too. See
 
 | File | Top-level key | Content | Validated as |
 |---|---|---|---|
-| `engines.yaml` | `engines` | Map of `engine_id` → `{enabled, options}` | `enabled` boolean, `options` a map. Options are checked against the engine's specs. |
-| `voices.yaml` | `voices` | List of voices | Same fields and rules as `POST /voices/`; unknown fields are rejected |
-| `profiles.yaml` | `profiles` | List of profiles | Same fields and rules as `POST /profiles/`; unknown fields (including `id`) are rejected |
-| `settings.yaml` | `settings` | Map of key → native JSON value | Known keys are range-checked. |
+| `engines.yaml` | `engine` | Map of `engine_id` → `{enabled, options}` | `enabled` boolean, `options` a map. Options are checked against the engine's specs. |
+| `voices.yaml` | `voice` | List of voices | Same fields and rules as `POST /voices/`; unknown fields are rejected |
+| `profiles.yaml` | `profile` | List of profiles | Same fields and rules as `POST /profiles/`; unknown fields (including `id`) are rejected |
+| `settings.yaml` | `setting` | Map of key → native JSON value | Known keys are range-checked. |
 
 Every file starts with an optional `version: 1`. Only the files that are present replace their section;
 the other sections are kept. Engines in `engines.yaml` that aren't installed are ignored with a warning,
 and missing option keys get the adapter's defaults.
 
 ```yaml
-# config/engines.yaml
+# config/engine.yaml
 version: 1
 engines:
   piper:
@@ -588,7 +588,7 @@ engines:
 ```
 
 ```yaml
-# config/voices.yaml
+# config/voice.yaml
 version: 1
 voices:
   - voice_id: en-us-amy-low
@@ -613,7 +613,7 @@ voices:
 ```
 
 ```yaml
-# config/profiles.yaml
+# config/profile.yaml
 version: 1
 profiles:
   - name: default
@@ -635,7 +635,7 @@ profiles:
 ```
 
 ```yaml
-# config/settings.yaml
+# config/setting.yaml
 version: 1
 settings:
   max_text_chars: 20000
@@ -747,7 +747,7 @@ Every message has a `code`, a `message`, an optional `field` (for example
   bundled into `src/opal_say/contract/opal_say.yaml`. Every route uses the contract's `operationId`, and `/openapi.json` publishes
   the packaged contract file itself rather than a generated schema.
 - **Base URL:** `http://<host>:8001`. All resources are under `/api/v1`.
-- **Trailing slashes:** collection endpoints end with `/` (for example `/api/v1/voices/`). Calling them
+- **Trailing slashes:** collection endpoints end with `/` (for example `/api/v1/voice/`). Calling them
   without the slash triggers a redirect.
 - **IDs:** engines and voices are addressed by their string ids, profiles by integer id (`≥ 1`), settings
   by key, and backups by filename. Path ids are not pattern-checked: an unknown or malformed id is simply
@@ -830,7 +830,7 @@ curl -s $API/healthz
 
 ---
 
-### 5.4 Engines — `/api/v1/engines`
+### 5.4 Engines — `/api/v1/engine`
 
 Engine object:
 
@@ -843,16 +843,16 @@ Engine object:
 | `options` | object | Engine-scope options |
 | `metadata` | object | Adapter, runtime, version, and for Kokoro `native_sample_rate` and `speed_range` |
 
-#### `GET /api/v1/engines/` — list engines
+#### `GET /api/v1/engine/` — list engine
 
 ```bash
-curl -s $API/api/v1/engines/ | jq -r '.[] | "\(.engine_id)\t\(.enabled)\t\(.available)"'
+curl -s $API/api/v1/engine/ | jq -r '.[] | "\(.engine_id)\t\(.enabled)\t\(.available)"'
 ```
 
-#### `GET /api/v1/engines/{engine_id}` — get one engine
+#### `GET /api/v1/engine/{engine_id}` — get one engine
 
 ```bash
-curl -s $API/api/v1/engines/piper
+curl -s $API/api/v1/engine/piper
 ```
 ```json
 {
@@ -864,23 +864,23 @@ curl -s $API/api/v1/engines/piper
 }
 ```
 
-#### `PATCH /api/v1/engines/{engine_id}` — enable/disable or change options
+#### `PATCH /api/v1/engine/{engine_id}` — enable/disable or change options
 
 The body is `{"enabled"?: bool, "options"?: {...}}`, with at least one field. `options` is a top-level
 JSON **merge-patch**: supplied keys replace, `null` removes a key, and other keys are kept. The merged
 result is validated (`422` if invalid), stored, and applied to the adapter immediately.
 
 ```bash
-curl -s -X PATCH $API/api/v1/engines/piper -H 'Content-Type: application/json' \
+curl -s -X PATCH $API/api/v1/engine/piper -H 'Content-Type: application/json' \
   -d '{"options": {"cache_size": 8}}'
 
-curl -s -X PATCH $API/api/v1/engines/kokoro -H 'Content-Type: application/json' -d '{"enabled": false}'
+curl -s -X PATCH $API/api/v1/engine/kokoro -H 'Content-Type: application/json' -d '{"enabled": false}'
 ```
 
-#### `POST /api/v1/engines/{engine_id}/validate` — validate runtime and configuration
+#### `POST /api/v1/engine/{engine_id}/validate` — validate runtime and configuration
 
 ```bash
-curl -s -X POST $API/api/v1/engines/kokoro/validate
+curl -s -X POST $API/api/v1/engine/kokoro/validate
 ```
 ```json
 {"valid": false, "errors": [{"code": "engine_unavailable", "message": "Kokoro model file '/nope.onnx' not found", "field": null, "details": {}}],
@@ -893,7 +893,7 @@ always `200`; check `valid`.
 
 ---
 
-### 5.5 Voices — `/api/v1/voices`
+### 5.5 Voices — `/api/v1/voice`
 
 Voice object:
 
@@ -911,7 +911,7 @@ Voice object:
 | `metadata` | object | Read-only, from the adapter (model/config paths, quality, speakers, ...) |
 | `created_at`, `updated_at` | str | Read-only |
 
-#### `GET /api/v1/voices/` — list voices
+#### `GET /api/v1/voice/` — list voice
 
 | Query | Meaning |
 |---|---|
@@ -919,13 +919,13 @@ Voice object:
 | `enabled` | `true` or `false` |
 
 ```bash
-curl -s "$API/api/v1/voices/?engine_id=kokoro&enabled=true" | jq -r '.[].voice_id'
+curl -s "$API/api/v1/voice/?engine_id=kokoro&enabled=true" | jq -r '.[].voice_id'
 ```
 
-#### `POST /api/v1/voices/` — register a voice → `201`
+#### `POST /api/v1/voice/` — register a voice → `201`
 
 ```bash
-curl -s -X POST $API/api/v1/voices/ -H 'Content-Type: application/json' -d '{
+curl -s -X POST $API/api/v1/voice/ -H 'Content-Type: application/json' -d '{
   "voice_id": "amy-medium", "name": "Amy (medium)",
   "engine_id": "piper", "engine_voice_ref": "en_US-amy-medium"
 }'
@@ -948,20 +948,20 @@ curl -s -X POST $API/api/v1/voices/ -H 'Content-Type: application/json' -d '{
 | `409 voice_exists` | The `voice_id` is taken |
 | `422` | Schema error, invalid `engine_options`, or a reference that doesn't resolve (while the engine is available) |
 
-#### `GET /api/v1/voices/{voice_id}` — get one voice
+#### `GET /api/v1/voice/{voice_id}` — get one voice
 
 ```bash
-curl -s $API/api/v1/voices/en-us-amy-low
+curl -s $API/api/v1/voice/en-us-amy-low
 ```
 
-#### `PATCH /api/v1/voices/{voice_id}` — update a voice
+#### `PATCH /api/v1/voice/{voice_id}` — update a voice
 
 Any subset of `name`, `description`, `engine_id`, `engine_voice_ref`, `language`, `enabled` and
 `engine_options`. `engine_options` is **replaced** as a whole. Changing the engine, the reference or the
 options re-resolves the voice (native rate, metadata).
 
 ```bash
-curl -s -X PATCH $API/api/v1/voices/amy-medium -H 'Content-Type: application/json' \
+curl -s -X PATCH $API/api/v1/voice/amy-medium -H 'Content-Type: application/json' \
   -d '{"description": "Warmer Amy", "engine_options": {"noise_scale": 0.4}}'
 ```
 
@@ -971,19 +971,19 @@ curl -s -X PATCH $API/api/v1/voices/amy-medium -H 'Content-Type: application/jso
 | `409 voice_in_use` | `enabled: false` on the voice of the active profile |
 | `409 profile_options_incompatible` | A new `engine_id` would invalidate a referencing profile's `engine_options` |
 
-#### `DELETE /api/v1/voices/{voice_id}` — unregister → `204`
+#### `DELETE /api/v1/voice/{voice_id}` — unregister → `204`
 
 Host files are never touched. Returns `409 voice_in_use` (with `details.profile_ids`) while any profile
 references the voice.
 
 ```bash
-curl -s -X DELETE $API/api/v1/voices/amy-medium -o /dev/null -w '%{http_code}\n'   # 204
+curl -s -X DELETE $API/api/v1/voice/amy-medium -o /dev/null -w '%{http_code}\n'   # 204
 ```
 
-#### `POST /api/v1/voices/{voice_id}/validate` — validate a registration
+#### `POST /api/v1/voice/{voice_id}/validate` — validate a registration
 
 ```bash
-curl -s -X POST $API/api/v1/voices/kokoro-bm-george/validate
+curl -s -X POST $API/api/v1/voice/kokoro-bm-george/validate
 ```
 ```json
 {"valid": true, "errors": [], "warnings": [], "details": {"native_sample_rate": 24000, "language": "en-gb"}}
@@ -993,7 +993,7 @@ Error codes: `engine_not_found`, `engine_unavailable`, `model_not_found`, `model
 `model_config_invalid`, `voice_not_found` (Kokoro), `unsupported_option`, `invalid_option`. Warnings:
 `voice_disabled`, `engine_disabled`.
 
-#### `POST /api/v1/voices/{voice_id}/test` — generate a test utterance
+#### `POST /api/v1/voice/{voice_id}/test` — generate a test utterance
 
 The body is optional:
 
@@ -1009,27 +1009,27 @@ The body is optional:
 No profile and no `default_*` settings are applied. The response is the same as for `/generate`.
 
 ```bash
-curl -s -X POST $API/api/v1/voices/kokoro-af-heart/test -o test.wav
-curl -s -X POST $API/api/v1/voices/en-us-amy-low/test -H 'Content-Type: application/json' \
+curl -s -X POST $API/api/v1/voice/kokoro-af-heart/test -o test.wav
+curl -s -X POST $API/api/v1/voice/en-us-amy-low/test -H 'Content-Type: application/json' \
   -d '{"text": "Testing one two", "output_format": "pcm"}' -o test.pcm
 ```
 
 ---
 
-### 5.6 Profiles — `/api/v1/profiles`
+### 5.6 Profiles — `/api/v1/profile`
 
 See [4.4 Profiles](#44-profiles) for the fields and rules.
 
-#### `GET /api/v1/profiles/` — list profiles
+#### `GET /api/v1/profile/` — list profile
 
 ```bash
-curl -s $API/api/v1/profiles/ | jq -r '.[] | "\(.id)\t\(.name)\t\(.is_active)\t\(.voice_id)"'
+curl -s $API/api/v1/profile/ | jq -r '.[] | "\(.id)\t\(.name)\t\(.is_active)\t\(.voice_id)"'
 ```
 
-#### `POST /api/v1/profiles/` — create a profile → `201`
+#### `POST /api/v1/profile/` — create a profile → `201`
 
 ```bash
-curl -s -X POST $API/api/v1/profiles/ -H 'Content-Type: application/json' -d '{
+curl -s -X POST $API/api/v1/profile/ -H 'Content-Type: application/json' -d '{
   "name": "narrator", "description": "Audiobook narration",
   "voice_id": "kokoro-bm-george", "speed": 0.9, "engine_options": {"lang": "en-gb"}
 }'
@@ -1047,35 +1047,35 @@ curl -s -X POST $API/api/v1/profiles/ -H 'Content-Type: application/json' -d '{
 | `409 voice_disabled` / `engine_*` | `is_active: true` but the voice or engine can't be used |
 | `422` | Schema error, or `engine_options` the voice's engine doesn't accept |
 
-#### `GET /api/v1/profiles/{profile_id}` — get one profile
+#### `GET /api/v1/profile/{profile_id}` — get one profile
 
 ```bash
-curl -s $API/api/v1/profiles/3
+curl -s $API/api/v1/profile/3
 ```
 
-#### `PATCH /api/v1/profiles/{profile_id}` — partial update
+#### `PATCH /api/v1/profile/{profile_id}` — partial update
 
 Any subset of the writable fields. `engine_options` is **replaced**. `"sample_rate": null` returns to the
 native rate. `"is_active": true` activates (and deactivates the others); `"is_active": false` leaves no
 active profile.
 
 ```bash
-curl -s -X PATCH $API/api/v1/profiles/4 -H 'Content-Type: application/json' \
+curl -s -X PATCH $API/api/v1/profile/4 -H 'Content-Type: application/json' \
   -d '{"volume": 1.2, "sample_rate": 16000}'
 ```
 
-#### `DELETE /api/v1/profiles/{profile_id}` — delete → `204`
+#### `DELETE /api/v1/profile/{profile_id}` — delete → `204`
 
 Returns `409 profile_active` for the active profile.
 
 ```bash
-curl -s -X DELETE $API/api/v1/profiles/4 -o /dev/null -w '%{http_code}\n'
+curl -s -X DELETE $API/api/v1/profile/4 -o /dev/null -w '%{http_code}\n'
 ```
 
-#### `POST /api/v1/profiles/{profile_id}/activate` — activate a profile
+#### `POST /api/v1/profile/{profile_id}/activate` — activate a profile
 
 ```bash
-curl -s -X POST $API/api/v1/profiles/2/activate | jq '{id, name, is_active}'
+curl -s -X POST $API/api/v1/profile/2/activate | jq '{id, name, is_active}'
 ```
 ```json
 {"id": 2, "name": "kokoro", "is_active": true}
@@ -1172,23 +1172,23 @@ curl -sN -X POST $API/api/v1/generate/stream -H 'Content-Type: application/json'
 
 ---
 
-### 5.8 Settings — `/api/v1/settings`
+### 5.8 Settings — `/api/v1/setting`
 
 See [4.3 Settings](#43-settings) for the known keys.
 
-#### `GET /api/v1/settings/` — all stored settings as a key → string map
+#### `GET /api/v1/setting/` — all stored setting as a key → string map
 
 ```bash
-curl -s $API/api/v1/settings/
+curl -s $API/api/v1/setting/
 ```
 ```json
 {"chunk_max_chars": "400", "max_text_chars": "20000"}
 ```
 
-#### `GET /api/v1/settings/{key}` — one stored setting
+#### `GET /api/v1/setting/{key}` — one stored setting
 
 ```bash
-curl -s $API/api/v1/settings/chunk_max_chars
+curl -s $API/api/v1/setting/chunk_max_chars
 ```
 ```json
 {"id": 2, "key": "chunk_max_chars", "value": "400", "updated_at": "2026-10-12T16:19:33.361017Z"}
@@ -1196,23 +1196,23 @@ curl -s $API/api/v1/settings/chunk_max_chars
 
 Returns `404 not_found` if the key isn't stored, even for a known key that has a default.
 
-#### `PUT /api/v1/settings/{key}` — create or replace
+#### `PUT /api/v1/setting/{key}` — create or replace
 
 The body is `{"value": "<string>"}`. Known keys are validated:
 
 ```bash
-curl -s -X PUT $API/api/v1/settings/default_speed -H 'Content-Type: application/json' -d '{"value": "1.1"}'
+curl -s -X PUT $API/api/v1/setting/default_speed -H 'Content-Type: application/json' -d '{"value": "1.1"}'
 
-curl -s -X PUT $API/api/v1/settings/chunk_max_chars -H 'Content-Type: application/json' -d '{"value": "10"}'
+curl -s -X PUT $API/api/v1/setting/chunk_max_chars -H 'Content-Type: application/json' -d '{"value": "10"}'
 # 422: {"detail": [{"loc": ["body", "value"], "msg": "setting 'chunk_max_chars' must be between 50 and 5000", ...}]}
 ```
 
-#### `DELETE /api/v1/settings/{key}` — delete → `204`
+#### `DELETE /api/v1/setting/{key}` — delete → `204`
 
 The default applies again. Returns `404` if the key isn't stored.
 
 ```bash
-curl -s -X DELETE $API/api/v1/settings/default_speed -o /dev/null -w '%{http_code}\n'
+curl -s -X DELETE $API/api/v1/setting/default_speed -o /dev/null -w '%{http_code}\n'
 ```
 
 ---
@@ -1317,8 +1317,8 @@ curl -s $API/api/v1/backup/export | jq 'keys'
 ["engines", "exported_at", "profiles", "settings", "version", "voices"]
 ```
 
-`engines`, `voices` and `profiles` use the same objects as the corresponding `GET` endpoints, and
-`settings` is the stored key → value map. Model files are never included.
+`engine`, `voice` and `profile` use the same objects as the corresponding `GET` endpoints, and
+`setting` is the stored key → value map. Model files are never included.
 
 #### `POST /api/v1/backup/import` — import the YAML config directory
 
@@ -1487,10 +1487,10 @@ Rules:
 - Engines and voices are referenced by their string id, and profiles by **numeric id**.
 - `-O key=value` (repeatable; values parsed as JSON when possible) and `--options-json '{...}'` pass
   `engine_options`.
-- `generate` and `voices test` write audio to `-o FILE` or `-o -` (stdout), and print a summary on stderr.
+- `generate` and `voice test` write audio to `-o FILE` or `-o -` (stdout), and print a summary on stderr.
 - No command asks for confirmation.
-- `--help` works at every level: `opal say --help`, `opal say voices --help`,
-  `opal say voices add --help`.
+- `--help` works at every level: `opal say --help`, `opal say voice --help`,
+  `opal say voice add --help`.
 
 Exit codes:
 
@@ -1501,59 +1501,59 @@ Exit codes:
 | `2` | Invalid CLI usage (bad option, missing argument, out-of-range value, nothing to update), or the service is unreachable |
 
 ```bash
-opal say --json voices list | jq -r '.[].voice_id'
+opal say --json voice list | jq -r '.[].voice_id'
 opal say --api-url http://pi5.local:8001 health
 OPAL_SAY_API_URL=http://pi5.local:8001 opal say generate "Hello" -o hello.wav
 ```
 
-### 7.2 `engines`
+### 7.2 `engine`
 
 | Command | REST | Description |
 |---|---|---|
-| `engines list` | `GET /api/v1/engines/` | Table: engine_id, name, enabled, available |
-| `engines get ENGINE` | `GET /api/v1/engines/{id}` | JSON with options and metadata |
-| `engines update ENGINE [--enable/--disable] [-O k=v]... [--options-json J]` | `PATCH /api/v1/engines/{id}` | Options are merged; `k=null` removes a key |
-| `engines validate ENGINE` | `POST /api/v1/engines/{id}/validate` | `valid`/`INVALID`; exit `1` if invalid |
+| `engine list` | `GET /api/v1/engine/` | Table: engine_id, name, enabled, available |
+| `engine get ENGINE` | `GET /api/v1/engine/{id}` | JSON with options and metadata |
+| `engine update ENGINE [--enable/--disable] [-O k=v]... [--options-json J]` | `PATCH /api/v1/engine/{id}` | Options are merged; `k=null` removes a key |
+| `engine validate ENGINE` | `POST /api/v1/engine/{id}/validate` | `valid`/`INVALID`; exit `1` if invalid |
 
 ```bash
-opal say engines update piper -O voices_dir='"~/piper/voices"' -O cache_size=8
-opal say engines update kokoro --disable
-opal say engines validate kokoro
+opal say engine update piper -O voices_dir='"~/piper/voices"' -O cache_size=8
+opal say engine update kokoro --disable
+opal say engine validate kokoro
 ```
 
-### 7.3 `voices`
+### 7.3 `voice`
 
 | Command | REST | Description |
 |---|---|---|
-| `voices list [--engine E] [--enabled/--disabled]` | `GET /api/v1/voices/` | Table |
-| `voices get VOICE` | `GET /api/v1/voices/{id}` | JSON |
-| `voices add VOICE --name N --engine E --ref R [--description D] [--language L] [--enabled/--disabled] [-O k=v]...` | `POST /api/v1/voices/` | Register a host-installed voice |
-| `voices update VOICE [--name] [--engine] [--ref] [--description\|--clear-description] [--language\|--clear-language] [--enabled/--disabled] [-O k=v]...` | `PATCH /api/v1/voices/{id}` | `engine_options` are replaced |
-| `voices remove VOICE` | `DELETE /api/v1/voices/{id}` | Unregister (files untouched) |
-| `voices validate VOICE` | `POST /api/v1/voices/{id}/validate` | Exit `1` if invalid |
-| `voices test VOICE -o OUT [--text] [--speed] [--volume] [--format] [--sample-rate] [-O k=v]...` | `POST /api/v1/voices/{id}/test` | Test utterance |
+| `voice list [--engine E] [--enabled/--disabled]` | `GET /api/v1/voice/` | Table |
+| `voice get VOICE` | `GET /api/v1/voice/{id}` | JSON |
+| `voice add VOICE --name N --engine E --ref R [--description D] [--language L] [--enabled/--disabled] [-O k=v]...` | `POST /api/v1/voice/` | Register a host-installed voice |
+| `voice update VOICE [--name] [--engine] [--ref] [--description\|--clear-description] [--language\|--clear-language] [--enabled/--disabled] [-O k=v]...` | `PATCH /api/v1/voice/{id}` | `engine_options` are replaced |
+| `voice remove VOICE` | `DELETE /api/v1/voice/{id}` | Unregister (files untouched) |
+| `voice validate VOICE` | `POST /api/v1/voice/{id}/validate` | Exit `1` if invalid |
+| `voice test VOICE -o OUT [--text] [--speed] [--volume] [--format] [--sample-rate] [-O k=v]...` | `POST /api/v1/voice/{id}/test` | Test utterance |
 
 ```bash
-opal say voices add amy-medium --name "Amy (medium)" --engine piper --ref en_US-amy-medium
-opal say voices add kokoro-am-adam --name "Kokoro Adam" --engine kokoro --ref am_adam
-opal say voices test kokoro-am-adam -o - | aplay
+opal say voice add amy-medium --name "Amy (medium)" --engine piper --ref en_US-amy-medium
+opal say voice add kokoro-am-adam --name "Kokoro Adam" --engine kokoro --ref am_adam
+opal say voice test kokoro-am-adam -o - | aplay
 ```
 
-### 7.4 `profiles`
+### 7.4 `profile`
 
 | Command | REST | Description |
 |---|---|---|
-| `profiles list` | `GET /api/v1/profiles/` | Table |
-| `profiles get ID` | `GET /api/v1/profiles/{id}` | JSON |
-| `profiles add NAME --voice V [--description] [--speed] [--volume] [--format] [--sample-rate] [--active] [-O k=v]...` | `POST /api/v1/profiles/` | Create |
-| `profiles update ID [--name] [--voice] [--description\|--clear-description] [--speed] [--volume] [--format] [--sample-rate\|--native-rate] [--active/--inactive] [-O k=v]...` | `PATCH /api/v1/profiles/{id}` | `engine_options` are replaced |
-| `profiles remove ID` | `DELETE /api/v1/profiles/{id}` | Not the active profile |
-| `profiles activate ID` | `POST /api/v1/profiles/{id}/activate` | Make it the active profile |
+| `profile list` | `GET /api/v1/profile/` | Table |
+| `profile get ID` | `GET /api/v1/profile/{id}` | JSON |
+| `profile add NAME --voice V [--description] [--speed] [--volume] [--format] [--sample-rate] [--active] [-O k=v]...` | `POST /api/v1/profile/` | Create |
+| `profile update ID [--name] [--voice] [--description\|--clear-description] [--speed] [--volume] [--format] [--sample-rate\|--native-rate] [--active/--inactive] [-O k=v]...` | `PATCH /api/v1/profile/{id}` | `engine_options` are replaced |
+| `profile remove ID` | `DELETE /api/v1/profile/{id}` | Not the active profile |
+| `profile activate ID` | `POST /api/v1/profile/{id}/activate` | Make it the active profile |
 
 ```bash
-opal say profiles add narrator --voice kokoro-bm-george --speed 0.9 --active
-opal say profiles update 4 --sample-rate 16000 -O lang=en-gb
-opal say profiles activate 1
+opal say profile add narrator --voice kokoro-bm-george --speed 0.9 --active
+opal say profile update 4 --sample-rate 16000 -O lang=en-gb
+opal say profile activate 1
 ```
 
 ### 7.5 `generate`
@@ -1571,14 +1571,14 @@ opal say generate - --profile 3 -o prompt.raw < prompt.txt
 opal say generate "Live" --stream --sample-rate 22050 -o - | aplay -r 22050 -f S16_LE -c 1 -t raw
 ```
 
-### 7.6 `settings`
+### 7.6 `setting`
 
 | Command | REST | Description |
 |---|---|---|
-| `settings list` | `GET /api/v1/settings/` | Stored settings as JSON |
-| `settings get KEY` | `GET /api/v1/settings/{key}` | `404` if not stored |
-| `settings set KEY VALUE` | `PUT /api/v1/settings/{key}` | Known keys validated |
-| `settings delete KEY` | `DELETE /api/v1/settings/{key}` | The default applies again |
+| `setting list` | `GET /api/v1/setting/` | Stored settings as JSON |
+| `setting get KEY` | `GET /api/v1/setting/{key}` | `404` if not stored |
+| `setting set KEY VALUE` | `PUT /api/v1/setting/{key}` | Known keys validated |
+| `setting delete KEY` | `DELETE /api/v1/setting/{key}` | The default applies again |
 
 ### 7.7 `backup`
 
@@ -1660,12 +1660,12 @@ base=https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medi
 wget $base/en_GB-alan-medium.onnx $base/en_GB-alan-medium.onnx.json
 
 # 2. Register and check it
-opal say voices add en-gb-alan --name "Alan (British)" --engine piper --ref en_GB-alan-medium
-opal say voices validate en-gb-alan
-opal say voices test en-gb-alan -o - | aplay
+opal say voice add en-gb-alan --name "Alan (British)" --engine piper --ref en_GB-alan-medium
+opal say voice validate en-gb-alan
+opal say voice test en-gb-alan -o - | aplay
 
 # 3. A profile that uses it, activated immediately
-opal say profiles add british --voice en-gb-alan --description "British male" --active
+opal say profile add british --voice en-gb-alan --description "British male" --active
 
 # 4. Everything without --profile/--voice now uses it
 opal say generate "Good evening." -o evening.wav
@@ -1674,9 +1674,9 @@ opal say generate "Good evening." -o evening.wav
 The same steps with the REST API:
 
 ```bash
-curl -s -X POST $API/api/v1/voices/ -H 'Content-Type: application/json' \
+curl -s -X POST $API/api/v1/voice/ -H 'Content-Type: application/json' \
   -d '{"voice_id":"en-gb-alan","name":"Alan (British)","engine_id":"piper","engine_voice_ref":"en_GB-alan-medium"}'
-curl -s -X POST $API/api/v1/profiles/ -H 'Content-Type: application/json' \
+curl -s -X POST $API/api/v1/profile/ -H 'Content-Type: application/json' \
   -d '{"name":"british","voice_id":"en-gb-alan","is_active":true}'
 curl -s -X POST $API/api/v1/generate -H 'Content-Type: application/json' -d '{"text":"Good evening."}' -o evening.wav
 ```
@@ -1684,23 +1684,23 @@ curl -s -X POST $API/api/v1/generate -H 'Content-Type: application/json' -d '{"t
 ### 9.2 Multilingual output with Kokoro
 
 ```bash
-opal say voices add kokoro-ff-siwis --name "Siwis (French)" --engine kokoro --ref ff_siwis
+opal say voice add kokoro-ff-siwis --name "Siwis (French)" --engine kokoro --ref ff_siwis
 opal say generate "Bonjour, comment allez-vous ?" --voice kokoro-ff-siwis -o fr.wav
 
 # Force a pronunciation language for a voice from another language family
 opal say generate "Hola, buenos días." --voice kokoro-af-heart -O lang=es -o es.wav
 
 # Make it permanent for a profile
-opal say profiles add spanish --voice kokoro-af-heart -O lang=es
+opal say profile add spanish --voice kokoro-af-heart -O lang=es
 ```
 
 ### 9.3 Low-latency streaming announcements
 
 ```bash
 # Small chunks: the first audio arrives after the first short sentence
-opal say settings set chunk_max_chars 120
+opal say setting set chunk_max_chars 120
 
-# A fixed rate keeps the player settings the same for every voice
+# A fixed rate keeps the player setting the same for every voice
 opal say generate "Attention please. The kitchen timer has finished. Dinner is ready." \
   --stream --sample-rate 22050 -o - | aplay -q -r 22050 -f S16_LE -c 1 -t raw
 ```
@@ -1709,7 +1709,7 @@ Piper is usually the fastest to the first sample on a Raspberry Pi. The first re
 its model, so warm it up after a restart:
 
 ```bash
-opal say voices test en-us-amy-low --text "ready" -o /dev/null
+opal say voice test en-us-amy-low --text "ready" -o /dev/null
 ```
 
 ### 9.4 Telephony and embedded sinks
@@ -1758,17 +1758,17 @@ opal say backup restore opal-say-<stamp>.tar.gz
 > Exports and backups contain the **registrations**, not the model files. Copy `~/piper/voices` and
 > `~/kokoro` (or wherever your models live) to the new host as well.
 
-### 9.6 Choose voices per situation with profiles
+### 9.6 Choose voice per situation with profile
 
 ```bash
-opal say profiles add night --voice en-us-amy-low --volume 0.5 --speed 0.9
-opal say profiles add alarm --voice kokoro-bm-george --volume 1.8 --speed 1.2
+opal say profile add night --voice en-us-amy-low --volume 0.5 --speed 0.9
+opal say profile add alarm --voice kokoro-bm-george --volume 1.8 --speed 1.2
 
 # Switch from home automation
-opal say profiles activate "$(opal say --json profiles list | jq '.[] | select(.name=="night") | .id')"
+opal say profile activate "$(opal say --json profile list | jq '.[] | select(.name=="night") | .id')"
 
 # Or keep the active profile and pick one per request
-opal say generate "Wake up!" --profile "$(opal say --json profiles list | jq '.[] | select(.name=="alarm") | .id')" -o alarm.wav
+opal say generate "Wake up!" --profile "$(opal say --json profile list | jq '.[] | select(.name=="alarm") | .id')" -o alarm.wav
 ```
 
 ### 9.7 Tune a Piper voice
@@ -1776,12 +1776,12 @@ opal say generate "Wake up!" --profile "$(opal say --json profiles list | jq '.[
 ```bash
 # Try variations without changing the registration
 for ns in 0.3 0.667 1.0; do
-  opal say voices test en-us-lessac-medium -O noise_scale=$ns -O noise_w_scale=0.8 \
+  opal say voice test en-us-lessac-medium -O noise_scale=$ns -O noise_w_scale=0.8 \
     --text "The quick brown fox jumps over the lazy dog." -o "lessac-$ns.wav"
 done
 
 # Keep the one you like as the voice's default
-opal say voices update en-us-lessac-medium -O noise_scale=0.3 -O noise_w_scale=0.8
+opal say voice update en-us-lessac-medium -O noise_scale=0.3 -O noise_w_scale=0.8
 ```
 
 ### 9.8 CI: guard your configuration
@@ -1793,8 +1793,8 @@ export OPAL_SAY_API_URL=http://127.0.0.1:8001
 opal-say backup import                 # exit 1 if the YAML is invalid (nothing applied)
 opal-say backup validate               # exit 1 if a voice doesn't resolve on this host
 [ "$(opal-say --json info health | jq -r .status)" = ok ]
-for v in $(opal-say --json voices list --enabled | jq -r '.[].voice_id'); do
-  opal-say voices test "$v" --text "ci" -o /dev/null
+for v in $(opal-say --json voice list --enabled | jq -r '.[].voice_id'); do
+  opal-say voice test "$v" --text "ci" -o /dev/null
 done
 ```
 
@@ -1912,7 +1912,7 @@ with httpx.Client(base_url=LISTEN, timeout=None) as client:
                     say(datetime.datetime.now().strftime("It is %H:%M."))
 ```
 
-### 10.6 Custom TTS engines
+### 10.6 Custom TTS engine
 
 Other engines plug in without any change to the API. Implement `TtsEngine`
 (see [src/opal_say/tts/base.py](../src/opal_say/tts/base.py)): declare `option_specs` and, if needed,
@@ -1966,8 +1966,8 @@ espeak = "my_package.espeak_engine:EspeakEngine"
 ```
 
 ```bash
-opal say engines list                                       # espeak appears
-opal say voices add espeak-en --name "eSpeak English" --engine espeak --ref en-us
+opal say engine list                                       # espeak appears
+opal say voice add espeak-en --name "eSpeak English" --engine espeak --ref en-us
 opal say generate "Hello from a plugin." --voice espeak-en -O pitch=40 -o plugin.wav
 ```
 
@@ -2018,7 +2018,7 @@ never be selected while their version differs from the implementation.
 | `cannot reach OPAL Say API` | The service isn't running, or the URL is wrong. The default is `http://127.0.0.1:8001`. Set `OPAL_SAY_API_URL` / `--api-url`. To reach it from other machines, start the service with `OPAL_SAY_HOST=0.0.0.0`. |
 | Health `degraded` / `error` | `opal say health` shows the reason per engine. Typical causes: the runtime isn't installed (`pip install -e '.[piper]'` / `'.[kokoro]'`), or Kokoro's `model_path`/`voices_path` are wrong. |
 | `422 ... could not be resolved on this host` when registering | The model file doesn't exist where the **service** looks: check `voices_dir` (Piper), the absolute path, or the Kokoro voice name. Paths are resolved on the service host, as the service's user. |
-| Voice shows `native_sample_rate: null` | It was registered while its engine was unavailable. Fix the engine, then run `opal say voices update V --ref <same ref>` to re-resolve it. |
+| Voice shows `native_sample_rate: null` | It was registered while its engine was unavailable. Fix the engine, then run `opal say voice update V --ref <same ref>` to re-resolve it. |
 | `409 no_voice` | No profile is active. Activate one, or pass `voice_id` / `profile_id`. |
 | `409 unsupported_speed` | Kokoro supports `0.5`–`2.0`. Check the request, the profile and `default_speed`. |
 | `409 voice_engine_mismatch` | `engine_id` overrides the voice's engine, and the other engine can't use that reference. Drop the override. |
@@ -2026,7 +2026,7 @@ never be selected while their version differs from the implementation.
 | `413 payload_too_large` | Raise `max_text_chars` or split the text. |
 | Raw PCM sounds like chipmunks or slow motion | The player's rate doesn't match `X-Opal-Sample-Rate`. Use that rate, or force one with `sample_rate`. |
 | Stream stops with an incomplete-read error | The engine failed mid-stream. Check the service log. The audio received so far is incomplete. |
-| First request for a voice is slow | The model is loaded on first use. Warm it up with `voices test`. Raise Piper's `cache_size` if you switch between many voices. |
+| First request for a voice is slow | The model is loaded on first use. Warm it up with `voice test`. Raise Piper's `cache_size` if you switch between many voices. |
 | Requests queue up | Synthesis is serialized per engine. Use a smaller `chunk_max_chars` for faster first audio, or spread the load across engines. |
 | `/openapi.json` returns `500`, `/docs` shows nothing | The service publishes `src/opal_say/contract/opal_say.yaml`, the packaged bundle of `openapi/opal_say_v1.5.0.yaml` and the shared kernel. If the file is missing or unreadable, reinstall/re-checkout the package. |
 | Web GUI is `404` at `/ui` | Build it (`make spa-build`), and check that `spa_dir` points at `spa/dist`. |
@@ -2086,29 +2086,29 @@ Write a `TtsEngine` adapter and register it under the `opal_say.engines` entry p
 | Service info | `GET /` | `info` | header |
 | Liveness | `GET /healthz` | `ping` | header (online pill) |
 | Health | `GET /api/v1/health/` | `health` | Health |
-| List engines | `GET /api/v1/engines/` | `engines list` | Engines, Generate, Voices |
-| Get engine | `GET /api/v1/engines/{engine_id}` | `engines get` | Engines → Configure |
-| Update engine | `PATCH /api/v1/engines/{engine_id}` | `engines update` | Engines → Enable/Disable, Configure |
-| Validate engine | `POST /api/v1/engines/{engine_id}/validate` | `engines validate` | Engines → Validate |
-| List voices | `GET /api/v1/voices/` | `voices list` | Voices, Generate, Profiles |
-| Register voice | `POST /api/v1/voices/` | `voices add` | Voices → Register voice |
-| Get voice | `GET /api/v1/voices/{voice_id}` | `voices get` | Voices → Details |
-| Update voice | `PATCH /api/v1/voices/{voice_id}` | `voices update` | Voices → Edit |
-| Unregister voice | `DELETE /api/v1/voices/{voice_id}` | `voices remove` | Voices → Unregister |
-| Validate voice | `POST /api/v1/voices/{voice_id}/validate` | `voices validate` | Voices → Validate |
-| Test voice | `POST /api/v1/voices/{voice_id}/test` | `voices test` | Voices → Test |
-| List profiles | `GET /api/v1/profiles/` | `profiles list` | Profiles, Generate |
-| Create profile | `POST /api/v1/profiles/` | `profiles add` | Profiles → Create profile |
-| Get profile | `GET /api/v1/profiles/{profile_id}` | `profiles get` | Profiles → Details |
-| Update profile | `PATCH /api/v1/profiles/{profile_id}` | `profiles update` | Profiles → Edit |
-| Delete profile | `DELETE /api/v1/profiles/{profile_id}` | `profiles remove` | Profiles → Delete |
-| Activate profile | `POST /api/v1/profiles/{profile_id}/activate` | `profiles activate` | Profiles → Activate |
+| List engines | `GET /api/v1/engine/` | `engine list` | Engines, Generate, Voices |
+| Get engine | `GET /api/v1/engine/{engine_id}` | `engine get` | Engines → Configure |
+| Update engine | `PATCH /api/v1/engine/{engine_id}` | `engine update` | Engines → Enable/Disable, Configure |
+| Validate engine | `POST /api/v1/engine/{engine_id}/validate` | `engine validate` | Engines → Validate |
+| List voices | `GET /api/v1/voice/` | `voice list` | Voices, Generate, Profiles |
+| Register voice | `POST /api/v1/voice/` | `voice add` | Voices → Register voice |
+| Get voice | `GET /api/v1/voice/{voice_id}` | `voice get` | Voices → Details |
+| Update voice | `PATCH /api/v1/voice/{voice_id}` | `voice update` | Voices → Edit |
+| Unregister voice | `DELETE /api/v1/voice/{voice_id}` | `voice remove` | Voices → Unregister |
+| Validate voice | `POST /api/v1/voice/{voice_id}/validate` | `voice validate` | Voices → Validate |
+| Test voice | `POST /api/v1/voice/{voice_id}/test` | `voice test` | Voices → Test |
+| List profiles | `GET /api/v1/profile/` | `profile list` | Profiles, Generate |
+| Create profile | `POST /api/v1/profile/` | `profile add` | Profiles → Create profile |
+| Get profile | `GET /api/v1/profile/{profile_id}` | `profile get` | Profiles → Details |
+| Update profile | `PATCH /api/v1/profile/{profile_id}` | `profile update` | Profiles → Edit |
+| Delete profile | `DELETE /api/v1/profile/{profile_id}` | `profile remove` | Profiles → Delete |
+| Activate profile | `POST /api/v1/profile/{profile_id}/activate` | `profile activate` | Profiles → Activate |
 | Generate audio | `POST /api/v1/generate` | `generate` | Generate |
 | Stream audio | `POST /api/v1/generate/stream` | `generate --stream` | Generate → Stream (raw PCM) |
-| List settings | `GET /api/v1/settings/` | `settings list` | Settings |
-| Get setting | `GET /api/v1/settings/{key}` | `settings get` | Settings → Details |
-| Set setting | `PUT /api/v1/settings/{key}` | `settings set` | Settings → Set |
-| Delete setting | `DELETE /api/v1/settings/{key}` | `settings delete` | Settings → Delete |
+| List settings | `GET /api/v1/setting/` | `setting list` | Settings |
+| Get setting | `GET /api/v1/setting/{key}` | `setting get` | Settings → Details |
+| Set setting | `PUT /api/v1/setting/{key}` | `setting set` | Settings → Set |
+| Delete setting | `DELETE /api/v1/setting/{key}` | `setting delete` | Settings → Delete |
 | List backups | `GET /api/v1/backup/list` | `backup list` | Backup |
 | Create backup | `POST /api/v1/backup/create` | `backup create` | Backup → Create backup |
 | Download backup | `GET /api/v1/backup/download/{filename}` | `backup download` | Backup → download link |
