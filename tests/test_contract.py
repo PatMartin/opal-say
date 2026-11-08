@@ -212,6 +212,8 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     make_voice(c, "v1")
     make_voice(c, "v2", ref="tone-b")
     assert c.get("/api/v1/voice/", params={"engine_id": "fake", "enabled": True}).status_code == 200
+    langs = c.get("/api/v1/voice/", params={"language": "en"}).json()
+    assert all((v["language"] or "").lower().replace("-", "_").startswith("en") for v in langs)
     assert c.get("/api/v1/voice/v1").status_code == 200
     assert c.patch("/api/v1/voice/v1", json={"name": "Voice One"}).status_code == 200
     assert c.post("/api/v1/voice/v1/validate").json()["valid"] is True

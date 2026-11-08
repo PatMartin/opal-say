@@ -64,6 +64,7 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     run('voice add v1 --name "Voice One" --engine fake --ref tone-a -O pitch=300 --language en-US')
     run("voice add v2 --name Two --engine fake --ref tone-b --disabled")
     listing = json.loads(run("--json voice list --engine fake --enabled").stdout)
+    assert [v["voice_id"] for v in json.loads(run("--json voice list --language en-US").stdout)] == ["v1", "v2"]
     assert [v["voice_id"] for v in listing] == ["v1"]
     assert json.loads(run("voice get v1").stdout)["engine_options"] == {"pitch": 300}
     assert json.loads(run("voice update v2 --enabled --description hi").stdout)["description"] == "hi"

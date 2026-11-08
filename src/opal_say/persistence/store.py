@@ -179,7 +179,8 @@ class Store:
 
     # -- voices -------------------------------------------------------------
 
-    def list_voices(self, engine_id: str | None = None, enabled: bool | None = None) -> list[dict[str, Any]]:
+    def list_voices(self, engine_id: str | None = None, enabled: bool | None = None,
+                    language: str | None = None) -> list[dict[str, Any]]:
         sql, params = "SELECT * FROM voices WHERE 1 = 1", []
         if engine_id is not None:
             sql += " AND engine_id = ?"
@@ -187,7 +188,11 @@ class Store:
         if enabled is not None:
             sql += " AND enabled = ?"
             params.append(int(enabled))
-        return self._all(sql + " ORDER BY voice_id", tuple(params))
+        rows = self._all(sql + " ORDER BY voice_id", tuple(params))
+        if language is not None:
+            want = language.lower().replace("-", "_")
+            rows = [r for r in rows if (r["language"] or "").lower().replace("-", "_").startswith(want)]
+        return rows
 
     def get_voice(self, voice_id: str) -> dict[str, Any] | None:
         return self._one("SELECT * FROM voices WHERE voice_id = ?", (voice_id,))

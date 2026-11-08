@@ -134,8 +134,8 @@ class VoiceService:
             raise NotFound(f"voice '{voice_id}' not found", "voice_not_found", {"voice_id": voice_id})
         return voice
 
-    def list(self, engine_id: str | None, enabled: bool | None) -> list[dict[str, Any]]:
-        return self.store.list_voices(engine_id, enabled)
+    def list(self, engine_id: str | None, enabled: bool | None, language: str | None = None) -> list[dict[str, Any]]:
+        return self.store.list_voices(engine_id, enabled, language)
 
     def _describe(self, engine: TtsEngine, ref: str, options: dict[str, Any]) -> dict[str, Any]:
         """Validate options and resolve the host resource (when the engine can currently do so)."""

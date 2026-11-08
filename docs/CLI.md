@@ -129,6 +129,7 @@ opal say --api-url http://pi5.local:8001 --timeout 300 health
 
 # Wrong: --json after the group is rejected as an unknown option (exit code 2)
 opal say voice list --json
+opal say voice list --language en_US   # only US-English voices
 ```
 
 ### Environment variables
@@ -764,6 +765,7 @@ Each value comes from the first source that sets it:
 |---|---|---|---|---|
 | Voice | `--voice` | profile `voice_id` | | (`409 no_voice`) |
 | Engine | `--engine` | | | voice's `engine_id` |
+| `--language` | Filter voice list by language/locale prefix (`en`, `en_US`, ...) |
 | Speed | `--speed` | profile `speed` | `default_speed` | `1.0` |
 | Volume | `--volume` | profile `volume` | `default_volume` | `1.0` |
 | Format | `--format` | profile `output_format` | `default_output_format` | `wav` |

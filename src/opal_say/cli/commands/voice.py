@@ -28,10 +28,12 @@ def voice_list(
     ctx: typer.Context,
     engine: str = typer.Option(None, "--engine", help="Only voice of this engine"),
     enabled: bool = typer.Option(None, "--enabled/--disabled", help="Filter by enabled state"),
+    language: str = typer.Option(None, "--language", help="Filter by language/locale prefix (en, en_US, ...)"),
 ) -> None:
     """List registered voice."""
     resp = _call(ctx, "opal_voice_list", params={"engine_id": engine,
-                                                                 "enabled": None if enabled is None else str(enabled).lower()})
+                                                                 "enabled": None if enabled is None else str(enabled).lower(),
+                                                                 "language": language})
     _emit(ctx, resp.json(), VOICE_COLUMNS)
 
 

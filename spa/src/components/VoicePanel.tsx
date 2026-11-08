@@ -20,15 +20,16 @@ const EMPTY: VoiceForm = { voice_id: '', name: '', description: '', engine_id: '
 export function VoicePanel() {
   const [engineFilter, setEngineFilter] = useState('')
   const [enabledFilter, setEnabledFilter] = useState('')
+  const [languageFilter, setLanguageFilter] = useState('')
   const voice = useLoad(
-    () => call<Voice[]>('opal_voice_list', { query: { engine_id: engineFilter, enabled: enabledFilter } }),
+    () => call<Voice[]>('opal_voice_list', { query: { engine_id: engineFilter, enabled: enabledFilter, language: languageFilter } }),
     [],
   )
   const engines = useLoad(() => call<Engine[]>('opal_engine_list'), [])
   const { reload: reloadVoice } = voice
   useEffect(() => {
     void reloadVoice()
-  }, [engineFilter, enabledFilter, reloadVoice])
+  }, [engineFilter, enabledFilter, languageFilter, reloadVoice])
   const [form, setForm] = useState<VoiceForm>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [selected, setSelected] = useState<Voice | null>(null)
@@ -122,6 +123,11 @@ export function VoicePanel() {
             <option value="true">enabled</option>
             <option value="false">disabled</option>
           </select>
+        </label>
+        <label>
+          Language
+          <input value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)}
+                 placeholder="en, en_US, ..." />
         </label>
         <button type="button" onClick={() => void voice.reload()}>
           Refresh

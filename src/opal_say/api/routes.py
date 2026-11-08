@@ -220,10 +220,11 @@ def list_voice(
     response: Response,
     engine_id: str | None = Query(None, min_length=1),
     enabled: bool | None = Query(None),
+    language: str | None = Query(None, min_length=1),
     svc: Services = Depends(services),
 ):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.voice.list(engine_id, enabled)
+    return svc.voice.list(engine_id, enabled, language)
 
 
 @router.post("/api/v1/voice/", tags=["voice"], operation_id="opal_voice_create",

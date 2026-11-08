@@ -277,6 +277,14 @@ paths:
         schema:
           type: string
           minLength: 1
+      - name: language
+        in: query
+        required: false
+        description: If supplied, filter by language/locale. Matches stored language codes as a case-insensitive prefix, so
+          `en` selects all English locales and `en_US` only US English.
+        schema:
+          type: string
+          minLength: 1
       - name: enabled
         in: query
         required: false
