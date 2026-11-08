@@ -9,4 +9,6 @@ dist/
 spa/node_modules/
 spa/dist/
 spa/*.tsbuildinfo
-resources/
+resources/piper/
+resources/voices/
+resources/kokoro/

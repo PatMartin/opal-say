@@ -5,7 +5,7 @@ engines:
   piper:
     enabled: true
     options:
-      voices_dir: ~/piper/voices
+      voices_dir: resources/piper
       use_cuda: false
       cache_size: 4
   kokoro:
