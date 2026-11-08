@@ -220,11 +220,11 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
 
     p1 = make_profile(c, "p1", "v1", is_active=True)
     p2 = make_profile(c, "p2", "v2")
-    assert c.get("/api/v1/profiles/").status_code == 200
-    assert c.get(f"/api/v1/profiles/{p1['id']}").status_code == 200
-    assert c.patch(f"/api/v1/profiles/{p2['id']}", json={"speed": 1.5}).status_code == 200
-    assert c.post(f"/api/v1/profiles/{p2['id']}/activate").status_code == 200
-    assert c.delete(f"/api/v1/profiles/{p1['id']}").status_code == 204
+    assert c.get("/api/v1/profile/").status_code == 200
+    assert c.get(f"/api/v1/profile/{p1['id']}").status_code == 200
+    assert c.patch(f"/api/v1/profile/{p2['id']}", json={"speed": 1.5}).status_code == 200
+    assert c.post(f"/api/v1/profile/{p2['id']}/activate").status_code == 200
+    assert c.delete(f"/api/v1/profile/{p1['id']}").status_code == 204
 
     assert c.post("/api/v1/persona/", json={"persona_id": "amy", "name": "Amy", "voice_id": "v2"}).status_code == 201
     assert c.get("/api/v1/persona/").status_code == 200

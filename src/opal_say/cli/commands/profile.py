@@ -1,4 +1,4 @@
-"""`opal say profiles ...` — manage reusable generation profiles."""
+"""`opal say profile ...` — manage reusable generation profile."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import typer
 
 from opal_say.cli.common import PROFILE_COLUMNS, OptionPairs, OptionsJson, _call, _emit, _parse_options
 
-profiles_app = typer.Typer(help="Manage reusable generation profiles.", no_args_is_help=True)
+profile_app = typer.Typer(help="Manage reusable generation profile.", no_args_is_help=True)
 
 
 def _profile_body(
@@ -24,14 +24,14 @@ def _profile_body(
     return body
 
 
-@profiles_app.command("list")
-def profiles_list(ctx: typer.Context) -> None:
-    """List profiles."""
+@profile_app.command("list")
+def profile_list(ctx: typer.Context) -> None:
+    """List profile."""
     _emit(ctx, _call(ctx, "opal_profiles_list").json(), PROFILE_COLUMNS)
 
 
-@profiles_app.command("add")
-def profiles_add(
+@profile_app.command("add")
+def profile_add(
     ctx: typer.Context,
     name: str,
     voice: str = typer.Option(..., "--voice", help="Registered voice_id"),
@@ -50,15 +50,15 @@ def profiles_add(
     _emit(ctx, _call(ctx, "opal_profiles_create", json=body).json())
 
 
-@profiles_app.command("get")
-def profiles_get(ctx: typer.Context, profile_id: int) -> None:
+@profile_app.command("get")
+def profile_get(ctx: typer.Context, profile_id: int) -> None:
     """Show one profile."""
     _emit(ctx, _call(ctx, "opal_profile_get",
                      path_params={"profile_id": profile_id}).json())
 
 
-@profiles_app.command("update")
-def profiles_update(
+@profile_app.command("update")
+def profile_update(
     ctx: typer.Context,
     profile_id: int,
     name: str = typer.Option(None, "--name"),
@@ -90,15 +90,15 @@ def profiles_update(
     _emit(ctx, resp.json())
 
 
-@profiles_app.command("remove")
-def profiles_remove(ctx: typer.Context, profile_id: int) -> None:
+@profile_app.command("remove")
+def profile_remove(ctx: typer.Context, profile_id: int) -> None:
     """Delete a (non-active) profile."""
     _call(ctx, "opal_profile_delete", path_params={"profile_id": profile_id})
     typer.echo(f"profile {profile_id} deleted")
 
 
-@profiles_app.command("activate")
-def profiles_activate(ctx: typer.Context, profile_id: int) -> None:
+@profile_app.command("activate")
+def profile_activate(ctx: typer.Context, profile_id: int) -> None:
     """Make a profile the active one."""
     resp = _call(ctx, "opal_profile_activate",
                  path_params={"profile_id": profile_id})
@@ -106,4 +106,4 @@ def profiles_activate(ctx: typer.Context, profile_id: int) -> None:
 
 
 def register(say_app: typer.Typer) -> None:
-    say_app.add_typer(profiles_app, name="profiles")
+    say_app.add_typer(profile_app, name="profile")

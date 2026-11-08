@@ -6,7 +6,7 @@ import { AudioResult, ErrorBanner, OptionsField, parseOptions, useAction, useLoa
 
 /** Completed (/generate) and streamed (/generate/stream) speech generation. */
 export function GeneratePanel() {
-  const profiles = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
+  const profile = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
   const voice = useLoad(() => call<Voice[]>('list_voice_api_v1_voice__get', { query: { enabled: true } }), [])
   const engine = useLoad(() => call<Engine[]>('opal_engines_list'), [])
   const persona = useLoad(() => call<Persona[]>('list_persona_api_v1_persona__get', { query: { enabled: true } }), [])
@@ -76,7 +76,7 @@ export function GeneratePanel() {
   return (
     <section>
       <h2>Generate</h2>
-      <ErrorBanner error={profiles.error || voice.error || engine.error} />
+      <ErrorBanner error={profile.error || voice.error || engine.error} />
       <form onSubmit={submit} className="grid">
         <label className="wide">
           Text
@@ -86,7 +86,7 @@ export function GeneratePanel() {
           Profile
           <select value={profileId} onChange={(e) => setProfileId(e.target.value)}>
             <option value="">(active profile)</option>
-            {profiles.data.map((p) => (
+            {profile.data.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
                 {p.is_active ? ' (active)' : ''}

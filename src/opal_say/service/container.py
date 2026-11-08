@@ -28,7 +28,7 @@ class Services:
     runtime: EngineRuntimeManager
     engine: EngineService
     voice: VoiceService
-    profiles: ProfileService
+    profile: ProfileService
     persona: PersonaService
     settings: SettingsService
     generation: GenerationService
@@ -53,7 +53,7 @@ class Services:
             "details": {
                 "voices": len(self.store.list_voices()),
                 "enabled_voices": len(self.store.list_voices(enabled=True)),
-                "profiles": len(self.store.list_profiles()),
+                "profile": len(self.store.list_profiles()),
             },
         }
 
@@ -75,7 +75,7 @@ def build_services(config: ServiceConfig, engine: list[TtsEngine] | None = None)
         runtime=runtime,
         engine=engine_svc,
         voice=voice_svc,
-        profiles=ProfileService(store, engine_svc, voice_svc),
+        profile=ProfileService(store, engine_svc, voice_svc),
         persona=PersonaService(store, voice_svc),
         settings=settings_svc,
         generation=GenerationService(store, engine_svc, settings_svc),

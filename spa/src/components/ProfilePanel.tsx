@@ -19,8 +19,8 @@ const EMPTY: ProfileForm = {
   name: '', description: '', voice_id: '', speed: '1', volume: '1', output_format: 'wav', sample_rate: '', is_active: false, options: '',
 }
 
-export function ProfilesPanel() {
-  const profiles = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
+export function ProfilePanel() {
+  const profile = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
   const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get'), [])
   const [form, setForm] = useState<ProfileForm>(EMPTY)
   const [editing, setEditing] = useState<number | null>(null)
@@ -49,7 +49,7 @@ export function ProfilesPanel() {
       }
       setForm(EMPTY)
       setEditing(null)
-      await profiles.reload()
+      await profile.reload()
     })
   }
 
@@ -74,19 +74,19 @@ export function ProfilesPanel() {
   const activate = (id: number) =>
     action.run(async () => {
       await call('opal_profile_activate', { path: { profile_id: id } })
-      await profiles.reload()
+      await profile.reload()
     })
 
   const remove = (id: number) =>
     action.run(async () => {
       await call('opal_profile_delete', { path: { profile_id: id } })
-      await profiles.reload()
+      await profile.reload()
     })
 
   return (
     <section>
-      <h2>Profiles</h2>
-      <ErrorBanner error={profiles.error} />
+      <h2>Profile</h2>
+      <ErrorBanner error={profile.error} />
       <table>
         <thead>
           <tr>
@@ -102,7 +102,7 @@ export function ProfilesPanel() {
           </tr>
         </thead>
         <tbody>
-          {profiles.data.map((p) => (
+          {profile.data.map((p) => (
             <tr key={p.id}>
               <td>{p.id}</td>
               <td>{p.name}</td>

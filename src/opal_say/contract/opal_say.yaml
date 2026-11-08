@@ -4,7 +4,7 @@ info:
   version: 1.6.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides a stable REST\
     \ contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients interact with OPAL concepts—engine,\n\
-    voice, profiles, generation settings, and audio output—without depending on a\nspecific engine's command line, model layout,\
+    voice, profile, generation settings, and audio output—without depending on a\nspecific engine's command line, model layout,\
     \ Python API, or native output format.\n\nDesign principles:\n\n* The OpenAPI contract is the public source of truth for\
     \ service behavior.\n* Engines are installed and discovered by the implementation; they are not created\n  or deleted\
     \ through this API.\n* Voice are registrations that point at voice/model resources already available\n  on the host. The\
@@ -49,7 +49,7 @@ tags:
     present on the host. Voice operations never upload, modify, or delete model files.
 
     '
-- name: profiles
+- name: profile
   description: 'Manage reusable generation presets. Exactly one profile may be active at a time.
 
     The active profile supplies defaults when a generation request does not name a
@@ -656,7 +656,7 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /api/v1/profiles/:
+  /api/v1/profile/:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
@@ -742,7 +742,7 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
-  /api/v1/profiles/{profile_id}:
+  /api/v1/profile/{profile_id}:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
@@ -859,7 +859,7 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
-  /api/v1/profiles/{profile_id}/activate:
+  /api/v1/profile/{profile_id}/activate:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
     - $ref: '#/components/parameters/OpalTransactionIdParameter'

@@ -1,4 +1,4 @@
-"""Engines, voice registrations and profiles."""
+"""Engines, voice registrations and profile."""
 
 from __future__ import annotations
 

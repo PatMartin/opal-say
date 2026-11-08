@@ -45,27 +45,27 @@
   },
   "opal_profiles_list": {
     "method": "GET",
-    "path": "/api/v1/profiles/"
+    "path": "/api/v1/profile/"
   },
   "opal_profiles_create": {
     "method": "POST",
-    "path": "/api/v1/profiles/"
+    "path": "/api/v1/profile/"
   },
   "opal_profile_get": {
     "method": "GET",
-    "path": "/api/v1/profiles/{profile_id}"
+    "path": "/api/v1/profile/{profile_id}"
   },
   "opal_profile_patch": {
     "method": "PATCH",
-    "path": "/api/v1/profiles/{profile_id}"
+    "path": "/api/v1/profile/{profile_id}"
   },
   "opal_profile_delete": {
     "method": "DELETE",
-    "path": "/api/v1/profiles/{profile_id}"
+    "path": "/api/v1/profile/{profile_id}"
   },
   "opal_profile_activate": {
     "method": "POST",
-    "path": "/api/v1/profiles/{profile_id}/activate"
+    "path": "/api/v1/profile/{profile_id}/activate"
   },
   "list_persona_api_v1_persona__get": {
     "method": "GET",

@@ -75,14 +75,14 @@ def test_full_cli_workflow(run, http, tmp_path, config):
         assert w.getframerate() == 16000
     assert "voice=v1" in result.stderr
 
-    p = json.loads(run("profiles add main --voice v1 --active --speed 1.5 --format pcm").stdout)
+    p = json.loads(run("profile add main --voice v1 --active --speed 1.5 --format pcm").stdout)
     assert p["is_active"] and p["output_format"] == "pcm"
-    p2 = json.loads(run("profiles add other --voice v2 --options-json '{\"pitch\": 600}'").stdout)
-    assert "main" in run("profiles list").stdout
-    assert json.loads(run(f"profiles get {p['id']}").stdout)["speed"] == 1.5
-    assert json.loads(run(f"profiles update {p2['id']} --volume 0.5 --native-rate").stdout)["volume"] == 0.5
-    assert json.loads(run(f"profiles activate {p2['id']}").stdout)["is_active"] is True
-    run(f"profiles remove {p['id']}")
+    p2 = json.loads(run("profile add other --voice v2 --options-json '{\"pitch\": 600}'").stdout)
+    assert "main" in run("profile list").stdout
+    assert json.loads(run(f"profile get {p['id']}").stdout)["speed"] == 1.5
+    assert json.loads(run(f"profile update {p2['id']} --volume 0.5 --native-rate").stdout)["volume"] == 0.5
+    assert json.loads(run(f"profile activate {p2['id']}").stdout)["is_active"] is True
+    run(f"profile remove {p['id']}")
 
     run('persona add amy --name "Amy" --voice v1')
     assert "amy" in run("persona list").stdout
@@ -173,7 +173,7 @@ def test_tree_command_prints_command_surface():
     result = CliRunner().invoke(cli.app, ["say", "tree"])
     assert result.exit_code == 0
     out = result.stdout
-    for cmd in ("generate", "engine", "voice", "profiles", "settings", "backup", "health"):
+    for cmd in ("generate", "engine", "voice", "profile", "settings", "backup", "health"):
         assert cmd in out
     assert "speak" not in out  # hidden default command
     # Required args/options are bare; optional ones are bracketed.

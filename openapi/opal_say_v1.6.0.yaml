@@ -4,7 +4,7 @@ info:
   version: 1.6.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides\
     \ a stable REST contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients\
-    \ interact with OPAL concepts—engine,\nvoice, profiles, generation settings, and audio output—without\
+    \ interact with OPAL concepts—engine,\nvoice, profile, generation settings, and audio output—without\
     \ depending on a\nspecific engine's command line, model layout, Python API, or native output format.\n\n\
     Design principles:\n\n* The OpenAPI contract is the public source of truth for service behavior.\n* Engines\
     \ are installed and discovered by the implementation; they are not created\n  or deleted through this API.\n\
@@ -54,7 +54,7 @@ tags:
     present on the host. Voice operations never upload, modify, or delete model files.
 
     '
-- name: profiles
+- name: profile
   description: 'Manage reusable generation presets. Exactly one profile may be active at a time.
 
     The active profile supplies defaults when a generation request does not name a
@@ -542,11 +542,11 @@ paths:
           $ref: './shared/opal_kernel.yaml#/components/responses/UnprocessableEntity'
         '503':
           $ref: './shared/opal_kernel.yaml#/components/responses/ServiceUnavailable'
-  /api/v1/profiles/:
+  /api/v1/profile/:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/profiles_collection'
-  /api/v1/profiles/{profile_id}:
+  /api/v1/profile/{profile_id}:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/profile_item'
-  /api/v1/profiles/{profile_id}/activate:
+  /api/v1/profile/{profile_id}/activate:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/profile_activate'
   /api/v1/persona/:
     get:

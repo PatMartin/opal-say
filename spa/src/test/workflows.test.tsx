@@ -7,7 +7,7 @@ import { AUDIO_HEADERS, ENGINE, PROFILE, VOICE, audio, json, mockApi } from './m
 const BASE_ROUTES = {
   'GET /api/v1/info/': { name: 'opal-say-svc', version: '1.4.0', api_version: 'v1' },
   'GET /api/v1/info/ping': { status: 'ok' },
-  'GET /api/v1/profiles/': [PROFILE],
+  'GET /api/v1/profile/': [PROFILE],
   'GET /api/v1/voice/': [VOICE],
   'GET /api/v1/engine/': [ENGINE],
 }
@@ -182,26 +182,26 @@ describe('Voice', () => {
   })
 })
 
-describe('Profiles', () => {
-  it('creates and activates profiles', async () => {
+describe('Profile', () => {
+  it('creates and activates profile', async () => {
     const calls = mockApi({
       ...BASE_ROUTES,
-      'POST /api/v1/profiles/': () => json({ ...PROFILE, id: 2, name: 'fast' }, 201),
-      'POST /api/v1/profiles/1/activate': { ...PROFILE, is_active: true },
+      'POST /api/v1/profile/': () => json({ ...PROFILE, id: 2, name: 'fast' }, 201),
+      'POST /api/v1/profile/1/activate': { ...PROFILE, is_active: true },
     })
     render(<App />)
-    await openTab('Profiles')
+    await openTab('Profile')
     const row = (await screen.findByText('default')).closest('tr')!
     await userEvent.click(within(row).getByRole('button', { name: 'Activate' }))
-    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/profiles/1/activate')).toBe(true))
+    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/profile/1/activate')).toBe(true))
 
     await userEvent.type(screen.getByLabelText('Name'), 'fast')
     await userEvent.selectOptions(screen.getByLabelText('Voice'), 'amy')
     await userEvent.clear(screen.getByLabelText('Speed'))
     await userEvent.type(screen.getByLabelText('Speed'), '1.5')
     await userEvent.click(screen.getByRole('button', { name: 'Create' }))
-    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/profiles/')).toBe(true))
-    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/profiles/')!.body).toMatchObject({
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/profile/')).toBe(true))
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/profile/')!.body).toMatchObject({
       name: 'fast',
       voice_id: 'amy',
       speed: 1.5,
@@ -215,11 +215,11 @@ describe('Profiles', () => {
   it('surfaces 409 when deleting the active profile', async () => {
     mockApi({
       ...BASE_ROUTES,
-      'GET /api/v1/profiles/': [{ ...PROFILE, is_active: true }],
-      'DELETE /api/v1/profiles/1': () => json({ code: 'profile_active', message: 'activate another profile first' }, 409),
+      'GET /api/v1/profile/': [{ ...PROFILE, is_active: true }],
+      'DELETE /api/v1/profile/1': () => json({ code: 'profile_active', message: 'activate another profile first' }, 409),
     })
     render(<App />)
-    await openTab('Profiles')
+    await openTab('Profile')
     const row = (await screen.findByText('default')).closest('tr')!
     await userEvent.click(within(row).getByRole('button', { name: 'Delete' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('409 profile_active')
@@ -268,7 +268,7 @@ describe('Settings and backup', () => {
       ),
       'POST /api/v1/backup/import': {
         success: false,
-        validation: { valid: false, errors: [{ code: 'voice_not_found', message: 'bad ref', field: 'profiles.x.voice_id' }], warnings: [], details: {} },
+        validation: { valid: false, errors: [{ code: 'voice_not_found', message: 'bad ref', field: 'profile.x.voice_id' }], warnings: [], details: {} },
         message: 'Configuration is invalid; nothing was applied.',
       },
     })

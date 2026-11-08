@@ -105,7 +105,7 @@ def _needs_if_match(method: str, url: str) -> bool:
     """Configuration mutations carrying the mandatory If-Match precondition."""
     m = method.upper()
     if m in {"PATCH", "DELETE"} and url.startswith(
-        ("/api/v1/engine/", "/api/v1/voice/", "/api/v1/profiles/", "/api/v1/persona/")
+        ("/api/v1/engine/", "/api/v1/voice/", "/api/v1/profile/", "/api/v1/persona/")
     ):
         return True
     if m in {"PUT", "DELETE", "PATCH"} and url.startswith("/api/v1/settings/"):
@@ -114,10 +114,10 @@ def _needs_if_match(method: str, url: str) -> bool:
         return (
             url == "/api/v1/voice/"
             or url == "/api/v1/persona/"
-            or url == "/api/v1/profiles/"
+            or url == "/api/v1/profile/"
             or url == "/api/v1/backup/import"
             or url.startswith("/api/v1/backup/restore/")
-            or (url.startswith("/api/v1/profiles/") and url.endswith("/activate"))
+            or (url.startswith("/api/v1/profile/") and url.endswith("/activate"))
         )
     return False
 
@@ -197,6 +197,6 @@ def make_voice(client: TestClient, voice_id: str = "v1", engine_id: str = "fake"
 
 
 def make_profile(client: TestClient, name: str = "p1", voice_id: str = "v1", **extra) -> dict:
-    resp = client.post("/api/v1/profiles/", json={"name": name, "voice_id": voice_id, **extra})
+    resp = client.post("/api/v1/profile/", json={"name": name, "voice_id": voice_id, **extra})
     assert resp.status_code == 201, resp.text
     return resp.json()

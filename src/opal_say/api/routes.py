@@ -315,51 +315,51 @@ def delete_persona(persona_id: str, if_match: str | None = Header(None), svc: Se
     return Response(status_code=204)
 
 
-# -- profiles --------------------------------------------------------------------
+# -- profile --------------------------------------------------------------------
 
 
-@router.get("/api/v1/profiles/", tags=["profiles"], operation_id="opal_profiles_list",
+@router.get("/api/v1/profile/", tags=["profile"], operation_id="opal_profiles_list",
             response_model=list[ProfileRead])
-def list_profiles(response: Response, svc: Services = Depends(services)):
+def list_profile(response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.profiles.list()
+    return svc.profile.list()
 
 
-@router.post("/api/v1/profiles/", tags=["profiles"], operation_id="opal_profiles_create",
+@router.post("/api/v1/profile/", tags=["profile"], operation_id="opal_profiles_create",
              response_model=ProfileRead, status_code=201)
 def create_profile(body: ProfileCreate, response: Response, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
-    profile = mutate_with_revision(svc.store, if_match, lambda: svc.profiles.create(body))
-    response.headers["Location"] = f"/api/v1/profiles/{profile['id']}"
+    profile = mutate_with_revision(svc.store, if_match, lambda: svc.profile.create(body))
+    response.headers["Location"] = f"/api/v1/profile/{profile['id']}"
     return profile
 
 
-@router.get("/api/v1/profiles/{profile_id}", tags=["profiles"],
+@router.get("/api/v1/profile/{profile_id}", tags=["profile"],
             operation_id="opal_profile_get", response_model=ProfileRead)
 def get_profile(response: Response, profile_id: int = ProfileId, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.profiles.get(profile_id)
+    return svc.profile.get(profile_id)
 
 
-@router.patch("/api/v1/profiles/{profile_id}", tags=["profiles"],
+@router.patch("/api/v1/profile/{profile_id}", tags=["profile"],
               operation_id="opal_profile_patch", response_model=ProfileRead)
 def update_profile(body: ProfileUpdate, profile_id: int = ProfileId, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.profiles.update(profile_id, body))
+    return mutate_with_revision(svc.store, if_match, lambda: svc.profile.update(profile_id, body))
 
 
-@router.delete("/api/v1/profiles/{profile_id}", tags=["profiles"],
+@router.delete("/api/v1/profile/{profile_id}", tags=["profile"],
                operation_id="opal_profile_delete", status_code=204)
 def delete_profile(profile_id: int = ProfileId, if_match: str | None = Header(None), svc: Services = Depends(services)):
-    mutate_with_revision(svc.store, if_match, lambda: svc.profiles.delete(profile_id))
+    mutate_with_revision(svc.store, if_match, lambda: svc.profile.delete(profile_id))
     return Response(status_code=204)
 
 
-@router.post("/api/v1/profiles/{profile_id}/activate", tags=["profiles"],
+@router.post("/api/v1/profile/{profile_id}/activate", tags=["profile"],
              operation_id="opal_profile_activate", response_model=ProfileRead)
 def activate_profile(profile_id: int = ProfileId, if_match: str | None = Header(None),
                      svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.profiles.activate(profile_id))
+    return mutate_with_revision(svc.store, if_match, lambda: svc.profile.activate(profile_id))
 
 
 # -- generate --------------------------------------------------------------------
