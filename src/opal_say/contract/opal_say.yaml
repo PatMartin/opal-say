@@ -69,6 +69,9 @@ tags:
   description: Service readiness and health information. Playback devices are out of scope.
 - name: backup
   description: Backup, restore, import, export, and validate OPAL Say configuration.
+servers:
+- url: http://127.0.0.1:8080
+  description: Illustrative local endpoint; actual bind address and port are configurable.
 paths:
   /api/v1/engines/:
     parameters:
@@ -382,6 +385,12 @@ paths:
               $ref: '#/components/headers/OpalCausationIdHeader'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
@@ -490,14 +499,7 @@ paths:
         '428':
           $ref: '#/components/responses/PreconditionRequired'
       parameters:
-      - name: If-Match
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-        description: Required strong ETag for optimistic concurrency; missing 428, stale 412. DELETE without existence is
-          still subject to the precondition.
+      - $ref: '#/components/parameters/IfMatch'
     delete:
       tags:
       - voices
@@ -555,14 +557,7 @@ paths:
         '428':
           $ref: '#/components/responses/PreconditionRequired'
       parameters:
-      - name: If-Match
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-        description: Required strong ETag for optimistic concurrency; missing 428, stale 412. DELETE without existence is
-          still subject to the precondition.
+      - $ref: '#/components/parameters/IfMatch'
   /api/v1/voices/{voice_id}/validate:
     parameters:
     - $ref: '#/components/parameters/VoiceId'
@@ -2370,46 +2365,6 @@ components:
         updated_at:
           type: string
           format: date-time
-    PortableGenerationOptions:
-      type: object
-      description: 'Engine-neutral generation controls shared by completed and streaming generation.
-
-        These fields are standardized by OPAL Say and must retain the same meaning
-
-        regardless of the selected engine.
-
-        '
-      properties:
-        speed:
-          type: number
-          format: float
-          minimum: 0.25
-          maximum: 4.0
-          default: 1.0
-          description: Speech-rate multiplier. `1.0` is normal speed; `0.5` is half speed; `2.0` is double speed.
-        volume:
-          type: number
-          format: float
-          minimum: 0.0
-          maximum: 2.0
-          default: 1.0
-          description: Linear output gain. `1.0` is unchanged, `0.0` is silence, and `2.0` is approximately double amplitude
-            before clipping control.
-        sample_rate:
-          anyOf:
-          - type: integer
-            minimum: 8000
-            maximum: 192000
-          - type: 'null'
-          description: 'Requested output sample rate in Hz. If omitted/null, the service chooses an
-
-            appropriate rate, commonly the voice''s native rate. If explicitly requested,
-
-            the accepted response must use exactly this rate.
-
-            '
-        engine_options:
-          $ref: '#/components/schemas/EngineOptions'
     GenerateRequest:
       type: object
       additionalProperties: false
@@ -2594,64 +2549,6 @@ components:
           default: null
         engine_options:
           $ref: '#/components/schemas/EngineOptions'
-    ValidationMessage:
-      type: object
-      required:
-      - code
-      - message
-      properties:
-        code:
-          type: string
-          description: Stable machine-readable diagnostic code when possible.
-          example: model_not_found
-        message:
-          type: string
-          description: Human-readable diagnostic message.
-          example: The configured voice resource could not be resolved on this host.
-        field:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Related configuration field, when applicable.
-          example: engine_voice_ref
-        details:
-          type: object
-          additionalProperties: true
-          description: Optional implementation-specific diagnostic context.
-    EngineHealthRead:
-      type: object
-      required:
-      - engine_id
-      - enabled
-      - available
-      properties:
-        engine_id:
-          type: string
-        enabled:
-          type: boolean
-        available:
-          type: boolean
-        message:
-          anyOf:
-          - type: string
-          - type: 'null'
-    OperationResult:
-      type: object
-      required:
-      - success
-      - message
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        details:
-          type: object
-          additionalProperties: true
-      example:
-        success: true
-        message: Backup restored successfully.
-        details: {}
     ServiceInfo:
       type: object
       required:
