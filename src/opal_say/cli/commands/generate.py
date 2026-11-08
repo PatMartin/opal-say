@@ -24,11 +24,13 @@ from opal_say.cli.common import (
 
 def _generation_body(text: str, profile: int | None, voice: str | None, engine: str | None, speed: float | None,
                      volume: float | None, output_format: str | None, sample_rate: int | None,
-                     option: list[str] | None, options_json: str | None) -> dict[str, Any]:
+                     option: list[str] | None, options_json: str | None,
+                     persona: str | None = None) -> dict[str, Any]:
     if text == "-":
         text = sys.stdin.read()
     body: dict[str, Any] = {"text": text}
-    for key, value in (("profile_id", profile), ("voice_id", voice), ("engine_id", engine), ("speed", speed),
+    for key, value in (("profile_id", profile), ("voice_id", voice), ("persona", persona), ("engine_id", engine),
+                       ("speed", speed),
                        ("volume", volume), ("output_format", output_format), ("sample_rate", sample_rate)):
         if value is not None:
             body[key] = value
@@ -96,6 +98,7 @@ def register(say_app: typer.Typer) -> None:
         stream: bool = typer.Option(False, "--stream", help="Play progressively while audio is synthesized"),
         play: bool = typer.Option(True, "--play/--no-play", help="Play locally (default) or only write output"),
         profile: int = typer.Option(None, "--profile", min=1, help="Profile id (default: active profile)"),
+        persona: str = typer.Option(None, "--persona", help="Named persona supplying the voice"),
         voice: str = typer.Option(None, "--voice"),
         engine: str = typer.Option(None, "--engine", help="Advanced engine override"),
         speed: float = typer.Option(None, "--speed", min=0.25, max=4.0),
@@ -111,7 +114,7 @@ def register(say_app: typer.Typer) -> None:
         if output == "-":  # piping to stdout wins over playback
             play = False
         _synthesize(ctx, _generation_body(text, profile, voice, engine, speed, volume, output_format, sample_rate,
-                                        option, options_json), output, stream, play)
+                                        option, options_json, persona=persona), output, stream, play)
 
     @say_app.command("generate")
     def generate(
@@ -121,6 +124,7 @@ def register(say_app: typer.Typer) -> None:
         stream: bool = typer.Option(False, "--stream", help="Use /generate/stream (progressive raw PCM)"),
         play: bool = typer.Option(False, "--play", help="Also play the audio locally (requires 'opal-say[audio]')"),
         profile: int = typer.Option(None, "--profile", min=1, help="Profile id (default: active profile)"),
+        persona: str = typer.Option(None, "--persona", help="Named persona supplying the voice"),
         voice: str = typer.Option(None, "--voice"),
         engine: str = typer.Option(None, "--engine", help="Advanced engine override"),
         speed: float = typer.Option(None, "--speed", min=0.25, max=4.0),
@@ -137,4 +141,4 @@ def register(say_app: typer.Typer) -> None:
         if stream and output_format is not None:
             raise typer.BadParameter("--format is not supported with --stream (always pcm)")
         _synthesize(ctx, _generation_body(text, profile, voice, engine, speed, volume, output_format, sample_rate,
-                                        option, options_json), output, stream, play)
+                                        option, options_json, persona=persona), output, stream, play)

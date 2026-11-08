@@ -133,6 +133,7 @@ Output = typer.Option(..., "--output", "-o", help="Output file ('-' for stdout)"
 ENGINE_COLUMNS = ["engine_id", "name", "enabled", "available"]
 VOICE_COLUMNS = ["voice_id", "name", "engine_id", "engine_voice_ref", "language", "enabled", "native_sample_rate"]
 PROFILE_COLUMNS = ["id", "name", "is_active", "voice_id", "speed", "volume", "output_format", "sample_rate"]
+PERSONA_COLUMNS = ["persona_id", "name", "voice_id", "enabled"]
 
 OptionalOutput = typer.Option(None, "--output", "-o",
                               help="Output file ('-' for stdout); required unless the audio is played locally")

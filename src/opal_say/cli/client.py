@@ -32,6 +32,9 @@ PRECONDITION_OPS = {
     "opal_setting_delete",
     "opal_settings_patch",
     # kernel 1.5.0: creates/activations/imports/restores are also preconditioned
+    "create_persona_api_v1_personas__post",
+    "update_persona_api_v1_personas__persona_id__patch",
+    "delete_persona_api_v1_personas__persona_id__delete",
     "opal_profiles_create",
     "opal_profile_activate",
     "opal_backup_restore",
