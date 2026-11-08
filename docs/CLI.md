@@ -8,7 +8,7 @@ configuration.
 The CLI is a thin REST client. **Every command calls the OPAL Say REST API.** It never opens the
 database or loads an engine itself, so the service must be running, either locally or on another
 machine. The service never plays audio: the CLI writes it to a file or to stdout for piping into a
-player such as `aplay`, and — when the optional `audio` extra is installed — `opal say TEXT` and
+player such as `aplay`, and — when the optional `audio` extra is installed — `opal say generate ... --play` and
 `--play` play it through the machine where you run the CLI.
 
 ---
@@ -195,7 +195,7 @@ By default the CLI prints human-friendly output:
 | `remove`, `delete` | A one-line confirmation, e.g. `voice 'test-voice' unregistered` |
 | `validate` (engines, voices, backup) | `valid` or `INVALID`, followed by one line per error and warning |
 | `health` | A status line, then an engine table |
-| `generate`, `voices test`, `say TEXT` | Audio goes to the `-o` target and/or the local speaker. A summary line goes to **stderr**. |
+| `generate`, `voices test` | Audio goes to the `-o` target and/or the local speaker. A summary line goes to **stderr**. |
 
 In tables, `null` values are shown as `-`, booleans as `yes`/`no`, and nested lists and maps as compact
 JSON.
@@ -218,8 +218,8 @@ Every audio-producing command has two destinations:
 - `--play` plays the audio on the machine running the CLI via [`simpleaudio`](https://pypi.org/project/simpleaudio/)
   (`pip install 'opal-say[audio]'`).
 
-`opal say TEXT` is the shortcut for speaking aloud: it generates and plays, needs no `-o`, and
-`opal say TEXT -o file.wav` saves a copy while playing. `-o -` on that path writes to stdout and
+`opal say generate TEXT --play` speaks aloud: it generates and plays, needs no `-o`, and
+adding `-o file.wav` saves a copy while playing. `-o -` writes to stdout and
 skips playback. `--play` without `-o` also works on `generate` and `voices test`; `-o` is required
 only when nothing plays. `--play -o -` is rejected — pick one destination.
 
@@ -314,9 +314,7 @@ opal (or opal-say, which starts at 'say')
     ├── voices    list | get | add | update | remove | validate | test
     ├── profiles  list | get | add | update | remove | activate
     ├── personas  list | get | add | update | remove
-    ├── TEXT      speaks aloud (shortcut for 'speak': generate + play)
     ├── generate  TEXT [-o OUT] [--stream] [--play] ...
-    ├── speak     TEXT [-o OUT] [--stream] [--play/--no-play] ...   (hidden; 'say TEXT' routes here)
     ├── settings  list | get | set | delete
     ├── backup    list | create | download | restore | delete | export | import | validate
     ├── health
@@ -700,7 +698,7 @@ opal say profiles remove 4
 ## 8. `personas`: named personas
 
 A persona is a named character bound to a registered voice. Passing `--persona ID` to
-`speak`/`generate` selects that persona's voice; an explicit `--voice` still wins, and the
+`generate` selects that persona's voice; an explicit `--voice` still wins, and the
 persona voice beats the profile voice. Unknown or disabled personas are rejected with 422.
 
 | Command | Description |
@@ -714,23 +712,23 @@ persona voice beats the profile voice. Unknown or disabled personas are rejected
 ```bash
 opal say personas add amy --name "Amy" --voice en-gb-alan-low
 opal say personas list
-opal say "Hello, I am Amy." --persona amy
-opal say "same persona, different voice" --persona amy --voice en-us-ryan-medium
+opal say generate "Hello, I am Amy." --play --persona amy
+opal say generate "same persona, different voice" --play --persona amy --voice en-us-ryan-medium
 ```
 
 ---
 
 ## 9. `generate`: speech generation and streaming
 
-`opal say TEXT` is the shortcut for the common case — it generates and **plays the audio locally**
+For the common case, `generate ... --play` generates and **plays the audio locally**
 without `-o`. It accepts all the options below plus `--play/--no-play`. These are equivalent:
 
 ```bash
-opal say "Build complete."                      # speak aloud
+opal say generate "Build complete." --play         # speak aloud
 opal say generate "Build complete." --play      # same, explicitly
-opal say "Build complete." -o done.wav          # save a copy while speaking
-opal say "Build complete." --no-play -o q.wav   # file only
-opal say "Pipe me." -o - | aplay                # stdout wins over playback
+opal say generate "Build complete." --play -o done.wav   # save a copy while speaking
+opal say generate "Build complete." -o q.wav        # file only
+opal say generate "Pipe me." -o - | aplay           # stdout output
 ```
 
 Local playback needs the `audio` extra (`pip install 'opal-say[audio]'`) and plays on the machine

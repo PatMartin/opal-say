@@ -2040,7 +2040,7 @@ never be selected while their version differs from the implementation.
 **Does OPAL Say play audio?**
 The service never plays audio — playback, audio devices and job queues are deliberately outside the
 API. Pipe the output into `aplay`, `pacat` or `ffplay`, play it in your application, or let the CLI
-do it locally: `opal say TEXT` and `--play` use `simpleaudio` (`pip install 'opal-say[audio]'`) on
+do it locally: `opal say generate ... --play` use `simpleaudio` (`pip install 'opal-say[audio]'`) on
 the machine running the CLI.
 
 **Can I upload or download models through the API?**

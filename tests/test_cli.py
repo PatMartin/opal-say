@@ -184,45 +184,45 @@ def test_tree_command_prints_command_surface():
     assert "│   ├──" in out and "└──" in out
 
 
-def test_say_text_plays_by_default(run, monkeypatch):
+def test_generate_plays_when_asked(run, monkeypatch):
     played: list[int] = []
     monkeypatch.setattr(audio, "play_response", lambda resp: played.append(len(resp.content)) or len(resp.content))
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
-    run('"Hello there." --voice v1')
+    run('generate "Hello there." --voice v1 --play')
     assert played and played[0] > 0
 
 
-def test_say_text_writes_and_plays(run, monkeypatch, tmp_path):
+def test_generate_writes_and_plays(run, monkeypatch, tmp_path):
     played: list[int] = []
     monkeypatch.setattr(audio, "play_response", lambda resp: played.append(len(resp.content)) or len(resp.content))
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
     wav = tmp_path / "out.wav"
-    run(f'"Save and speak." --voice v1 -o {wav.as_posix()}')
+    run(f'generate "Save and speak." --voice v1 --play -o {wav.as_posix()}')
     assert wav.read_bytes()[:4] == b"RIFF" and played == [wav.stat().st_size]
 
 
-def test_say_text_no_play_writes_only(run, monkeypatch, tmp_path):
+def test_generate_writes_only_without_play(run, monkeypatch, tmp_path):
     monkeypatch.setattr(audio, "play_response", lambda resp: pytest.fail("playback must not run"))
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
     wav = tmp_path / "quiet.wav"
-    run(f'"Quiet export." --voice v1 --no-play -o {wav.as_posix()}')
+    run(f'generate "Quiet export." --voice v1 -o {wav.as_posix()}')
     assert wav.read_bytes()[:4] == b"RIFF"
 
 
-def test_say_text_stdout_disables_playback(run, monkeypatch):
+def test_generate_stdout_disables_playback(run, monkeypatch):
     monkeypatch.setattr(audio, "play_response", lambda resp: pytest.fail("playback must not run"))
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
-    result = run('"Pipe me." --voice v1 -o -')
+    result = run('generate "Pipe me." --voice v1 -o -')
     assert result.stdout_bytes[:4] == b"RIFF"
 
 
-def test_say_text_requires_a_destination(run):
+def test_generate_requires_a_destination(run):
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
-    result = run('"No destination." --voice v1 --no-play', code=2)
+    result = run('generate "No destination." --voice v1', code=2)
     assert "supply -o/--output" in result.stderr
 
 
-def test_say_text_stream_plays_progressively(run, monkeypatch):
+def test_generate_stream_plays_progressively(run, monkeypatch):
     chunks: list[bytes] = []
     rates: list[int] = []
 
@@ -234,7 +234,7 @@ def test_say_text_stream_plays_progressively(run, monkeypatch):
 
     monkeypatch.setattr(audio, "play_pcm_stream", fake_stream)
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
-    run('"Streaming speech." --voice v1 --stream')
+    run('generate "Streaming speech." --voice v1 --stream --play')
     assert chunks and rates == [rates[0]] * len(rates)
 
 
@@ -249,14 +249,14 @@ def test_say_text_stream_writes_and_plays(run, monkeypatch, tmp_path):
     monkeypatch.setattr(audio, "play_pcm_stream", fake_stream)
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
     pcm = tmp_path / "out.pcm"
-    run(f'"Stream and save." --voice v1 --stream -o {pcm.as_posix()}')
+    run(f'generate "Stream and save." --voice v1 --stream --play -o {pcm.as_posix()}')
     assert chunks and pcm.stat().st_size == sum(len(c) for c in chunks)
 
 
-def test_say_text_reads_stdin(run, monkeypatch):
+def test_generate_reads_stdin(run, monkeypatch):
     monkeypatch.setattr(audio, "play_response", lambda resp: len(resp.content))
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a')
-    run("- --voice v1", stdin="stdin speech")
+    run("generate - --voice v1 --play", stdin="stdin speech")
 
 
 def test_subcommands_still_win_over_text(run):

@@ -90,32 +90,6 @@ def _synthesize(ctx: typer.Context, body: dict[str, Any], output: str | None, st
 
 
 def register(say_app: typer.Typer) -> None:
-    @say_app.command("speak", hidden=True)
-    def speak(
-        ctx: typer.Context,
-        text: str = typer.Argument(..., help="Plain text to speak ('-' reads stdin)"),
-        output: str | None = OptionalOutput,
-        stream: bool = typer.Option(False, "--stream", help="Play progressively while audio is synthesized"),
-        play: bool = typer.Option(True, "--play/--no-play", help="Play locally (default) or only write output"),
-        profile: int = typer.Option(None, "--profile", min=1, help="Profile id (default: active profile)"),
-        persona: str = typer.Option(None, "--persona", help="Named persona supplying the voice"),
-        voice: str = typer.Option(None, "--voice"),
-        engine: str = typer.Option(None, "--engine", help="Advanced engine override"),
-        speed: float = typer.Option(None, "--speed", min=0.25, max=4.0),
-        volume: float = typer.Option(None, "--volume", min=0.0, max=2.0),
-        output_format: str = typer.Option(None, "--format", help="wav or pcm (not with --stream)"),
-        sample_rate: int = typer.Option(None, "--sample-rate", min=8000, max=192000),
-        option: list[str] = OptionPairs,
-        options_json: str = OptionsJson,
-    ) -> None:
-        """Speak text aloud (the default for 'opal say TEXT')."""
-        if stream and output_format is not None:
-            raise typer.BadParameter("--format is not supported with --stream (always pcm)")
-        if output == "-":  # piping to stdout wins over playback
-            play = False
-        _synthesize(ctx, _generation_body(text, profile, voice, engine, speed, volume, output_format, sample_rate,
-                                        option, options_json, persona=persona), output, stream, play)
-
     @say_app.command("generate")
     def generate(
         ctx: typer.Context,

@@ -35,7 +35,7 @@ It provides one consistent interface over local synthesis engines, including **P
              alerts, or other services
 ~~~
 
-> **Important distinction:** the OPAL Say **service** generates audio; it does not play it. A shell player such as `aplay`, your own application, or the browser provides playback. The CLI can also play locally — `opal say "Hello"` and `--play` use the optional `simpleaudio` extra (`pip install 'opal-say[audio]'`) on the machine where you run the command. This separation lets the same service power a Raspberry Pi speaker, a dashboard, a phone system, and an automation pipeline.
+> **Important distinction:** the OPAL Say **service** generates audio; it does not play it. A shell player such as `aplay`, your own application, or the browser provides playback. The CLI can also play locally — `opal say generate "Hello" --play` use the optional `simpleaudio` extra (`pip install 'opal-say[audio]'`) on the machine where you run the command. This separation lets the same service power a Raspberry Pi speaker, a dashboard, a phone system, and an automation pipeline.
 
 ## What makes it interesting?
 
@@ -70,7 +70,7 @@ pip install -e '.[engines,dev]'
 # Alternatives:
 # pip install -e '.[piper]'      # Piper only
 # pip install -e '.[kokoro]'     # Kokoro only
-# pip install -e '.[audio]'      # local playback ('opal say TEXT', --play)
+# pip install -e '.[audio]'      # local playback ('generate --play')
 # pip install -e .              # API/CLI core, no speech engine runtime
 ~~~
 
