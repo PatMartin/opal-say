@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { call } from '../api/client'
-import type { Persona, Voice } from '../api/types'
-import { ErrorBanner, useAction, useLoad } from './common'
+import type { Persona, ValidationResult, Voice } from '../api/types'
+import { ErrorBanner, ValidationView, useAction, useLoad } from './common'
 
 interface PersonaForm {
   persona_id: string
@@ -19,6 +19,7 @@ export function PersonaPanel() {
   const [form, setForm] = useState<PersonaForm>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [selected, setSelected] = useState<Persona | null>(null)
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
   const action = useAction()
   const set = (patch: Partial<PersonaForm>) => setForm((f) => ({ ...f, ...patch }))
 
@@ -86,6 +87,7 @@ export function PersonaPanel() {
               <td className="actions">
                 <button onClick={() => void show(p.persona_id)}>Details</button>
                 <button onClick={() => edit(p)}>Edit</button>
+                <button onClick={() => void action.run(async () => setValidation(await call<ValidationResult>('opal_persona_validate', { path: { persona_id: p.persona_id } })))}>Validate</button>
                 <button onClick={() => void remove(p.persona_id)}>Delete</button>
               </td>
             </tr>
@@ -93,6 +95,7 @@ export function PersonaPanel() {
         </tbody>
       </table>
       <ErrorBanner error={action.error} />
+      <ValidationView result={validation} />
       {selected && <pre data-testid="persona-details">{JSON.stringify(selected, null, 2)}</pre>}
 
       <h3>{editing !== null ? `Edit persona ${editing}` : 'Create persona'}</h3>

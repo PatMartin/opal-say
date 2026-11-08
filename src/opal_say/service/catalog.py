@@ -374,3 +374,13 @@ class PersonaService:
     def delete(self, persona_id: str) -> None:
         self.get(persona_id)
         self.store.delete_persona(persona_id)
+
+    def validate(self, persona_id: str) -> Report:
+        persona = self.get(persona_id)
+        if self.store.get_voice(persona["voice_id"]) is None:
+            return Report(errors=[Issue("voice_not_found",
+                                        f"voice '{persona['voice_id']}' is not registered", "voice_id")])
+        report = self.voice.validate(persona["voice_id"])
+        if not persona["enabled"]:
+            report.warnings.append(Issue("persona_disabled", f"persona '{persona_id}' is disabled", "enabled"))
+        return report

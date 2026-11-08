@@ -1044,6 +1044,44 @@ paths:
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
     - $ref: '#/components/parameters/OpalRequestIdParameter'
     - $ref: '#/components/parameters/OpalCausationIdParameter'
+  /api/v1/persona/{persona_id}/validate:
+    post:
+      summary: Validate Persona
+      description: 'Check that a persona resolves for generation: the persona is registered and enabled, its bound voice exists
+        and validates against its engine. No audio is synthesized.'
+      operationId: opal_persona_validate
+      tags:
+      - persona
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '200':
+          description: Persona validation report.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalValidationReport'
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    parameters:
+    - $ref: '#/components/parameters/PersonaId'
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
   /api/v1/persona/{persona_id}:
     parameters:
     - $ref: '#/components/parameters/PersonaId'

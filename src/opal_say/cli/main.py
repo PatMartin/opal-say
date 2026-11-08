@@ -30,6 +30,7 @@ COMMANDS: dict[str, str] = {
     "opal_persona_list": "persona list",
     "opal_persona_create": "persona add",
     "opal_persona_get": "persona get",
+    "opal_persona_validate": "persona validate",
     "opal_persona_patch": "persona update",
     "opal_persona_delete": "persona remove",
     "opal_generate": "generate",

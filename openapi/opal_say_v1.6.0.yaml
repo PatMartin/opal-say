@@ -688,6 +688,45 @@ paths:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalTransactionIdParameter'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalRequestIdParameter'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
+  /api/v1/persona/{persona_id}/validate:
+    post:
+      summary: Validate Persona
+      description: 'Check that a persona resolves for generation: the persona is registered
+        and enabled, its bound voice exists and validates against its engine. No audio is
+        synthesized.'
+      operationId: opal_persona_validate
+      tags:
+      - persona
+      responses:
+        '401':
+          $ref: './shared/opal_kernel.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared/opal_kernel.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared/opal_kernel.yaml#/components/responses/NotFound'
+        '200':
+          description: Persona validation report.
+          content:
+            application/json:
+              schema:
+                $ref: './shared/opal_kernel.yaml#/components/schemas/OpalValidationReport'
+          headers:
+            X-Opal-Session-Id:
+              $ref: './shared/opal_kernel.yaml#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: './shared/opal_kernel.yaml#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: './shared/opal_kernel.yaml#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: './shared/opal_kernel.yaml#/components/headers/OpalCausationIdHeader'
+        '422':
+          $ref: './shared/opal_kernel.yaml#/components/responses/UnprocessableEntity'
+    parameters:
+    - $ref: '#/components/parameters/PersonaId'
+    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalSessionIdParameter'
+    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalTransactionIdParameter'
+    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalRequestIdParameter'
+    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
   /api/v1/persona/{persona_id}:
     parameters:
     - $ref: '#/components/parameters/PersonaId'

@@ -175,6 +175,7 @@ Error: cannot reach OPAL Say API: [Errno 111] Connection refused
 | Voice | `voice_id`, chosen when you register it | `en-us-amy-low`, `kokoro-af-heart` |
 | Profile | Numeric `id` **only** (not the name) | `opal say profile get 3` |
 | Persona | `persona_id` string | `opal say persona get amy` |
+opal say persona validate amy    # check persona resolution (voice exists, enabled, usable)
 | Setting | Key | `max_text_chars` |
 | Backup | Filename | `opal-say-2026-10-12T162205Z.tar.gz` |
 

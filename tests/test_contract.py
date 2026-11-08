@@ -230,6 +230,8 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.get("/api/v1/persona/").status_code == 200
     assert c.get("/api/v1/persona/amy").status_code == 200
     assert c.patch("/api/v1/persona/amy", json={"description": "warm"}).status_code == 200
+    assert c.post("/api/v1/persona/amy/validate").json()["valid"] is True
+    assert c.post("/api/v1/persona/nope/validate").status_code == 404
     assert c.post("/api/v1/generate", json={"text": "Hello there.", "persona": "amy"}).status_code == 200
     assert c.delete("/api/v1/persona/amy").status_code == 204
 

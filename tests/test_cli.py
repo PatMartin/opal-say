@@ -88,6 +88,7 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert "amy" in run("persona list").stdout
     assert json.loads(run("persona get amy").stdout)["voice_id"] == "v1"
     assert json.loads(run("persona update amy --description warm").stdout)["description"] == "warm"
+    assert "valid" in run("persona validate amy").stdout
     persona_wav = tmp_path / "persona.wav"
     run(f'generate "as Amy" --persona amy -o {persona_wav.as_posix()}')
     assert persona_wav.stat().st_size > 0

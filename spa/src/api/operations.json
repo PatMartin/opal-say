@@ -75,6 +75,10 @@
     "method": "POST",
     "path": "/api/v1/persona/"
   },
+  "opal_persona_validate": {
+    "method": "POST",
+    "path": "/api/v1/persona/{persona_id}/validate"
+  },
   "opal_persona_get": {
     "method": "GET",
     "path": "/api/v1/persona/{persona_id}"

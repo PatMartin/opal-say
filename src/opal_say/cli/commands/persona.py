@@ -6,7 +6,7 @@ from typing import Any
 
 import typer
 
-from opal_say.cli.common import PERSONA_COLUMNS, _call, _emit
+from opal_say.cli.common import PERSONA_COLUMNS, _call, _emit, _validation
 
 persona_app = typer.Typer(help="Manage named persona bound to registered voice.", no_args_is_help=True)
 
@@ -67,6 +67,14 @@ def persona_update(
     resp = _call(ctx, "opal_persona_patch",
                  path_params={"persona_id": persona_id}, json=body)
     _emit(ctx, resp.json(), PERSONA_COLUMNS)
+
+
+@persona_app.command("validate")
+def persona_validate(ctx: typer.Context, persona_id: str) -> None:
+    """Validate that a persona resolves: registered, enabled, and its voice usable."""
+    _validation(
+        ctx, _call(ctx, "opal_persona_validate", path_params={"persona_id": persona_id})
+    )
 
 
 @persona_app.command("remove")

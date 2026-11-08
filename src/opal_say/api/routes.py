@@ -301,6 +301,12 @@ def get_persona(persona_id: str, response: Response, svc: Services = Depends(ser
     return svc.persona.get(persona_id)
 
 
+@router.post("/api/v1/persona/{persona_id}/validate", tags=["persona"],
+             operation_id="opal_persona_validate", response_model=ValidationResult)
+def validate_persona(persona_id: str, svc: Services = Depends(services)):
+    return report_dict(svc.persona.validate(persona_id))
+
+
 @router.patch("/api/v1/persona/{persona_id}", tags=["persona"],
               operation_id="opal_persona_patch", response_model=PersonaRead)
 def update_persona(persona_id: str, body: PersonaUpdate, if_match: str | None = Header(None),
