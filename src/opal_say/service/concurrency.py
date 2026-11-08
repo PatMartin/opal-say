@@ -12,7 +12,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from opal_say.persistence.store import Store
-from opal_say.service.errors import PreconditionFailed, PreconditionRequired
+from opal_say.service.errors import InvalidRequest, PreconditionFailed, PreconditionRequired
 
 T = TypeVar("T")
 
@@ -33,9 +33,15 @@ def mutate_with_revision(store: Store, if_match: str | None, fn: Callable[[], T]
     if if_match is None:
         raise PreconditionRequired("configuration mutations require an If-Match header")
     expected = _revision(if_match)
+    if expected is None:
+        raise InvalidRequest.single(
+            ["header", "if-match"],
+            'malformed If-Match: one strong quoted ETag required (e.g. "r7"); weak tags, lists and * are rejected',
+            input_=if_match,
+        )
     with store.write_lock():
         current = store.config_revision()
-        if expected is None or expected != current:
+        if expected != current:
             raise PreconditionFailed(
                 f"If-Match {if_match!r} does not match current configuration revision {config_etag(store)}"
             )

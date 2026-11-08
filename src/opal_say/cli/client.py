@@ -23,6 +23,7 @@ OPERATIONS: dict[str, tuple[str, str]] = contract_operations()
 # retries once on 412.
 PRECONDITION_OPS = {
     "opal_engine_patch",
+    "create_voice_api_v1_voices__post",
     "update_voice_api_v1_voices__voice_id__patch",
     "delete_voice_api_v1_voices__voice_id__delete",
     "opal_profile_patch",

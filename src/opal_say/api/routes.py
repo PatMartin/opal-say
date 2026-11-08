@@ -225,8 +225,9 @@ def list_voices(
 
 @router.post("/api/v1/voices/", tags=["voices"], operation_id="create_voice_api_v1_voices__post",
              response_model=VoiceRead, status_code=201)
-def create_voice(body: VoiceCreate, response: Response, svc: Services = Depends(services)):
-    voice = svc.voices.create(body)
+def create_voice(body: VoiceCreate, response: Response, if_match: str | None = Header(None),
+                 svc: Services = Depends(services)):
+    voice = mutate_with_revision(svc.store, if_match, lambda: svc.voices.create(body))
     response.headers["Location"] = f"/api/v1/voices/{voice['voice_id']}"
     return voice
 
