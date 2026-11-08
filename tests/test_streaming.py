@@ -163,11 +163,14 @@ def test_failure_after_first_block_terminates_and_logs(client, voices, app, capl
 def test_early_close_releases_generator_and_permit(client, voices, app):
     """Abandoning a live response frees the runtime reference and inference permit."""
     rec = app.state.services.runtime._records["fake"]
-    body = {"text": SENTENCES, "voice_id": "v1", "engine_options": {"delay": 0.02}}
+    body = {"text": SENTENCES, "voice_id": "v1", "engine_options": {"delay": 0.5}}
     with client.stream("POST", "/api/v1/generate/stream", json=body) as resp:
         assert resp.status_code == 200
-        assert next(resp.iter_raw())
+        # The generator is alive while the first synthesis call sleeps; asserting
+        # before consuming keeps the reference count deterministic even though the
+        # client eagerly drains the stream in the background.
         assert rec.refs == 1
+        assert next(resp.iter_raw())
     assert _wait_until(lambda: rec.refs == 0)
     # The released permit lets the next request run normally.
     assert client.post("/api/v1/generate", json={"text": "ok", "voice_id": "v1"}).status_code == 200
