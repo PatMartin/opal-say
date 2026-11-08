@@ -56,8 +56,8 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     const path = url.pathname
     const method = route.request().method()
 
-    if (method === 'GET' && path === '/') return json(route, { name: 'opal-say-svc', version: '1.5.0', api_version: '1.5.0' })
-    if (method === 'GET' && path === '/healthz') return json(route, { status: 'ok' })
+    if (method === 'GET' && path === '/api/v1/info/') return json(route, { name: 'opal-say-svc', version: '1.6.0', api_version: 'v1' })
+    if (method === 'GET' && path === '/api/v1/info/ping') return json(route, { status: 'ok' })
     if (method === 'GET' && path === '/api/v1/health/') {
       return json(route, { status: 'ok', version: '1.5.0', active_profile_id: 1, engines: [{ ...engine, message: '' }], details: {} })
     }
@@ -69,14 +69,14 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     if (method === 'GET' && path === '/api/v1/settings/') return json(route, { greeting: 'hi' })
     if (method === 'GET' && path === '/api/v1/backup/list') return json(route, [])
 
-    if (path === '/api/v1/personas/') {
+    if (path === '/api/v1/persona/') {
       if (method === 'GET') return json(route, personas)
       if (method === 'POST') {
         const body = route.request().postDataJSON()
         personas.push(body)
         return route.fulfill({
           status: 201, contentType: 'application/json',
-          headers: { location: `/api/v1/personas/${body.persona_id}` },
+          headers: { location: `/api/v1/persona/${body.persona_id}` },
           body: JSON.stringify({ ...body, created_at: now, updated_at: now }),
         })
       }
@@ -132,7 +132,7 @@ test('navigates every tab', async ({ page }) => {
   }
 })
 
-test('renders personas and creates one', async ({ page }) => {
+test('renders persona and creates one', async ({ page }) => {
   await page.getByRole('button', { name: 'Personas', exact: true }).click()
   // First data fetch can be slow while Vite transforms modules on a cold server.
   await expect(page.getByRole('cell', { name: 'amy', exact: true })).toBeVisible({ timeout: 15_000 })

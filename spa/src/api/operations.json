@@ -67,25 +67,25 @@
     "method": "POST",
     "path": "/api/v1/profiles/{profile_id}/activate"
   },
-  "list_personas_api_v1_personas__get": {
+  "list_persona_api_v1_persona__get": {
     "method": "GET",
-    "path": "/api/v1/personas/"
+    "path": "/api/v1/persona/"
   },
-  "create_persona_api_v1_personas__post": {
+  "create_persona_api_v1_persona__post": {
     "method": "POST",
-    "path": "/api/v1/personas/"
+    "path": "/api/v1/persona/"
   },
-  "get_persona_api_v1_personas__persona_id__get": {
+  "get_persona_api_v1_persona__persona_id__get": {
     "method": "GET",
-    "path": "/api/v1/personas/{persona_id}"
+    "path": "/api/v1/persona/{persona_id}"
   },
-  "update_persona_api_v1_personas__persona_id__patch": {
+  "update_persona_api_v1_persona__persona_id__patch": {
     "method": "PATCH",
-    "path": "/api/v1/personas/{persona_id}"
+    "path": "/api/v1/persona/{persona_id}"
   },
-  "delete_persona_api_v1_personas__persona_id__delete": {
+  "delete_persona_api_v1_persona__persona_id__delete": {
     "method": "DELETE",
-    "path": "/api/v1/personas/{persona_id}"
+    "path": "/api/v1/persona/{persona_id}"
   },
   "generate_audio_api_v1_generate_post": {
     "method": "POST",

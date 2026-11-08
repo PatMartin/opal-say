@@ -13,8 +13,8 @@ interface PersonaForm {
 
 const EMPTY: PersonaForm = { persona_id: '', name: '', description: '', voice_id: '', enabled: true }
 
-export function PersonasPanel() {
-  const personas = useLoad(() => call<Persona[]>('list_personas_api_v1_personas__get'), [])
+export function PersonaPanel() {
+  const persona = useLoad(() => call<Persona[]>('list_persona_api_v1_persona__get'), [])
   const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get'), [])
   const [form, setForm] = useState<PersonaForm>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
@@ -32,13 +32,13 @@ export function PersonasPanel() {
         enabled: form.enabled,
       }
       if (editing !== null) {
-        await call('update_persona_api_v1_personas__persona_id__patch', { path: { persona_id: editing }, body })
+        await call('update_persona_api_v1_persona__persona_id__patch', { path: { persona_id: editing }, body })
       } else {
-        await call('create_persona_api_v1_personas__post', { body: { persona_id: form.persona_id, ...body } })
+        await call('create_persona_api_v1_persona__post', { body: { persona_id: form.persona_id, ...body } })
       }
       setForm(EMPTY)
       setEditing(null)
-      await personas.reload()
+      await persona.reload()
     })
   }
 
@@ -54,18 +54,18 @@ export function PersonasPanel() {
   }
 
   const show = (id: string) =>
-    action.run(async () => setSelected(await call<Persona>('get_persona_api_v1_personas__persona_id__get', { path: { persona_id: id } })))
+    action.run(async () => setSelected(await call<Persona>('get_persona_api_v1_persona__persona_id__get', { path: { persona_id: id } })))
 
   const remove = (id: string) =>
     action.run(async () => {
-      await call('delete_persona_api_v1_personas__persona_id__delete', { path: { persona_id: id } })
-      await personas.reload()
+      await call('delete_persona_api_v1_persona__persona_id__delete', { path: { persona_id: id } })
+      await persona.reload()
     })
 
   return (
     <section>
       <h2>Personas</h2>
-      <ErrorBanner error={personas.error} />
+      <ErrorBanner error={persona.error} />
       <table>
         <thead>
           <tr>
@@ -77,7 +77,7 @@ export function PersonasPanel() {
           </tr>
         </thead>
         <tbody>
-          {personas.data.map((p) => (
+          {persona.data.map((p) => (
             <tr key={p.persona_id}>
               <td>{p.persona_id}</td>
               <td>{p.name}</td>

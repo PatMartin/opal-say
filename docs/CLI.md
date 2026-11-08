@@ -22,7 +22,7 @@ player such as `aplay`, and — when the optional `audio` extra is installed —
 5. [`engines`: engine discovery and configuration](#5-engines-engine-discovery-and-configuration)
 6. [`voices`: voice registrations](#6-voices-voice-registrations)
 7. [`profiles`: generation profiles](#7-profiles-generation-profiles)
-8. [`personas`: named personas](#8-personas-named-personas)
+8. [`persona`: named persona](#8-persona-named-persona)
 9. [`generate`: speech generation and streaming](#9-generate-speech-generation-and-streaming)
 10. [`settings`: service settings](#10-settings-service-settings)
 11. [`backup`: backup, restore, import, export and validation](#11-backup-backup-restore-import-export-and-validation)
@@ -174,7 +174,7 @@ Error: cannot reach OPAL Say API: [Errno 111] Connection refused
 | Engine | `engine_id`, fixed by the adapter | `piper`, `kokoro` |
 | Voice | `voice_id`, chosen when you register it | `en-us-amy-low`, `kokoro-af-heart` |
 | Profile | Numeric `id` **only** (not the name) | `opal say profiles get 3` |
-| Persona | `persona_id` string | `opal say personas get amy` |
+| Persona | `persona_id` string | `opal say persona get amy` |
 | Setting | Key | `max_text_chars` |
 | Backup | Filename | `opal-say-2026-10-12T162205Z.tar.gz` |
 
@@ -313,7 +313,7 @@ opal (or opal-say, which starts at 'say')
     ├── engines   list | get | update | validate
     ├── voices    list | get | add | update | remove | validate | test
     ├── profiles  list | get | add | update | remove | activate
-    ├── personas  list | get | add | update | remove
+    ├── persona  list | get | add | update | remove
     ├── generate  TEXT [-o OUT] [--stream] [--play] ...
     ├── settings  list | get | set | delete
     ├── backup    list | create | download | restore | delete | export | import | validate
@@ -693,23 +693,23 @@ opal say profiles remove 4
 
 ---
 
-## 8. `personas`: named personas
+## 8. `persona`: named persona
 
 A persona is a named character bound to a registered voice. Passing `--persona ID` to
 `generate` selects that persona's voice; an explicit `--voice` still wins, and the
-persona voice beats the profile voice. Unknown or disabled personas are rejected with 422.
+persona voice beats the profile voice. Unknown or disabled persona are rejected with 422.
 
 | Command | Description |
 |---|---|
-| `list` | List personas (`--enabled`/`--disabled` to filter) |
+| `list` | List persona (`--enabled`/`--disabled` to filter) |
 | `get ID` | Show one persona as JSON |
 | `add ID --name N --voice V [OPTIONS]` | Create a persona bound to a registered voice |
 | `update ID [OPTIONS]` | Partially update (`--name`, `--voice`, `--description`/`--clear-description`, `--enabled`/`--disabled`) |
 | `remove ID` | Delete a persona (the voice registration is unaffected) |
 
 ```bash
-opal say personas add amy --name "Amy" --voice en-gb-alan-low
-opal say personas list
+opal say persona add amy --name "Amy" --voice en-gb-alan-low
+opal say persona list
 opal say generate "Hello, I am Amy." --play --persona amy
 opal say generate "same persona, different voice" --play --persona amy --voice en-us-ryan-medium
 ```
@@ -1501,11 +1501,11 @@ contract. The parity tests check that the CLI covers every operation.
 | `profiles update` | `PATCH /api/v1/profiles/{profile_id}` | `update_profile_api_v1_profiles__profile_id__patch` |
 | `profiles remove` | `DELETE /api/v1/profiles/{profile_id}` | `delete_profile_api_v1_profiles__profile_id__delete` |
 | `profiles activate` | `POST /api/v1/profiles/{profile_id}/activate` | `activate_profile_api_v1_profiles__profile_id__activate_post` |
-| `personas list` | `GET /api/v1/personas/` | `list_personas_api_v1_personas__get` |
-| `personas add` | `POST /api/v1/personas/` | `create_persona_api_v1_personas__post` |
-| `personas get` | `GET /api/v1/personas/{persona_id}` | `get_persona_api_v1_personas__persona_id__get` |
-| `personas update` | `PATCH /api/v1/personas/{persona_id}` | `update_persona_api_v1_personas__persona_id__patch` |
-| `personas remove` | `DELETE /api/v1/personas/{persona_id}` | `delete_persona_api_v1_personas__persona_id__delete` |
+| `persona list` | `GET /api/v1/persona/` | `list_persona_api_v1_persona__get` |
+| `persona add` | `POST /api/v1/persona/` | `create_persona_api_v1_persona__post` |
+| `persona get` | `GET /api/v1/persona/{persona_id}` | `get_persona_api_v1_persona__persona_id__get` |
+| `persona update` | `PATCH /api/v1/persona/{persona_id}` | `update_persona_api_v1_persona__persona_id__patch` |
+| `persona remove` | `DELETE /api/v1/persona/{persona_id}` | `delete_persona_api_v1_persona__persona_id__delete` |
 | `generate` | `POST /api/v1/generate` | `generate_audio_api_v1_generate_post` |
 | `generate --stream` | `POST /api/v1/generate/stream` | `stream_audio_api_v1_generate_stream_post` |
 | `settings list` | `GET /api/v1/settings/` | `get_all_settings_api_v1_settings__get` |

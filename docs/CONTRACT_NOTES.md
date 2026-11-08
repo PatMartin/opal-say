@@ -40,7 +40,7 @@ client fetches it automatically for the preconditioned operations listed in
 
 ## Personas
 
-`/api/v1/personas/` is a Say-local catalog of named personas — a `persona_id`,
+`/api/v1/persona/` is a Say-local catalog of named persona — a `persona_id`,
 display name, and a bound registered `voice_id` (kept deliberately flat; the
 shape is designed so a future cross-service persona authority can serve the
 same identifiers). Generation requests accept `persona` on both
@@ -48,8 +48,8 @@ same identifiers). Generation requests accept `persona` on both
 
 - the persona supplies a voice default: explicit `voice_id` > persona voice >
   profile voice > service defaults;
-- unknown or disabled personas → `422`;
+- unknown or disabled persona → `422`;
 - persona create/update/delete carry the same If-Match preconditions as other
   configuration mutations; a persona's bound `voice_id` must resolve at write
-  time (`404` otherwise), and a voice cannot be deleted while personas
+  time (`404` otherwise), and a voice cannot be deleted while persona
   reference it (`409 voice_in_use`).

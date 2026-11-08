@@ -275,43 +275,43 @@ async def test_voice(voice_id: str, body: VoiceTestRequest | None = Body(None), 
     return Response(data, media_type=media_type, headers=plan.headers())
 
 
-# -- personas --------------------------------------------------------------------
+# -- persona --------------------------------------------------------------------
 
 
-@router.get("/api/v1/personas/", tags=["personas"], operation_id="list_personas_api_v1_personas__get",
+@router.get("/api/v1/persona/", tags=["persona"], operation_id="list_persona_api_v1_persona__get",
             response_model=list[PersonaRead])
-def list_personas(response: Response, enabled: bool | None = Query(None), svc: Services = Depends(services)):
+def list_persona(response: Response, enabled: bool | None = Query(None), svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.personas.list(enabled)
+    return svc.persona.list(enabled)
 
 
-@router.post("/api/v1/personas/", tags=["personas"], operation_id="create_persona_api_v1_personas__post",
+@router.post("/api/v1/persona/", tags=["persona"], operation_id="create_persona_api_v1_persona__post",
              response_model=PersonaRead, status_code=201)
 def create_persona(body: PersonaCreate, response: Response, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
-    persona = mutate_with_revision(svc.store, if_match, lambda: svc.personas.create(body))
-    response.headers["Location"] = f"/api/v1/personas/{persona['persona_id']}"
+    persona = mutate_with_revision(svc.store, if_match, lambda: svc.persona.create(body))
+    response.headers["Location"] = f"/api/v1/persona/{persona['persona_id']}"
     return persona
 
 
-@router.get("/api/v1/personas/{persona_id}", tags=["personas"],
-            operation_id="get_persona_api_v1_personas__persona_id__get", response_model=PersonaRead)
+@router.get("/api/v1/persona/{persona_id}", tags=["persona"],
+            operation_id="get_persona_api_v1_persona__persona_id__get", response_model=PersonaRead)
 def get_persona(persona_id: str, response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.personas.get(persona_id)
+    return svc.persona.get(persona_id)
 
 
-@router.patch("/api/v1/personas/{persona_id}", tags=["personas"],
-              operation_id="update_persona_api_v1_personas__persona_id__patch", response_model=PersonaRead)
+@router.patch("/api/v1/persona/{persona_id}", tags=["persona"],
+              operation_id="update_persona_api_v1_persona__persona_id__patch", response_model=PersonaRead)
 def update_persona(persona_id: str, body: PersonaUpdate, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.personas.update(persona_id, body))
+    return mutate_with_revision(svc.store, if_match, lambda: svc.persona.update(persona_id, body))
 
 
-@router.delete("/api/v1/personas/{persona_id}", tags=["personas"],
-               operation_id="delete_persona_api_v1_personas__persona_id__delete", status_code=204)
+@router.delete("/api/v1/persona/{persona_id}", tags=["persona"],
+               operation_id="delete_persona_api_v1_persona__persona_id__delete", status_code=204)
 def delete_persona(persona_id: str, if_match: str | None = Header(None), svc: Services = Depends(services)):
-    mutate_with_revision(svc.store, if_match, lambda: svc.personas.delete(persona_id))
+    mutate_with_revision(svc.store, if_match, lambda: svc.persona.delete(persona_id))
     return Response(status_code=204)
 
 

@@ -9,7 +9,7 @@ export function GeneratePanel() {
   const profiles = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
   const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get', { query: { enabled: true } }), [])
   const engines = useLoad(() => call<Engine[]>('opal_engines_list'), [])
-  const personas = useLoad(() => call<Persona[]>('list_personas_api_v1_personas__get', { query: { enabled: true } }), [])
+  const persona = useLoad(() => call<Persona[]>('list_persona_api_v1_persona__get', { query: { enabled: true } }), [])
 
   const [text, setText] = useState('')
   const [profileId, setProfileId] = useState('')
@@ -98,7 +98,7 @@ export function GeneratePanel() {
           Persona
           <select value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
             <option value="">(none)</option>
-            {personas.data.map((p) => (
+            {persona.data.map((p) => (
               <option key={p.persona_id} value={p.persona_id}>
                 {p.name} ({p.voice_id})
               </option>

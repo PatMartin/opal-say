@@ -11,6 +11,6 @@ do
 done
 
 # Create a persona (voice must be a registered voice_id, not the model ref)
-opal say personas add ryan --name "ryan" \
+opal say persona add ryan --name "ryan" \
   --voice "en-us-ryan-high" \
   --description "A test persona"

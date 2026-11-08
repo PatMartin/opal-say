@@ -29,7 +29,7 @@ class Services:
     engines: EngineService
     voices: VoiceService
     profiles: ProfileService
-    personas: PersonaService
+    persona: PersonaService
     settings: SettingsService
     generation: GenerationService
     config_ops: ConfigService
@@ -76,7 +76,7 @@ def build_services(config: ServiceConfig, engines: list[TtsEngine] | None = None
         engines=engine_svc,
         voices=voice_svc,
         profiles=ProfileService(store, engine_svc, voice_svc),
-        personas=PersonaService(store, voice_svc),
+        persona=PersonaService(store, voice_svc),
         settings=settings_svc,
         generation=GenerationService(store, engine_svc, settings_svc),
         config_ops=ConfigService(store, engine_svc, config.config_dir, config.backup_dir),

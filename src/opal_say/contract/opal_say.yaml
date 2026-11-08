@@ -57,8 +57,8 @@ tags:
     profile explicitly.
 
     '
-- name: personas
-  description: 'Manage named personas: identities that bind a registered voice so requests can
+- name: persona
+  description: 'Manage named persona: identities that bind a registered voice so requests can
 
     select a consistent character with a single `persona` field. The schema is kept
 
@@ -904,12 +904,12 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
-  /api/v1/personas/:
+  /api/v1/persona/:
     get:
       tags:
-      - personas
+      - persona
       summary: List Personas
-      description: 'List registered OPAL personas. A persona is a named character that binds a
+      description: 'List registered OPAL persona. A persona is a named character that binds a
 
         registered voice (and, in future contract versions, per-service fragments for
 
@@ -921,7 +921,7 @@ paths:
         Return the complete bounded configuration collection; pagination is not supported.
 
         '
-      operationId: list_personas_api_v1_personas__get
+      operationId: list_persona_api_v1_persona__get
       parameters:
       - name: enabled
         in: query
@@ -935,7 +935,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '200':
-          description: Registered personas.
+          description: Registered persona.
           content:
             application/json:
               schema:
@@ -959,7 +959,7 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
     post:
       tags:
-      - personas
+      - persona
       summary: Create Persona
       description: 'Register a persona that binds a registered voice to a stable identity.
 
@@ -970,7 +970,7 @@ paths:
         binding. Strong If-Match is mandatory.
 
         '
-      operationId: create_persona_api_v1_personas__post
+      operationId: create_persona_api_v1_persona__post
       requestBody:
         required: true
         content:
@@ -1044,7 +1044,7 @@ paths:
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
     - $ref: '#/components/parameters/OpalRequestIdParameter'
     - $ref: '#/components/parameters/OpalCausationIdParameter'
-  /api/v1/personas/{persona_id}:
+  /api/v1/persona/{persona_id}:
     parameters:
     - $ref: '#/components/parameters/PersonaId'
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -1053,10 +1053,10 @@ paths:
     - $ref: '#/components/parameters/OpalCausationIdParameter'
     get:
       tags:
-      - personas
+      - persona
       summary: Get Persona
       description: Return one registered persona.
-      operationId: get_persona_api_v1_personas__persona_id__get
+      operationId: get_persona_api_v1_persona__persona_id__get
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1087,10 +1087,10 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
     patch:
       tags:
-      - personas
+      - persona
       summary: Update Persona
       description: Partially update a persona. If `voice_id` changes, the new voice must resolve. Strong If-Match is mandatory.
-      operationId: update_persona_api_v1_personas__persona_id__patch
+      operationId: update_persona_api_v1_persona__persona_id__patch
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -1131,10 +1131,10 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
     delete:
       tags:
-      - personas
+      - persona
       summary: Delete Persona
       description: Remove a persona. The bound voice registration is unaffected. Strong If-Match is mandatory.
-      operationId: delete_persona_api_v1_personas__persona_id__delete
+      operationId: delete_persona_api_v1_persona__persona_id__delete
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       responses:

@@ -5,8 +5,8 @@ import { pcmToWav } from '../audio'
 import { AUDIO_HEADERS, ENGINE, PROFILE, VOICE, audio, json, mockApi } from './mockApi'
 
 const BASE_ROUTES = {
-  'GET /': { name: 'opal-say-svc', version: '1.4.0', api_version: 'v1' },
-  'GET /healthz': { status: 'ok' },
+  'GET /api/v1/info/': { name: 'opal-say-svc', version: '1.4.0', api_version: 'v1' },
+  'GET /api/v1/info/ping': { status: 'ok' },
   'GET /api/v1/profiles/': [PROFILE],
   'GET /api/v1/voices/': [VOICE],
   'GET /api/v1/engines/': [ENGINE],

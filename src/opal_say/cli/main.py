@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from opal_say.cli.client import api_url_from_env
-from opal_say.cli.commands import backup, engines, generate, personas, profiles, root, settings, voices
+from opal_say.cli.commands import backup, engines, generate, persona, profiles, root, settings, voices
 from opal_say.cli.common import CliState, client_factory  # noqa: F401 - re-exported; tests patch main.client_factory
 
 # REST operationId -> CLI command (relative to `opal say`). Verified by the parity tests.
@@ -27,11 +27,11 @@ COMMANDS: dict[str, str] = {
     "opal_profile_patch": "profiles update",
     "opal_profile_delete": "profiles remove",
     "opal_profile_activate": "profiles activate",
-    "list_personas_api_v1_personas__get": "personas list",
-    "create_persona_api_v1_personas__post": "personas add",
-    "get_persona_api_v1_personas__persona_id__get": "personas get",
-    "update_persona_api_v1_personas__persona_id__patch": "personas update",
-    "delete_persona_api_v1_personas__persona_id__delete": "personas remove",
+    "list_persona_api_v1_persona__get": "persona list",
+    "create_persona_api_v1_persona__post": "persona add",
+    "get_persona_api_v1_persona__persona_id__get": "persona get",
+    "update_persona_api_v1_persona__persona_id__patch": "persona update",
+    "delete_persona_api_v1_persona__persona_id__delete": "persona remove",
     "generate_audio_api_v1_generate_post": "generate",
     "stream_audio_api_v1_generate_stream_post": "generate --stream",
     "opal_settings_get": "settings list",
@@ -75,7 +75,7 @@ def say_callback(
     ctx.obj = CliState(client_factory(api_url or api_url_from_env(), timeout), json_output)
 
 
-for _module in (engines, voices, profiles, personas, generate, settings, backup, root):
+for _module in (engines, voices, profiles, persona, generate, settings, backup, root):
     _module.register(say_app)
 
 
