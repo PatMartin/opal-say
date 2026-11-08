@@ -391,39 +391,39 @@ async def stream_audio(request: Request, body: GenerateStreamRequest, svc: Servi
     return _PcmStreamResponse(stream, media_type="application/octet-stream", headers=plan.headers("pcm"))
 
 
-# -- settings --------------------------------------------------------------------
+# -- setting --------------------------------------------------------------------
 
 
-@router.get("/api/v1/settings/", tags=["settings"], operation_id="opal_settings_get")
-def get_all_settings(response: Response, svc: Services = Depends(services)) -> dict[str, Any]:
+@router.get("/api/v1/setting/", tags=["setting"], operation_id="opal_settings_get")
+def get_all_setting(response: Response, svc: Services = Depends(services)) -> dict[str, Any]:
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.settings.all()
+    return svc.setting.all()
 
 
-@router.patch("/api/v1/settings/", tags=["settings"], operation_id="opal_settings_patch")
-def patch_settings(body: dict[str, Any] = Body(min_length=1), if_match: str | None = Header(None),
+@router.patch("/api/v1/setting/", tags=["setting"], operation_id="opal_settings_patch")
+def patch_setting(body: dict[str, Any] = Body(min_length=1), if_match: str | None = Header(None),
                    svc: Services = Depends(services)) -> dict[str, Any]:
-    return mutate_with_revision(svc.store, if_match, lambda: svc.settings.patch(body))
+    return mutate_with_revision(svc.store, if_match, lambda: svc.setting.patch(body))
 
 
-@router.get("/api/v1/settings/{key}", tags=["settings"], operation_id="opal_setting_get",
+@router.get("/api/v1/setting/{key}", tags=["setting"], operation_id="opal_setting_get",
             response_model=SettingRead)
 def get_setting(response: Response, key: str = SettingKey, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.settings.get(key)
+    return svc.setting.get(key)
 
 
-@router.put("/api/v1/settings/{key}", tags=["settings"], operation_id="opal_setting_put",
+@router.put("/api/v1/setting/{key}", tags=["setting"], operation_id="opal_setting_put",
             response_model=SettingRead)
 def upsert_setting(body: SettingUpdate, key: str = SettingKey, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.settings.upsert(key, body.value))
+    return mutate_with_revision(svc.store, if_match, lambda: svc.setting.upsert(key, body.value))
 
 
-@router.delete("/api/v1/settings/{key}", tags=["settings"], operation_id="opal_setting_delete",
+@router.delete("/api/v1/setting/{key}", tags=["setting"], operation_id="opal_setting_delete",
                status_code=204)
 def delete_setting(key: str = SettingKey, if_match: str | None = Header(None), svc: Services = Depends(services)):
-    mutate_with_revision(svc.store, if_match, lambda: svc.settings.delete(key))
+    mutate_with_revision(svc.store, if_match, lambda: svc.setting.delete(key))
     return Response(status_code=204)
 
 

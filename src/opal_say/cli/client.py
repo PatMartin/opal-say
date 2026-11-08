@@ -88,7 +88,7 @@ class ApiClient:
             raise ApiCallError(resp.status_code, body)
 
     def _config_etag(self) -> str:
-        return self.http.get("/api/v1/settings/").headers.get("ETag", "")
+        return self.http.get("/api/v1/setting/").headers.get("ETag", "")
 
     def call(
         self,

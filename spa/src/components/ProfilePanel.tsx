@@ -21,7 +21,7 @@ const EMPTY: ProfileForm = {
 
 export function ProfilePanel() {
   const profile = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
-  const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get'), [])
+  const voices = useLoad(() => call<Voice[]>('list_voice_api_v1_voice__get'), [])
   const [form, setForm] = useState<ProfileForm>(EMPTY)
   const [editing, setEditing] = useState<number | null>(null)
   const [selected, setSelected] = useState<Profile | null>(null)

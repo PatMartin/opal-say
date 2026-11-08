@@ -97,23 +97,23 @@
   },
   "opal_settings_get": {
     "method": "GET",
-    "path": "/api/v1/settings/"
+    "path": "/api/v1/setting/"
   },
   "opal_settings_patch": {
     "method": "PATCH",
-    "path": "/api/v1/settings/"
+    "path": "/api/v1/setting/"
   },
   "opal_setting_get": {
     "method": "GET",
-    "path": "/api/v1/settings/{key}"
+    "path": "/api/v1/setting/{key}"
   },
   "opal_setting_put": {
     "method": "PUT",
-    "path": "/api/v1/settings/{key}"
+    "path": "/api/v1/setting/{key}"
   },
   "opal_setting_delete": {
     "method": "DELETE",
-    "path": "/api/v1/settings/{key}"
+    "path": "/api/v1/setting/{key}"
   },
   "opal_health_get": {
     "method": "GET",

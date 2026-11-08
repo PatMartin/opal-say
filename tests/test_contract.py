@@ -236,12 +236,12 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.post("/api/v1/generate", json={"text": "Hello there."}).status_code == 200
     assert c.post("/api/v1/generate/stream", json={"text": "Hello there."}).status_code == 200
 
-    assert c.put("/api/v1/settings/greeting", json={"value": "hi"}).status_code == 200
-    assert c.get("/api/v1/settings/").json() == {"greeting": "hi"}
-    assert c.get("/api/v1/settings/greeting").status_code == 200
-    assert c.patch("/api/v1/settings/", json={"greeting": None, "other": "x"}).status_code == 200
-    assert c.get("/api/v1/settings/").json() == {"other": "x"}
-    assert c.delete("/api/v1/settings/other").status_code == 204
+    assert c.put("/api/v1/setting/greeting", json={"value": "hi"}).status_code == 200
+    assert c.get("/api/v1/setting/").json() == {"greeting": "hi"}
+    assert c.get("/api/v1/setting/greeting").status_code == 200
+    assert c.patch("/api/v1/setting/", json={"greeting": None, "other": "x"}).status_code == 200
+    assert c.get("/api/v1/setting/").json() == {"other": "x"}
+    assert c.delete("/api/v1/setting/other").status_code == 204
 
     assert c.get("/api/v1/health/live").json() == {"status": "ok", "ready": True}
     assert c.get("/api/v1/health/ready").json()["ready"] is True

@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from opal_say.cli.client import api_url_from_env
-from opal_say.cli.commands import backup, engine, generate, persona, profile, root, settings, voice
+from opal_say.cli.commands import backup, engine, generate, persona, profile, root, setting, voice
 from opal_say.cli.common import CliState, client_factory  # noqa: F401 - re-exported; tests patch main.client_factory
 
 # REST operationId -> CLI command (relative to `opal say`). Verified by the parity tests.
@@ -34,14 +34,14 @@ COMMANDS: dict[str, str] = {
     "delete_persona_api_v1_persona__persona_id__delete": "persona remove",
     "generate_audio_api_v1_generate_post": "generate",
     "stream_audio_api_v1_generate_stream_post": "generate --stream",
-    "opal_settings_get": "settings list",
-    "opal_setting_get": "settings get",
-    "opal_setting_put": "settings set",
-    "opal_setting_delete": "settings delete",
+    "opal_settings_get": "setting list",
+    "opal_setting_get": "setting get",
+    "opal_setting_put": "setting set",
+    "opal_setting_delete": "setting delete",
     "opal_health_get": "info health",
     "opal_health_live_get": "info live",
     "opal_health_ready_get": "info ready",
-    "opal_settings_patch": "settings patch",
+    "opal_settings_patch": "setting patch",
     "opal_backup_validate": "backup validate --payload",
     "opal_backup_list": "backup list",
     "opal_backup_create": "backup create",
@@ -75,7 +75,7 @@ def say_callback(
     ctx.obj = CliState(client_factory(api_url or api_url_from_env(), timeout), json_output)
 
 
-for _module in (engine, voice, profile, persona, generate, settings, backup, root):
+for _module in (engine, voice, profile, persona, generate, setting, backup, root):
     _module.register(say_app)
 
 

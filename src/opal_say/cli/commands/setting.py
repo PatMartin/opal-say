@@ -1,4 +1,4 @@
-"""`opal say settings ...` — service-wide key/value settings."""
+"""`opal say setting ...` — service-wide key/value setting."""
 
 from __future__ import annotations
 
@@ -9,23 +9,23 @@ import typer
 
 from opal_say.cli.common import _call, _emit
 
-settings_app = typer.Typer(help="Service-wide key/value settings.", no_args_is_help=True)
+setting_app = typer.Typer(help="Service-wide key/value setting.", no_args_is_help=True)
 
 
-@settings_app.command("list")
-def settings_list(ctx: typer.Context) -> None:
-    """Show all stored settings."""
+@setting_app.command("list")
+def setting_list(ctx: typer.Context) -> None:
+    """Show all stored setting."""
     _emit(ctx, _call(ctx, "opal_settings_get").json())
 
 
-@settings_app.command("get")
-def settings_get(ctx: typer.Context, key: str) -> None:
+@setting_app.command("get")
+def setting_get(ctx: typer.Context, key: str) -> None:
     """Show one setting."""
     _emit(ctx, _call(ctx, "opal_setting_get", path_params={"key": key}).json())
 
 
-@settings_app.command("set")
-def settings_set(ctx: typer.Context, key: str, value: str) -> None:
+@setting_app.command("set")
+def setting_set(ctx: typer.Context, key: str, value: str) -> None:
     """Create or replace a setting. The value is sent as native JSON when it
     parses as such (`5`, `true`, `{"a": 1}`); otherwise it is sent as a string."""
     try:
@@ -36,20 +36,20 @@ def settings_set(ctx: typer.Context, key: str, value: str) -> None:
                      json={"value": parsed}).json())
 
 
-@settings_app.command("delete")
-def settings_delete(ctx: typer.Context, key: str) -> None:
+@setting_app.command("delete")
+def setting_delete(ctx: typer.Context, key: str) -> None:
     """Delete a setting so the default applies."""
     _call(ctx, "opal_setting_delete", path_params={"key": key})
     typer.echo(f"setting '{key}' deleted")
 
 
-@settings_app.command("patch")
-def settings_patch(ctx: typer.Context, payload: str = typer.Option(
+@setting_app.command("patch")
+def setting_patch(ctx: typer.Context, payload: str = typer.Option(
     ..., "--json", help='JSON object of changes, e.g. \'{"default_speed": 1.2}\' (null deletes a key).'
 )) -> None:
-    """Atomically merge-patch the whole settings document."""
+    """Atomically merge-patch the whole setting document."""
     _emit(ctx, _call(ctx, "opal_settings_patch", json=json.loads(payload)).json())
 
 
 def register(say_app: typer.Typer) -> None:
-    say_app.add_typer(settings_app, name="settings")
+    say_app.add_typer(setting_app, name="setting")

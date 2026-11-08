@@ -30,7 +30,7 @@ class Services:
     voice: VoiceService
     profile: ProfileService
     persona: PersonaService
-    settings: SettingsService
+    setting: SettingsService
     generation: GenerationService
     config_ops: ConfigService
 
@@ -68,7 +68,7 @@ def build_services(config: ServiceConfig, engine: list[TtsEngine] | None = None)
     engine_svc = EngineService(store, runtime)
     engine_svc.bootstrap(config.engines)
     voice_svc = VoiceService(store, engine_svc)
-    settings_svc = SettingsService(store)
+    setting_svc = SettingsService(store)
     services = Services(
         config=config,
         store=store,
@@ -77,8 +77,8 @@ def build_services(config: ServiceConfig, engine: list[TtsEngine] | None = None)
         voice=voice_svc,
         profile=ProfileService(store, engine_svc, voice_svc),
         persona=PersonaService(store, voice_svc),
-        settings=settings_svc,
-        generation=GenerationService(store, engine_svc, settings_svc),
+        setting=setting_svc,
+        generation=GenerationService(store, engine_svc, setting_svc),
         config_ops=ConfigService(store, engine_svc, config.config_dir, config.backup_dir),
     )
     if fresh and config.config_dir.is_dir():

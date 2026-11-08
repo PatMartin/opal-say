@@ -4,7 +4,7 @@ info:
   version: 1.6.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides\
     \ a stable REST contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients\
-    \ interact with OPAL concepts—engine,\nvoice, profile, generation settings, and audio output—without\
+    \ interact with OPAL concepts—engine,\nvoice, profile, generation setting, and audio output—without\
     \ depending on a\nspecific engine's command line, model layout, Python API, or native output format.\n\n\
     Design principles:\n\n* The OpenAPI contract is the public source of truth for service behavior.\n* Engines\
     \ are installed and discovered by the implementation; they are not created\n  or deleted through this API.\n\
@@ -32,8 +32,8 @@ info:
     \ session ID if known and transaction/request IDs. Never trust these values for access control. Propagate\
     \ them into derived ZeroMQ envelope metadata. All identifiers are opaque 1..128-character printable ASCII\
     \ tokens with no control/whitespace characters; client-supplied invalid values yield 422.\nStandard health\
-    \ routes: /api/v1/health/, /api/v1/health/live, /api/v1/health/ready. Settings: GET and PATCH /api/v1/settings/\
-    \ for the whole map, plus GET, PUT and DELETE /api/v1/settings/{key} for individual keys retained\
+    \ routes: /api/v1/health/, /api/v1/health/live, /api/v1/health/ready. Setting: GET and PATCH /api/v1/setting/\
+    \ for the whole map, plus GET, PUT and DELETE /api/v1/setting/{key} for individual keys retained\
     \ for OPAL suite consistency; PATCH is atomic. Mutable configuration uses strong ETags and mandatory If-Match with 428\
     \ missing, 412 stale. For bounded configuration catalogs return full arrays (subject to explicit deployment\
     \ caps); for growing histories use cursor pagination with stable deterministic ordering, opaque next_cursor\
@@ -78,8 +78,8 @@ tags:
     SSML is not supported by version 1 of this contract.
 
     '
-- name: settings
-  description: Service-wide key/value settings.
+- name: setting
+  description: Service-wide key/value setting.
 - name: info
   description: Service identity, version and liveness probes.
 - name: health
@@ -815,7 +815,7 @@ paths:
       description: "Generate completed speech audio from plain text.\n\nThe service may internally split long\
         \ text into multiple engine calls, but it\nMUST preserve the original text order and return one logically\
         \ continuous audio\nresult. Internal chunk boundaries are not part of the public API.\n\nGeneration\
-        \ settings are resolved in this order, from lowest to highest precedence:\n\n1. Service defaults.\n\
+        \ setting are resolved in this order, from lowest to highest precedence:\n\n1. Service defaults.\n\
         2. The active profile, when `profile_id` is omitted and an active profile exists.\n3. The explicitly\
         \ selected `profile_id`, when present.\n4. The `persona`'s bound voice, when `persona` is present\
         \ (voice field only).\n5. Fields supplied directly in this request.\n\nRequest-level\
@@ -909,9 +909,9 @@ paths:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalTransactionIdParameter'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalRequestIdParameter'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
-  /api/v1/settings/:
+  /api/v1/setting/:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/settings_collection'
-  /api/v1/settings/{key}:
+  /api/v1/setting/{key}:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/settings_key'
   /api/v1/health/:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/health'
@@ -1701,7 +1701,7 @@ x-opal-context-standard:
     default_limit: 100
     max_limit: 500
   concurrency:
-    settings_and_config_mutations: strong-etag-if-match-required
+    setting_and_config_mutations: strong-etag-if-match-required
     missing_status: 428
     stale_status: 412
   streaming: Include HTTP context headers before bytes; after headers are sent, failures are represented by

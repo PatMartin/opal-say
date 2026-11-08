@@ -242,15 +242,15 @@ describe('Engine', () => {
   })
 })
 
-describe('Settings and backup', () => {
+describe('Setting and backup', () => {
   it('upserts a setting', async () => {
     const calls = mockApi({
       ...BASE_ROUTES,
-      'GET /api/v1/settings/': {},
-      'PUT /api/v1/settings/chunk_max_chars': { id: 1, key: 'chunk_max_chars', value: 200, updated_at: 'now' },
+      'GET /api/v1/setting/': {},
+      'PUT /api/v1/setting/chunk_max_chars': { id: 1, key: 'chunk_max_chars', value: 200, updated_at: 'now' },
     })
     render(<App />)
-    await openTab('Settings')
+    await openTab('Setting')
     await userEvent.type(screen.getByLabelText('Key'), 'chunk_max_chars')
     await userEvent.type(screen.getByLabelText('Value'), '200')
     await userEvent.click(screen.getByRole('button', { name: 'Set' }))

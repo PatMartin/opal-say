@@ -102,12 +102,12 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     stdout_audio = run("generate Hi --voice v1 -o -").stdout_bytes
     assert stdout_audio[:4] == b"RIFF"
 
-    run("settings set chunk_max_chars 200")
-    assert json.loads(run("settings list").stdout) == {"chunk_max_chars": 200}
-    assert json.loads(run("settings get chunk_max_chars").stdout)["value"] == 200
-    run("settings delete chunk_max_chars")
-    assert json.loads(run("settings patch --json '{\"greeting\": \"hi\"}'").stdout)["greeting"] == "hi"
-    run("settings patch --json '{\"greeting\": null}'")
+    run("setting set chunk_max_chars 200")
+    assert json.loads(run("setting list").stdout) == {"chunk_max_chars": 200}
+    assert json.loads(run("setting get chunk_max_chars").stdout)["value"] == 200
+    run("setting delete chunk_max_chars")
+    assert json.loads(run("setting patch --json '{\"greeting\": \"hi\"}'").stdout)["greeting"] == "hi"
+    run("setting patch --json '{\"greeting\": null}'")
 
     assert "status:" in run("info health").stdout
     assert json.loads(run("--json info live").stdout)["ready"] is True
@@ -173,7 +173,7 @@ def test_tree_command_prints_command_surface():
     result = CliRunner().invoke(cli.app, ["say", "tree"])
     assert result.exit_code == 0
     out = result.stdout
-    for cmd in ("generate", "engine", "voice", "profile", "settings", "backup", "health"):
+    for cmd in ("generate", "engine", "voice", "profile", "setting", "backup", "health"):
         assert cmd in out
     assert "speak" not in out  # hidden default command
     # Required args/options are bare; optional ones are bracketed.

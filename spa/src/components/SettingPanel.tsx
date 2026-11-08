@@ -3,7 +3,7 @@ import { call } from '../api/client'
 import type { Setting } from '../api/types'
 import { ErrorBanner, useAction, useLoad } from './common'
 
-// Settings values are native JSON: `5`, `true`, {"a": 1} send as typed values;
+// Setting values are native JSON: `5`, `true`, {"a": 1} send as typed values;
 // anything that doesn't parse is sent as a plain string.
 function parseValue(text: string): unknown {
   try {
@@ -17,8 +17,8 @@ function formatValue(v: unknown): string {
   return typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)
 }
 
-export function SettingsPanel() {
-  const settings = useLoad(() => call<Record<string, unknown>>('opal_settings_get'), {})
+export function SettingPanel() {
+  const setting = useLoad(() => call<Record<string, unknown>>('opal_settings_get'), {})
   const [key, setKey] = useState('')
   const [value, setValue] = useState('')
   const [detail, setDetail] = useState<Setting | null>(null)
@@ -30,7 +30,7 @@ export function SettingsPanel() {
       setDetail(await call<Setting>('opal_setting_put', { path: { key }, body: { value: parseValue(value) } }))
       setKey('')
       setValue('')
-      await settings.reload()
+      await setting.reload()
     })
   }
 
@@ -40,12 +40,12 @@ export function SettingsPanel() {
   const remove = (k: string) =>
     action.run(async () => {
       await call('opal_setting_delete', { path: { key: k } })
-      await settings.reload()
+      await setting.reload()
     })
 
   return (
     <section>
-      <h2>Settings</h2>
+      <h2>Setting</h2>
       <p className="muted">
         Known keys: max_text_chars, max_audio_bytes, chunk_max_chars, default_speed, default_volume, default_output_format. Values are native JSON (numbers, booleans, objects). Deleting a setting restores its default.
         <button
@@ -61,14 +61,14 @@ export function SettingsPanel() {
                   default_output_format: 'wav',
                 },
               })
-              await settings.reload()
+              await setting.reload()
             })
           }
         >
           Reset to defaults
         </button>
       </p>
-      <ErrorBanner error={settings.error} />
+      <ErrorBanner error={setting.error} />
       <table>
         <thead>
           <tr>
@@ -78,7 +78,7 @@ export function SettingsPanel() {
           </tr>
         </thead>
         <tbody>
-          {Object.entries(settings.data).map(([k, v]) => (
+          {Object.entries(setting.data).map(([k, v]) => (
             <tr key={k}>
               <td>{k}</td>
               <td className="mono">{formatValue(v)}</td>

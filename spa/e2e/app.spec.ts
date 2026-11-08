@@ -66,7 +66,7 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     if (method === 'GET' && path === '/api/v1/engine/') return json(route, [engine])
     if (method === 'GET' && path === '/api/v1/voice/') return json(route, [voice])
     if (method === 'GET' && path === '/api/v1/profile/') return json(route, [profile])
-    if (method === 'GET' && path === '/api/v1/settings/') return json(route, { greeting: 'hi' })
+    if (method === 'GET' && path === '/api/v1/setting/') return json(route, { greeting: 'hi' })
     if (method === 'GET' && path === '/api/v1/backup/list') return json(route, [])
 
     if (path === '/api/v1/persona/') {
@@ -122,7 +122,7 @@ test('navigates every tab', async ({ page }) => {
     Profile: /^Profile$/,
     Persona: /^Persona$/,
     Engine: /^Engine$/,
-    Settings: /^Settings$/,
+    Setting: /^Setting$/,
     Backup: /^Backup/,
     Health: /^Health$/,
   }

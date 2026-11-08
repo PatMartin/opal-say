@@ -108,7 +108,7 @@ def _needs_if_match(method: str, url: str) -> bool:
         ("/api/v1/engine/", "/api/v1/voice/", "/api/v1/profile/", "/api/v1/persona/")
     ):
         return True
-    if m in {"PUT", "DELETE", "PATCH"} and url.startswith("/api/v1/settings/"):
+    if m in {"PUT", "DELETE", "PATCH"} and url.startswith("/api/v1/setting/"):
         return True
     if m == "POST":
         return (
@@ -130,7 +130,7 @@ class ContractClient(TestClient):
     """
 
     def _config_etag(self) -> str:
-        return self.get("/api/v1/settings/").headers["etag"]
+        return self.get("/api/v1/setting/").headers["etag"]
 
     def _auto_if_match(self, method: str, url, kwargs: dict) -> None:
         if not getattr(self, "skip_if_match", False) and _needs_if_match(method, str(url)):

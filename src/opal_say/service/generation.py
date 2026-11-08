@@ -1,4 +1,4 @@
-"""Engine-neutral generation: settings resolution, chunking, resampling, gain and encoding."""
+"""Engine-neutral generation: setting resolution, chunking, resampling, gain and encoding."""
 
 from __future__ import annotations
 
@@ -89,22 +89,22 @@ def translate_engine_error(exc: Exception) -> Exception:
 
 
 class GenerationService:
-    def __init__(self, store: Store, engine: EngineService, settings: SettingsService):
+    def __init__(self, store: Store, engine: EngineService, setting: SettingsService):
         self.store = store
         self.engine = engine
-        self.settings = settings
+        self.setting = setting
         # Per-engine serialization is owned by EngineRuntimeManager (engine.runtime).
 
     # -- resolution -----------------------------------------------------------
 
     def _check_text(self, text: str) -> list[str]:
-        limit = self.settings.effective("max_text_chars")
+        limit = self.setting.effective("max_text_chars")
         if len(text) > limit:
             raise PayloadTooLarge(
                 f"text length {len(text)} exceeds the configured maximum of {limit} characters",
                 details={"max_text_chars": limit, "text_length": len(text)},
             )
-        chunks = chunk_text(text, self.settings.effective("chunk_max_chars"))
+        chunks = chunk_text(text, self.setting.effective("chunk_max_chars"))
         if not chunks:
             raise InvalidRequest.single(["body", "text"], "text contains nothing to speak", input_=text)
         return chunks
@@ -232,7 +232,7 @@ class GenerationService:
             output_format = _first(
                 getattr(req, "output_format", None),
                 p.get("output_format"),
-                self.settings.effective("default_output_format"),
+                self.setting.effective("default_output_format"),
             )
             # Profile engine_options are engine-specific; they only apply when routing stays on the profile voice's engine.
             profile_options: dict[str, Any] = {}
@@ -245,8 +245,8 @@ class GenerationService:
                 voice=voice,
                 engine=engine,
                 profile=profile,
-                speed=_first(req.speed, p.get("speed"), self.settings.effective("default_speed")),
-                volume=_first(req.volume, p.get("volume"), self.settings.effective("default_volume")),
+                speed=_first(req.speed, p.get("speed"), self.setting.effective("default_speed")),
+                volume=_first(req.volume, p.get("volume"), self.setting.effective("default_volume")),
                 output_format=output_format,
                 sample_rate=_first(req.sample_rate, p.get("sample_rate")),
                 option_layers=[voice["engine_options"], profile_options, req.engine_options],
@@ -320,7 +320,7 @@ class GenerationService:
         incrementally and is governed by text and runtime resource limits —
         `max_text_chars`, inference permits — not this output-size limit.
         """
-        limit = int(self.settings.effective("max_audio_bytes"))
+        limit = int(self.setting.effective("max_audio_bytes"))
         pcm_budget = limit - (WAV_HEADER_BYTES if plan.output_format == "wav" else 0)
         total, blocks = 0, []
         try:

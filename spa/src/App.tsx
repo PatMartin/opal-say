@@ -8,7 +8,7 @@ import { GeneratePanel } from './components/GeneratePanel'
 import { HealthPanel } from './components/HealthPanel'
 import { PersonaPanel } from './components/PersonaPanel'
 import { ProfilePanel } from './components/ProfilePanel'
-import { SettingsPanel } from './components/SettingsPanel'
+import { SettingPanel } from './components/SettingPanel'
 import { VoicePanel } from './components/VoicePanel'
 
 const TABS = {
@@ -17,7 +17,7 @@ const TABS = {
   Profile: ProfilePanel,
   Persona: PersonaPanel,
   Engine: EnginePanel,
-  Settings: SettingsPanel,
+  Setting: SettingPanel,
   Backup: BackupPanel,
   Health: HealthPanel,
 } as const
