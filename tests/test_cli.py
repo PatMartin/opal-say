@@ -84,6 +84,15 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert json.loads(run(f"profiles activate {p2['id']}").stdout)["is_active"] is True
     run(f"profiles remove {p['id']}")
 
+    run('personas add amy --name "Amy" --voice v1')
+    assert "amy" in run("personas list").stdout
+    assert json.loads(run("personas get amy").stdout)["voice_id"] == "v1"
+    assert json.loads(run("personas update amy --description warm").stdout)["description"] == "warm"
+    persona_wav = tmp_path / "persona.wav"
+    run(f'generate "as Amy" --persona amy -o {persona_wav.as_posix()}')
+    assert persona_wav.stat().st_size > 0
+    run("personas remove amy")
+
     pcm = tmp_path / "out.pcm"
     result = run(f'generate "Hello there. General Kenobi." -o {pcm.as_posix()} --format pcm --sample-rate 8000')
     assert pcm.stat().st_size > 0 and "8000 Hz" in result.stderr

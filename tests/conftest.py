@@ -104,13 +104,16 @@ class FakeEngine(TtsEngine):
 def _needs_if_match(method: str, url: str) -> bool:
     """Configuration mutations carrying the mandatory If-Match precondition."""
     m = method.upper()
-    if m in {"PATCH", "DELETE"} and url.startswith(("/api/v1/engines/", "/api/v1/voices/", "/api/v1/profiles/")):
+    if m in {"PATCH", "DELETE"} and url.startswith(
+        ("/api/v1/engines/", "/api/v1/voices/", "/api/v1/profiles/", "/api/v1/personas/")
+    ):
         return True
     if m in {"PUT", "DELETE", "PATCH"} and url.startswith("/api/v1/settings/"):
         return True
     if m == "POST":
         return (
             url == "/api/v1/voices/"
+            or url == "/api/v1/personas/"
             or url == "/api/v1/profiles/"
             or url == "/api/v1/backup/import"
             or url.startswith("/api/v1/backup/restore/")

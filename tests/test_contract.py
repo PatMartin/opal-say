@@ -226,6 +226,13 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.post(f"/api/v1/profiles/{p2['id']}/activate").status_code == 200
     assert c.delete(f"/api/v1/profiles/{p1['id']}").status_code == 204
 
+    assert c.post("/api/v1/personas/", json={"persona_id": "amy", "name": "Amy", "voice_id": "v2"}).status_code == 201
+    assert c.get("/api/v1/personas/").status_code == 200
+    assert c.get("/api/v1/personas/amy").status_code == 200
+    assert c.patch("/api/v1/personas/amy", json={"description": "warm"}).status_code == 200
+    assert c.post("/api/v1/generate", json={"text": "Hello there.", "persona": "amy"}).status_code == 200
+    assert c.delete("/api/v1/personas/amy").status_code == 204
+
     assert c.post("/api/v1/generate", json={"text": "Hello there."}).status_code == 200
     assert c.post("/api/v1/generate/stream", json={"text": "Hello there."}).status_code == 200
 
