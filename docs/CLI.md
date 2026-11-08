@@ -22,15 +22,16 @@ player such as `aplay`, and — when the optional `audio` extra is installed —
 5. [`engines`: engine discovery and configuration](#5-engines-engine-discovery-and-configuration)
 6. [`voices`: voice registrations](#6-voices-voice-registrations)
 7. [`profiles`: generation profiles](#7-profiles-generation-profiles)
-8. [`generate`: speech generation and streaming](#8-generate-speech-generation-and-streaming)
-9. [`settings`: service settings](#9-settings-service-settings)
-10. [`backup`: backup, restore, import, export and validation](#10-backup-backup-restore-import-export-and-validation)
-11. [`health`, `info`, `ping`: service status](#11-health-info-ping-service-status)
-12. [Engine options reference](#12-engine-options-reference)
-13. [Walkthroughs](#13-walkthroughs)
-14. [Scripting and automation](#14-scripting-and-automation)
-15. [Troubleshooting](#15-troubleshooting)
-16. [Appendix: CLI ↔ REST mapping](#16-appendix-cli--rest-mapping)
+8. [`personas`: named personas](#8-personas-named-personas)
+9. [`generate`: speech generation and streaming](#9-generate-speech-generation-and-streaming)
+10. [`settings`: service settings](#10-settings-service-settings)
+11. [`backup`: backup, restore, import, export and validation](#11-backup-backup-restore-import-export-and-validation)
+12. [`health`, `info`, `ping`: service status](#12-health-info-ping-service-status)
+12. [Engine options reference](#13-engine-options-reference)
+13. [Walkthroughs](#14-walkthroughs)
+14. [Scripting and automation](#15-scripting-and-automation)
+15. [Troubleshooting](#16-troubleshooting)
+16. [Appendix: CLI ↔ REST mapping](#17-appendix-cli--rest-mapping)
 
 ---
 
@@ -173,6 +174,7 @@ Error: cannot reach OPAL Say API: [Errno 111] Connection refused
 | Engine | `engine_id`, fixed by the adapter | `piper`, `kokoro` |
 | Voice | `voice_id`, chosen when you register it | `en-us-amy-low`, `kokoro-af-heart` |
 | Profile | Numeric `id` **only** (not the name) | `opal say profiles get 3` |
+| Persona | `persona_id` string | `opal say personas get amy` |
 | Setting | Key | `max_text_chars` |
 | Backup | Filename | `opal-say-2026-10-12T162205Z.tar.gz` |
 
@@ -240,7 +242,7 @@ used). These values come from the `X-Opal-*` response headers.
   number, `true`/`false` a boolean, `null` a null, and `'"~/dir"'` a string. Anything that isn't valid
   JSON is kept as a plain string, so `-O lang=fr-fr` works without extra quotes. When both are given,
   `--options-json` is applied first, then each `-O` on top of it. See
-  [12. Engine options reference](#12-engine-options-reference) for the keys each engine accepts.
+  [12. Engine options reference](#13-engine-options-reference) for the keys each engine accepts.
 - **Boolean flag pairs.** `--enabled/--disabled` (voices), `--enable/--disable` (engines) and
   `--active/--inactive` (profile `update`). In `update` commands, leaving out both flags keeps the
   current value.
@@ -311,6 +313,7 @@ opal (or opal-say, which starts at 'say')
     ├── engines   list | get | update | validate
     ├── voices    list | get | add | update | remove | validate | test
     ├── profiles  list | get | add | update | remove | activate
+    ├── personas  list | get | add | update | remove
     ├── TEXT      speaks aloud (shortcut for 'speak': generate + play)
     ├── generate  TEXT [-o OUT] [--stream] [--play] ...
     ├── speak     TEXT [-o OUT] [--stream] [--play/--no-play] ...   (hidden; 'say TEXT' routes here)
@@ -694,7 +697,30 @@ opal say profiles remove 4
 
 ---
 
-## 8. `generate`: speech generation and streaming
+## 8. `personas`: named personas
+
+A persona is a named character bound to a registered voice. Passing `--persona ID` to
+`speak`/`generate` selects that persona's voice; an explicit `--voice` still wins, and the
+persona voice beats the profile voice. Unknown or disabled personas are rejected with 422.
+
+| Command | Description |
+|---|---|
+| `list` | List personas (`--enabled`/`--disabled` to filter) |
+| `get ID` | Show one persona as JSON |
+| `add ID --name N --voice V [OPTIONS]` | Create a persona bound to a registered voice |
+| `update ID [OPTIONS]` | Partially update (`--name`, `--voice`, `--description`/`--clear-description`, `--enabled`/`--disabled`) |
+| `remove ID` | Delete a persona (the voice registration is unaffected) |
+
+```bash
+opal say personas add amy --name "Amy" --voice en-gb-alan-low
+opal say personas list
+opal say "Hello, I am Amy." --persona amy
+opal say "same persona, different voice" --persona amy --voice en-us-ryan-medium
+```
+
+---
+
+## 9. `generate`: speech generation and streaming
 
 `opal say TEXT` is the shortcut for the common case — it generates and **plays the audio locally**
 without `-o`. It accepts all the options below plus `--play/--no-play`. These are equivalent:
@@ -765,7 +791,7 @@ Raw PCM has no header, so you need the sample rate to play it. The summary line 
 `opal say voices list` shows each voice's native rate. To avoid guessing, pass `--sample-rate`.
 
 Long text is split internally into chunks at sentence boundaries (at most `chunk_max_chars` characters
-each; see [settings](#9-settings-service-settings)). The chunks are joined seamlessly and the
+each; see [settings](#10-settings-service-settings)). The chunks are joined seamlessly and the
 boundaries are not visible in the output. Text longer than `max_text_chars` is rejected with `413`.
 
 ### Examples
@@ -852,7 +878,7 @@ ffmpeg -f s16le -ar 16000 -ac 1 -i s.pcm s.wav
 
 ---
 
-## 9. `settings`: service settings
+## 10. `settings`: service settings
 
 Settings are service-wide key/value pairs whose values are **native JSON** — numbers, booleans and
 objects round-trip with their type. Known keys are validated when you set them (a string that parses
@@ -921,7 +947,7 @@ opal say settings delete default_speed
 
 ---
 
-## 10. `backup`: backup, restore, import, export and validation
+## 11. `backup`: backup, restore, import, export and validation
 
 | Command | Description |
 |---|---|
@@ -1093,7 +1119,7 @@ The service also runs this import automatically on its first start, when the dat
 
 ---
 
-## 11. `health`, `info`, `ping`: service status
+## 12. `health`, `info`, `ping`: service status
 
 | Command | Description |
 |---|---|
@@ -1139,7 +1165,7 @@ opal say --json health | jq -r .status
 
 ---
 
-## 12. Engine options reference
+## 13. Engine options reference
 
 `engine_options` are opaque to the service core. Each adapter declares which keys it accepts, and at
 which **scope**:
@@ -1188,7 +1214,7 @@ Kokoro always generates audio at 24 kHz and supports speed `0.5`–`2.0` only. O
 
 ---
 
-## 13. Walkthroughs
+## 14. Walkthroughs
 
 ### 13.1 Full tour
 
@@ -1342,7 +1368,7 @@ opal say backup validate
 
 ---
 
-## 14. Scripting and automation
+## 15. Scripting and automation
 
 ### JSON output with `jq`
 
@@ -1425,7 +1451,7 @@ See the [User Guide](USER_GUIDE.md#10-integrating-with-your-application) for str
 
 ---
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
@@ -1437,7 +1463,7 @@ See the [User Guide](USER_GUIDE.md#10-integrating-with-your-application) for str
 | `Invalid value for 'profile_id': 'narrator' is not a valid int` | Profiles are addressed by id. Look it up with `opal say profiles list`. |
 | `Invalid value: nothing to update` | `update` was called without any change option. |
 | `422 ... engine_voice_ref: Piper voice model 'x' could not be resolved` | The model isn't in `voices_dir`, or the path is wrong. Check `opal say engines get piper` and the files on the **service** host. |
-| `422 ... unsupported option 'k' (allowed: [...])` | That key isn't valid for this engine at this scope. See [12. Engine options](#12-engine-options-reference). |
+| `422 ... unsupported option 'k' (allowed: [...])` | That key isn't valid for this engine at this scope. See [12. Engine options](#13-engine-options-reference). |
 | `422 ... option 'k' must be of type int` | `-O` values are JSON. Write `-O cache_size=8`, not `-O cache_size='"8"'`. To pass a string that looks like JSON, quote it: `-O speaker='"3922"'`. |
 | `409 unsupported_speed` | The engine doesn't support that speed (Kokoro: `0.5`–`2.0`). Check the request, the profile, and `default_speed`. |
 | `409 no_voice` | No active profile. Activate one, or pass `--voice` / `--profile`. |
@@ -1455,7 +1481,7 @@ See the [User Guide](USER_GUIDE.md#10-integrating-with-your-application) for str
 
 ---
 
-## 16. Appendix: CLI ↔ REST mapping
+## 17. Appendix: CLI ↔ REST mapping
 
 All paths are relative to the API base URL. The operation ids are the `operationId`s in the OpenAPI
 contract. The parity tests check that the CLI covers every operation.
@@ -1479,6 +1505,11 @@ contract. The parity tests check that the CLI covers every operation.
 | `profiles update` | `PATCH /api/v1/profiles/{profile_id}` | `update_profile_api_v1_profiles__profile_id__patch` |
 | `profiles remove` | `DELETE /api/v1/profiles/{profile_id}` | `delete_profile_api_v1_profiles__profile_id__delete` |
 | `profiles activate` | `POST /api/v1/profiles/{profile_id}/activate` | `activate_profile_api_v1_profiles__profile_id__activate_post` |
+| `personas list` | `GET /api/v1/personas/` | `list_personas_api_v1_personas__get` |
+| `personas add` | `POST /api/v1/personas/` | `create_persona_api_v1_personas__post` |
+| `personas get` | `GET /api/v1/personas/{persona_id}` | `get_persona_api_v1_personas__persona_id__get` |
+| `personas update` | `PATCH /api/v1/personas/{persona_id}` | `update_persona_api_v1_personas__persona_id__patch` |
+| `personas remove` | `DELETE /api/v1/personas/{persona_id}` | `delete_persona_api_v1_personas__persona_id__delete` |
 | `generate` | `POST /api/v1/generate` | `generate_audio_api_v1_generate_post` |
 | `generate --stream` | `POST /api/v1/generate/stream` | `stream_audio_api_v1_generate_stream_post` |
 | `settings list` | `GET /api/v1/settings/` | `get_all_settings_api_v1_settings__get` |
