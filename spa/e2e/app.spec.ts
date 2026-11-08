@@ -64,7 +64,7 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     if (method === 'GET' && path === '/api/v1/health/live') return json(route, { status: 'ok', ready: true })
     if (method === 'GET' && path === '/api/v1/health/ready') return json(route, { status: 'ok', ready: true })
     if (method === 'GET' && path === '/api/v1/engine/') return json(route, [engine])
-    if (method === 'GET' && path === '/api/v1/voices/') return json(route, [voice])
+    if (method === 'GET' && path === '/api/v1/voice/') return json(route, [voice])
     if (method === 'GET' && path === '/api/v1/profiles/') return json(route, [profile])
     if (method === 'GET' && path === '/api/v1/settings/') return json(route, { greeting: 'hi' })
     if (method === 'GET' && path === '/api/v1/backup/list') return json(route, [])
@@ -118,7 +118,7 @@ test.beforeEach(async ({ page }) => {
 test('navigates every tab', async ({ page }) => {
   const tabs: Record<string, RegExp> = {
     Generate: /^Generate$/,
-    Voices: /^Voices$/,
+    Voice: /^Voice$/,
     Profiles: /^Profiles$/,
     Persona: /^Persona$/,
     Engine: /^Engine$/,

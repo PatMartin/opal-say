@@ -211,63 +211,63 @@ def validate_engine(engine_id: str, svc: Services = Depends(services)):
     return report_dict(svc.engine.validate(engine_id))
 
 
-# -- voices ----------------------------------------------------------------------
+# -- voice ----------------------------------------------------------------------
 
 
-@router.get("/api/v1/voices/", tags=["voices"], operation_id="list_voices_api_v1_voices__get",
+@router.get("/api/v1/voice/", tags=["voice"], operation_id="list_voice_api_v1_voice__get",
             response_model=list[VoiceRead])
-def list_voices(
+def list_voice(
     response: Response,
     engine_id: str | None = Query(None, min_length=1),
     enabled: bool | None = Query(None),
     svc: Services = Depends(services),
 ):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.voices.list(engine_id, enabled)
+    return svc.voice.list(engine_id, enabled)
 
 
-@router.post("/api/v1/voices/", tags=["voices"], operation_id="create_voice_api_v1_voices__post",
+@router.post("/api/v1/voice/", tags=["voice"], operation_id="create_voice_api_v1_voice__post",
              response_model=VoiceRead, status_code=201)
 def create_voice(body: VoiceCreate, response: Response, if_match: str | None = Header(None),
                  svc: Services = Depends(services)):
-    voice = mutate_with_revision(svc.store, if_match, lambda: svc.voices.create(body))
-    response.headers["Location"] = f"/api/v1/voices/{voice['voice_id']}"
+    voice = mutate_with_revision(svc.store, if_match, lambda: svc.voice.create(body))
+    response.headers["Location"] = f"/api/v1/voice/{voice['voice_id']}"
     return voice
 
 
-@router.get("/api/v1/voices/{voice_id}", tags=["voices"], operation_id="get_voice_api_v1_voices__voice_id__get",
+@router.get("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="get_voice_api_v1_voice__voice_id__get",
             response_model=VoiceRead)
 def get_voice(voice_id: str, response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.voices.get(voice_id)
+    return svc.voice.get(voice_id)
 
 
-@router.patch("/api/v1/voices/{voice_id}", tags=["voices"], operation_id="update_voice_api_v1_voices__voice_id__patch",
+@router.patch("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="update_voice_api_v1_voice__voice_id__patch",
               response_model=VoiceRead)
 def update_voice(voice_id: str, body: VoiceUpdate, if_match: str | None = Header(None),
                 svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.voices.update(voice_id, body))
+    return mutate_with_revision(svc.store, if_match, lambda: svc.voice.update(voice_id, body))
 
 
-@router.delete("/api/v1/voices/{voice_id}", tags=["voices"],
-               operation_id="delete_voice_api_v1_voices__voice_id__delete", status_code=204)
+@router.delete("/api/v1/voice/{voice_id}", tags=["voice"],
+               operation_id="delete_voice_api_v1_voice__voice_id__delete", status_code=204)
 def delete_voice(voice_id: str, if_match: str | None = Header(None), svc: Services = Depends(services)):
-    mutate_with_revision(svc.store, if_match, lambda: svc.voices.delete(voice_id))
+    mutate_with_revision(svc.store, if_match, lambda: svc.voice.delete(voice_id))
     return Response(status_code=204)
 
 
-@router.post("/api/v1/voices/{voice_id}/validate", tags=["voices"],
-             operation_id="validate_voice_api_v1_voices__voice_id__validate_post", response_model=ValidationResult)
+@router.post("/api/v1/voice/{voice_id}/validate", tags=["voice"],
+             operation_id="validate_voice_api_v1_voice__voice_id__validate_post", response_model=ValidationResult)
 def validate_voice(voice_id: str, svc: Services = Depends(services)):
-    return report_dict(svc.voices.validate(voice_id))
+    return report_dict(svc.voice.validate(voice_id))
 
 
 # Deliberate asymmetry: CRUD handlers are sync `def` (FastAPI runs them in the threadpool
 # automatically); the three audio handlers are `async` because they must control *when* work
 # is dispatched — generate/voice-test produce the first block before 200 is committed, and
 # stream keeps a generator alive for the response body.
-@router.post("/api/v1/voices/{voice_id}/test", tags=["voices"],
-             operation_id="test_voice_api_v1_voices__voice_id__test_post", response_class=Response)
+@router.post("/api/v1/voice/{voice_id}/test", tags=["voice"],
+             operation_id="test_voice_api_v1_voice__voice_id__test_post", response_class=Response)
 async def test_voice(voice_id: str, body: VoiceTestRequest | None = Body(None), svc: Services = Depends(services)):
     plan, data, media_type = await run_in_threadpool(
         svc.generation.test_voice, voice_id, body or VoiceTestRequest()

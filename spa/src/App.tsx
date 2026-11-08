@@ -9,11 +9,11 @@ import { HealthPanel } from './components/HealthPanel'
 import { PersonaPanel } from './components/PersonaPanel'
 import { ProfilesPanel } from './components/ProfilesPanel'
 import { SettingsPanel } from './components/SettingsPanel'
-import { VoicesPanel } from './components/VoicesPanel'
+import { VoicePanel } from './components/VoicePanel'
 
 const TABS = {
   Generate: GeneratePanel,
-  Voices: VoicesPanel,
+  Voice: VoicePanel,
   Profiles: ProfilesPanel,
   Persona: PersonaPanel,
   Engine: EnginePanel,

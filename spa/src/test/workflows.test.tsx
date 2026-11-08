@@ -8,7 +8,7 @@ const BASE_ROUTES = {
   'GET /api/v1/info/': { name: 'opal-say-svc', version: '1.4.0', api_version: 'v1' },
   'GET /api/v1/info/ping': { status: 'ok' },
   'GET /api/v1/profiles/': [PROFILE],
-  'GET /api/v1/voices/': [VOICE],
+  'GET /api/v1/voice/': [VOICE],
   'GET /api/v1/engine/': [ENGINE],
 }
 
@@ -124,24 +124,24 @@ describe('Generate', () => {
   })
 })
 
-describe('Voices', () => {
+describe('Voice', () => {
   it('registers, validates and unregisters a voice', async () => {
     const calls = mockApi({
       ...BASE_ROUTES,
-      'POST /api/v1/voices/': () => json({ ...VOICE, voice_id: 'new' }, 201),
-      'POST /api/v1/voices/amy/validate': { valid: false, errors: [{ code: 'model_not_found', message: 'missing', field: 'engine_voice_ref' }], warnings: [], details: {} },
-      'DELETE /api/v1/voices/amy': () => json(null, 204),
+      'POST /api/v1/voice/': () => json({ ...VOICE, voice_id: 'new' }, 201),
+      'POST /api/v1/voice/amy/validate': { valid: false, errors: [{ code: 'model_not_found', message: 'missing', field: 'engine_voice_ref' }], warnings: [], details: {} },
+      'DELETE /api/v1/voice/amy': () => json(null, 204),
     })
     render(<App />)
-    await openTab('Voices')
+    await openTab('Voice')
     await screen.findByText('en_US-amy-low')
     await userEvent.type(screen.getByLabelText('Voice ID'), 'new')
     await userEvent.type(screen.getByLabelText('Name'), 'New voice')
     await userEvent.selectOptions(screen.getByLabelText('Engine', { selector: 'form select' }), 'piper')
     await userEvent.type(screen.getByLabelText('Engine voice reference'), '/models/new.onnx')
     await userEvent.click(screen.getByRole('button', { name: 'Register' }))
-    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/voices/')).toBe(true))
-    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/voices/')!.body).toEqual({
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/voice/')).toBe(true))
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/voice/')!.body).toEqual({
       voice_id: 'new',
       name: 'New voice',
       engine_id: 'piper',
@@ -156,26 +156,26 @@ describe('Voices', () => {
     await userEvent.click(within(row).getByRole('button', { name: 'Validate' }))
     expect(await screen.findByTestId('validation')).toHaveTextContent('error: model_not_found [engine_voice_ref]: missing')
     await userEvent.click(within(row).getByRole('button', { name: 'Unregister' }))
-    await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/v1/voices/amy')).toBe(true))
+    await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/v1/voice/amy')).toBe(true))
   })
 
   it('filters by engine and enabled state', async () => {
     const calls = mockApi(BASE_ROUTES)
     render(<App />)
-    await openTab('Voices')
+    await openTab('Voice')
     await screen.findByText('en_US-amy-low')
     await userEvent.selectOptions(screen.getByLabelText('State'), 'false')
-    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/voices/' && c.query.get('enabled') === 'false')).toBe(true))
+    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/voice/' && c.query.get('enabled') === 'false')).toBe(true))
   })
 
   it('plays a PCM voice test by wrapping it as WAV', async () => {
     mockApi({
       ...BASE_ROUTES,
-      'POST /api/v1/voices/amy/test': () =>
+      'POST /api/v1/voice/amy/test': () =>
         audio(new Uint8Array(64), { ...AUDIO_HEADERS, 'X-Opal-Audio-Format': 'pcm' }, 'application/octet-stream'),
     })
     render(<App />)
-    await openTab('Voices')
+    await openTab('Voice')
     const row = (await screen.findByText('en_US-amy-low')).closest('tr')!
     await userEvent.click(within(row).getByRole('button', { name: 'Test' }))
     expect(await screen.findByTestId('audio-result')).toHaveTextContent('64 bytes · pcm')

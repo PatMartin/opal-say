@@ -211,12 +211,12 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
 
     make_voice(c, "v1")
     make_voice(c, "v2", ref="tone-b")
-    assert c.get("/api/v1/voices/", params={"engine_id": "fake", "enabled": True}).status_code == 200
-    assert c.get("/api/v1/voices/v1").status_code == 200
-    assert c.patch("/api/v1/voices/v1", json={"name": "Voice One"}).status_code == 200
-    assert c.post("/api/v1/voices/v1/validate").json()["valid"] is True
-    assert c.post("/api/v1/voices/v1/test").status_code == 200
-    assert c.post("/api/v1/voices/v1/test", json={"output_format": "pcm"}).status_code == 200
+    assert c.get("/api/v1/voice/", params={"engine_id": "fake", "enabled": True}).status_code == 200
+    assert c.get("/api/v1/voice/v1").status_code == 200
+    assert c.patch("/api/v1/voice/v1", json={"name": "Voice One"}).status_code == 200
+    assert c.post("/api/v1/voice/v1/validate").json()["valid"] is True
+    assert c.post("/api/v1/voice/v1/test").status_code == 200
+    assert c.post("/api/v1/voice/v1/test", json={"output_format": "pcm"}).status_code == 200
 
     p1 = make_profile(c, "p1", "v1", is_active=True)
     p2 = make_profile(c, "p2", "v2")
@@ -262,7 +262,7 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.post("/api/v1/backup/import").json()["success"] is True
     assert c.delete(f"/api/v1/backup/{filename}").status_code == 204
 
-    assert c.delete("/api/v1/voices/v1").status_code == 204
+    assert c.delete("/api/v1/voice/v1").status_code == 204
 
     missing = set(contract_operations()) - c.seen
     assert not missing, f"operations not exercised: {sorted(missing)}"

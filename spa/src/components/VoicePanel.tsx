@@ -17,18 +17,18 @@ interface VoiceForm {
 
 const EMPTY: VoiceForm = { voice_id: '', name: '', description: '', engine_id: '', engine_voice_ref: '', language: '', enabled: true, options: '' }
 
-export function VoicesPanel() {
+export function VoicePanel() {
   const [engineFilter, setEngineFilter] = useState('')
   const [enabledFilter, setEnabledFilter] = useState('')
-  const voices = useLoad(
-    () => call<Voice[]>('list_voices_api_v1_voices__get', { query: { engine_id: engineFilter, enabled: enabledFilter } }),
+  const voice = useLoad(
+    () => call<Voice[]>('list_voice_api_v1_voice__get', { query: { engine_id: engineFilter, enabled: enabledFilter } }),
     [],
   )
   const engines = useLoad(() => call<Engine[]>('opal_engines_list'), [])
-  const { reload: reloadVoices } = voices
+  const { reload: reloadVoice } = voice
   useEffect(() => {
-    void reloadVoices()
-  }, [engineFilter, enabledFilter, reloadVoices])
+    void reloadVoice()
+  }, [engineFilter, enabledFilter, reloadVoice])
   const [form, setForm] = useState<VoiceForm>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [selected, setSelected] = useState<Voice | null>(null)
@@ -51,13 +51,13 @@ export function VoicesPanel() {
         engine_options: parseOptions(form.options) ?? {},
       }
       if (editing) {
-        await call('update_voice_api_v1_voices__voice_id__patch', { path: { voice_id: editing }, body })
+        await call('update_voice_api_v1_voice__voice_id__patch', { path: { voice_id: editing }, body })
       } else {
-        await call('create_voice_api_v1_voices__post', { body: { voice_id: form.voice_id, ...body } })
+        await call('create_voice_api_v1_voice__post', { body: { voice_id: form.voice_id, ...body } })
       }
       setForm(EMPTY)
       setEditing(null)
-      await voices.reload()
+      await voice.reload()
     })
   }
 
@@ -77,23 +77,23 @@ export function VoicesPanel() {
 
   const show = (id: string) =>
     action.run(async () => {
-      setSelected(await call<Voice>('get_voice_api_v1_voices__voice_id__get', { path: { voice_id: id } }))
+      setSelected(await call<Voice>('get_voice_api_v1_voice__voice_id__get', { path: { voice_id: id } }))
     })
 
   const remove = (id: string) =>
     action.run(async () => {
-      await call('delete_voice_api_v1_voices__voice_id__delete', { path: { voice_id: id } })
-      await voices.reload()
+      await call('delete_voice_api_v1_voice__voice_id__delete', { path: { voice_id: id } })
+      await voice.reload()
     })
 
   const validate = (id: string) =>
     action.run(async () => {
-      setValidation(await call<ValidationResult>('validate_voice_api_v1_voices__voice_id__validate_post', { path: { voice_id: id } }))
+      setValidation(await call<ValidationResult>('validate_voice_api_v1_voice__voice_id__validate_post', { path: { voice_id: id } }))
     })
 
   const test = (id: string) =>
     action.run(async () => {
-      const resp = await callRaw('test_voice_api_v1_voices__voice_id__test_post', { path: { voice_id: id }, body: {} })
+      const resp = await callRaw('test_voice_api_v1_voice__voice_id__test_post', { path: { voice_id: id }, body: {} })
       const meta = audioMeta(resp)
       const raw = new Uint8Array(await resp.arrayBuffer())
       const blob = meta.format === 'pcm' ? pcmToWav(raw, meta.sampleRate) : new Blob([raw], { type: 'audio/wav' })
@@ -102,7 +102,7 @@ export function VoicesPanel() {
 
   return (
     <section>
-      <h2>Voices</h2>
+      <h2>Voice</h2>
       <div className="row">
         <label>
           Engine
@@ -123,11 +123,11 @@ export function VoicesPanel() {
             <option value="false">disabled</option>
           </select>
         </label>
-        <button type="button" onClick={() => void voices.reload()}>
+        <button type="button" onClick={() => void voice.reload()}>
           Refresh
         </button>
       </div>
-      <ErrorBanner error={voices.error} />
+      <ErrorBanner error={voice.error} />
       <table>
         <thead>
           <tr>
@@ -142,7 +142,7 @@ export function VoicesPanel() {
           </tr>
         </thead>
         <tbody>
-          {voices.data.map((v) => (
+          {voice.data.map((v) => (
             <tr key={v.voice_id}>
               <td>{v.voice_id}</td>
               <td>{v.name}</td>

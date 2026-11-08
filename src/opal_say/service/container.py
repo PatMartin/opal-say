@@ -27,7 +27,7 @@ class Services:
     store: Store
     runtime: EngineRuntimeManager
     engine: EngineService
-    voices: VoiceService
+    voice: VoiceService
     profiles: ProfileService
     persona: PersonaService
     settings: SettingsService
@@ -74,7 +74,7 @@ def build_services(config: ServiceConfig, engine: list[TtsEngine] | None = None)
         store=store,
         runtime=runtime,
         engine=engine_svc,
-        voices=voice_svc,
+        voice=voice_svc,
         profiles=ProfileService(store, engine_svc, voice_svc),
         persona=PersonaService(store, voice_svc),
         settings=settings_svc,

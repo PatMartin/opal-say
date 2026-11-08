@@ -1,4 +1,4 @@
-"""`opal say voices ...` — register and manage host-resident voices."""
+"""`opal say voice ...` — register and manage host-resident voice."""
 
 from __future__ import annotations
 
@@ -20,23 +20,23 @@ from opal_say.cli.common import (
     _write_audio,
 )
 
-voices_app = typer.Typer(help="Register and manage host-resident voices.", no_args_is_help=True)
+voice_app = typer.Typer(help="Register and manage host-resident voice.", no_args_is_help=True)
 
 
-@voices_app.command("list")
-def voices_list(
+@voice_app.command("list")
+def voice_list(
     ctx: typer.Context,
-    engine: str = typer.Option(None, "--engine", help="Only voices of this engine"),
+    engine: str = typer.Option(None, "--engine", help="Only voice of this engine"),
     enabled: bool = typer.Option(None, "--enabled/--disabled", help="Filter by enabled state"),
 ) -> None:
-    """List registered voices."""
-    resp = _call(ctx, "list_voices_api_v1_voices__get", params={"engine_id": engine,
+    """List registered voice."""
+    resp = _call(ctx, "list_voice_api_v1_voice__get", params={"engine_id": engine,
                                                                  "enabled": None if enabled is None else str(enabled).lower()})
     _emit(ctx, resp.json(), VOICE_COLUMNS)
 
 
-@voices_app.command("add")
-def voices_add(
+@voice_app.command("add")
+def voice_add(
     ctx: typer.Context,
     voice_id: str,
     name: str = typer.Option(..., "--name", help="Human-readable name"),
@@ -55,17 +55,17 @@ def voices_add(
         body["description"] = description
     if language is not None:
         body["language"] = language
-    _emit(ctx, _call(ctx, "create_voice_api_v1_voices__post", json=body).json())
+    _emit(ctx, _call(ctx, "create_voice_api_v1_voice__post", json=body).json())
 
 
-@voices_app.command("get")
-def voices_get(ctx: typer.Context, voice_id: str) -> None:
+@voice_app.command("get")
+def voice_get(ctx: typer.Context, voice_id: str) -> None:
     """Show one voice."""
-    _emit(ctx, _call(ctx, "get_voice_api_v1_voices__voice_id__get", path_params={"voice_id": voice_id}).json())
+    _emit(ctx, _call(ctx, "get_voice_api_v1_voice__voice_id__get", path_params={"voice_id": voice_id}).json())
 
 
-@voices_app.command("update")
-def voices_update(
+@voice_app.command("update")
+def voice_update(
     ctx: typer.Context,
     voice_id: str,
     name: str = typer.Option(None, "--name"),
@@ -94,27 +94,27 @@ def voices_update(
         body["engine_options"] = options
     if not body:
         raise typer.BadParameter("nothing to update")
-    resp = _call(ctx, "update_voice_api_v1_voices__voice_id__patch", path_params={"voice_id": voice_id}, json=body)
+    resp = _call(ctx, "update_voice_api_v1_voice__voice_id__patch", path_params={"voice_id": voice_id}, json=body)
     _emit(ctx, resp.json())
 
 
-@voices_app.command("remove")
-def voices_remove(ctx: typer.Context, voice_id: str) -> None:
+@voice_app.command("remove")
+def voice_remove(ctx: typer.Context, voice_id: str) -> None:
     """Unregister a voice (host model files are never touched)."""
-    _call(ctx, "delete_voice_api_v1_voices__voice_id__delete", path_params={"voice_id": voice_id})
+    _call(ctx, "delete_voice_api_v1_voice__voice_id__delete", path_params={"voice_id": voice_id})
     typer.echo(f"voice '{voice_id}' unregistered")
 
 
-@voices_app.command("validate")
-def voices_validate(ctx: typer.Context, voice_id: str) -> None:
+@voice_app.command("validate")
+def voice_validate(ctx: typer.Context, voice_id: str) -> None:
     """Validate that a voice registration resolves and is usable."""
     _validation(
-        ctx, _call(ctx, "validate_voice_api_v1_voices__voice_id__validate_post", path_params={"voice_id": voice_id})
+        ctx, _call(ctx, "validate_voice_api_v1_voice__voice_id__validate_post", path_params={"voice_id": voice_id})
     )
 
 
-@voices_app.command("test")
-def voices_test(
+@voice_app.command("test")
+def voice_test(
     ctx: typer.Context,
     voice_id: str,
     output: str | None = OptionalOutput,
@@ -140,7 +140,7 @@ def voices_test(
     options = _parse_options(option, options_json)
     if options is not None:
         body["engine_options"] = options
-    resp = _call(ctx, "test_voice_api_v1_voices__voice_id__test_post", path_params={"voice_id": voice_id},
+    resp = _call(ctx, "test_voice_api_v1_voice__voice_id__test_post", path_params={"voice_id": voice_id},
                  json=body or None)
     size = _write_audio(resp, output) if output is not None else 0
     if play:
@@ -149,4 +149,4 @@ def voices_test(
 
 
 def register(say_app: typer.Typer) -> None:
-    say_app.add_typer(voices_app, name="voices")
+    say_app.add_typer(voice_app, name="voice")

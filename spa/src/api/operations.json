@@ -15,33 +15,33 @@
     "method": "POST",
     "path": "/api/v1/engine/{engine_id}/validate"
   },
-  "list_voices_api_v1_voices__get": {
+  "list_voice_api_v1_voice__get": {
     "method": "GET",
-    "path": "/api/v1/voices/"
+    "path": "/api/v1/voice/"
   },
-  "create_voice_api_v1_voices__post": {
+  "create_voice_api_v1_voice__post": {
     "method": "POST",
-    "path": "/api/v1/voices/"
+    "path": "/api/v1/voice/"
   },
-  "get_voice_api_v1_voices__voice_id__get": {
+  "get_voice_api_v1_voice__voice_id__get": {
     "method": "GET",
-    "path": "/api/v1/voices/{voice_id}"
+    "path": "/api/v1/voice/{voice_id}"
   },
-  "update_voice_api_v1_voices__voice_id__patch": {
+  "update_voice_api_v1_voice__voice_id__patch": {
     "method": "PATCH",
-    "path": "/api/v1/voices/{voice_id}"
+    "path": "/api/v1/voice/{voice_id}"
   },
-  "delete_voice_api_v1_voices__voice_id__delete": {
+  "delete_voice_api_v1_voice__voice_id__delete": {
     "method": "DELETE",
-    "path": "/api/v1/voices/{voice_id}"
+    "path": "/api/v1/voice/{voice_id}"
   },
-  "validate_voice_api_v1_voices__voice_id__validate_post": {
+  "validate_voice_api_v1_voice__voice_id__validate_post": {
     "method": "POST",
-    "path": "/api/v1/voices/{voice_id}/validate"
+    "path": "/api/v1/voice/{voice_id}/validate"
   },
-  "test_voice_api_v1_voices__voice_id__test_post": {
+  "test_voice_api_v1_voice__voice_id__test_post": {
     "method": "POST",
-    "path": "/api/v1/voices/{voice_id}/test"
+    "path": "/api/v1/voice/{voice_id}/test"
   },
   "opal_profiles_list": {
     "method": "GET",

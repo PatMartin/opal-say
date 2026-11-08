@@ -71,7 +71,7 @@ export const ENGINE = {
   description: null,
   enabled: true,
   available: true,
-  options: { voices_dir: '/v' },
+  options: { voice_dir: '/v' },
   metadata: { version: '1.8' },
 }
 

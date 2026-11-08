@@ -7,7 +7,7 @@ import { AudioResult, ErrorBanner, OptionsField, parseOptions, useAction, useLoa
 /** Completed (/generate) and streamed (/generate/stream) speech generation. */
 export function GeneratePanel() {
   const profiles = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
-  const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get', { query: { enabled: true } }), [])
+  const voice = useLoad(() => call<Voice[]>('list_voice_api_v1_voice__get', { query: { enabled: true } }), [])
   const engine = useLoad(() => call<Engine[]>('opal_engines_list'), [])
   const persona = useLoad(() => call<Persona[]>('list_persona_api_v1_persona__get', { query: { enabled: true } }), [])
 
@@ -76,7 +76,7 @@ export function GeneratePanel() {
   return (
     <section>
       <h2>Generate</h2>
-      <ErrorBanner error={profiles.error || voices.error || engine.error} />
+      <ErrorBanner error={profiles.error || voice.error || engine.error} />
       <form onSubmit={submit} className="grid">
         <label className="wide">
           Text
@@ -109,7 +109,7 @@ export function GeneratePanel() {
           Voice
           <select value={voiceId} onChange={(e) => setVoiceId(e.target.value)}>
             <option value="">(from profile)</option>
-            {voices.data.map((v) => (
+            {voice.data.map((v) => (
               <option key={v.voice_id} value={v.voice_id}>
                 {v.name} ({v.voice_id})
               </option>

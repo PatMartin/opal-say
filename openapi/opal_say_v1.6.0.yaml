@@ -4,11 +4,11 @@ info:
   version: 1.6.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides\
     \ a stable REST contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients\
-    \ interact with OPAL concepts—engine,\nvoices, profiles, generation settings, and audio output—without\
+    \ interact with OPAL concepts—engine,\nvoice, profiles, generation settings, and audio output—without\
     \ depending on a\nspecific engine's command line, model layout, Python API, or native output format.\n\n\
     Design principles:\n\n* The OpenAPI contract is the public source of truth for service behavior.\n* Engines\
     \ are installed and discovered by the implementation; they are not created\n  or deleted through this API.\n\
-    * Voices are registrations that point at voice/model resources already available\n  on the host. The API\
+    * Voice are registrations that point at voice/model resources already available\n  on the host. The API\
     \ never uploads or deletes model files.\n* A voice has a globally unique OPAL `voice_id` and normally determines\
     \ which\n  engine is used.\n* Requests may optionally specify an `engine_id` override for testing or advanced\n\
     \  routing. The selected engine must be compatible with the registered voice.\n* The portable controls\
@@ -48,8 +48,8 @@ tags:
     Engines are not created or deleted through this API.
 
     '
-- name: voices
-  description: 'Register and manage OPAL voices backed by engine-specific resources already
+- name: voice
+  description: 'Register and manage OPAL voice backed by engine-specific resources already
 
     present on the host. Voice operations never upload, modify, or delete model files.
 
@@ -140,12 +140,12 @@ paths:
           $ref: './shared/opal_kernel.yaml#/components/responses/NotFound'
         '422':
           $ref: './shared/opal_kernel.yaml#/components/responses/UnprocessableEntity'
-  /api/v1/voices/:
+  /api/v1/voice/:
     get:
       tags:
-      - voices
-      summary: List Voices
-      description: 'List registered OPAL voices. Registrations describe host-resident voice/model
+      - voice
+      summary: List Voice
+      description: 'List registered OPAL voice. Registrations describe host-resident voice/model
 
         resources and their engine association; they do not contain the model data itself.
 
@@ -154,12 +154,12 @@ paths:
         may reject catalog sizes over an advertised deployment cap, rather than silently truncate.
 
         '
-      operationId: list_voices_api_v1_voices__get
+      operationId: list_voice_api_v1_voice__get
       parameters:
       - name: engine_id
         in: query
         required: false
-        description: If supplied, return only voices registered to this engine.
+        description: If supplied, return only voice registered to this engine.
         schema:
           type: string
           minLength: 1
@@ -175,7 +175,7 @@ paths:
         '403':
           $ref: './shared/opal_kernel.yaml#/components/responses/Forbidden'
         '200':
-          description: Registered voices.
+          description: Registered voice.
           content:
             application/json:
               schema:
@@ -199,7 +199,7 @@ paths:
           $ref: './shared/opal_kernel.yaml#/components/responses/UnprocessableEntity'
     post:
       tags:
-      - voices
+      - voice
       summary: Register Voice
       description: 'Register a host-resident voice/model resource with OPAL Say.
 
@@ -220,7 +220,7 @@ paths:
         resolved before accepting the registration.
 
         '
-      operationId: create_voice_api_v1_voices__post
+      operationId: create_voice_api_v1_voice__post
       requestBody:
         required: true
         content:
@@ -294,7 +294,7 @@ paths:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalTransactionIdParameter'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalRequestIdParameter'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
-  /api/v1/voices/{voice_id}:
+  /api/v1/voice/{voice_id}:
     parameters:
     - $ref: '#/components/parameters/VoiceId'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalSessionIdParameter'
@@ -303,10 +303,10 @@ paths:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
     get:
       tags:
-      - voices
+      - voice
       summary: Get Voice
       description: Return one registered voice.
-      operationId: get_voice_api_v1_voices__voice_id__get
+      operationId: get_voice_api_v1_voice__voice_id__get
       responses:
         '401':
           $ref: './shared/opal_kernel.yaml#/components/responses/Unauthorized'
@@ -337,7 +337,7 @@ paths:
           $ref: './shared/opal_kernel.yaml#/components/responses/UnprocessableEntity'
     patch:
       tags:
-      - voices
+      - voice
       summary: Update Voice
       description: 'Update a voice registration. The engine association and opaque
 
@@ -346,7 +346,7 @@ paths:
         never modified by this API.
 
         '
-      operationId: update_voice_api_v1_voices__voice_id__patch
+      operationId: update_voice_api_v1_voice__voice_id__patch
       requestBody:
         required: true
         content:
@@ -400,7 +400,7 @@ paths:
       - $ref: './shared/opal_kernel.yaml#/components/parameters/IfMatch'
     delete:
       tags:
-      - voices
+      - voice
       summary: Unregister Voice
       description: 'Remove the OPAL voice registration only.
 
@@ -414,7 +414,7 @@ paths:
         is changed or removed.
 
         '
-      operationId: delete_voice_api_v1_voices__voice_id__delete
+      operationId: delete_voice_api_v1_voice__voice_id__delete
       responses:
         '401':
           $ref: './shared/opal_kernel.yaml#/components/responses/Unauthorized'
@@ -456,7 +456,7 @@ paths:
           $ref: './shared/opal_kernel.yaml#/components/responses/PreconditionRequired'
       parameters:
       - $ref: './shared/opal_kernel.yaml#/components/parameters/IfMatch'
-  /api/v1/voices/{voice_id}/validate:
+  /api/v1/voice/{voice_id}/validate:
     parameters:
     - $ref: '#/components/parameters/VoiceId'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalSessionIdParameter'
@@ -465,7 +465,7 @@ paths:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
     post:
       tags:
-      - voices
+      - voice
       summary: Validate Voice
       description: 'Ask the registered engine to validate that this voice registration can be
 
@@ -474,7 +474,7 @@ paths:
         lightweight engine-specific load check but does not return generated speech.
 
         '
-      operationId: validate_voice_api_v1_voices__voice_id__validate_post
+      operationId: validate_voice_api_v1_voice__voice_id__validate_post
       responses:
         '401':
           $ref: './shared/opal_kernel.yaml#/components/responses/Unauthorized'
@@ -499,7 +499,7 @@ paths:
           $ref: './shared/opal_kernel.yaml#/components/responses/NotFound'
         '422':
           $ref: './shared/opal_kernel.yaml#/components/responses/UnprocessableEntity'
-  /api/v1/voices/{voice_id}/test:
+  /api/v1/voice/{voice_id}/test:
     parameters:
     - $ref: '#/components/parameters/VoiceId'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalSessionIdParameter'
@@ -508,7 +508,7 @@ paths:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
     post:
       tags:
-      - voices
+      - voice
       summary: Test Voice
       description: 'Generate a short test utterance with this voice.
 
@@ -520,7 +520,7 @@ paths:
         returns completed WAV or PCM audio.
 
         '
-      operationId: test_voice_api_v1_voices__voice_id__test_post
+      operationId: test_voice_api_v1_voice__voice_id__test_post
       requestBody:
         required: false
         content:
@@ -1239,7 +1239,7 @@ components:
             clients must treat the value as an opaque string.
 
             '
-          example: /opt/opal/voices/en_US-lessac-medium.onnx
+          example: /opt/opal/voice/en_US-lessac-medium.onnx
         language:
           anyOf:
           - type: string
@@ -1257,7 +1257,7 @@ components:
         voice_id: en-us-lessac-medium
         name: Lessac Medium
         engine_id: piper
-        engine_voice_ref: /opt/opal/voices/en_US-lessac-medium.onnx
+        engine_voice_ref: /opt/opal/voice/en_US-lessac-medium.onnx
         language: en-US
         enabled: true
         engine_options: {}
@@ -1326,7 +1326,7 @@ components:
         engine_voice_ref:
           type: string
           description: Opaque engine-specific reference to the host-resident voice/model resource.
-          example: /opt/opal/voices/en_US-lessac-medium.onnx
+          example: /opt/opal/voice/en_US-lessac-medium.onnx
         language:
           anyOf:
           - type: string

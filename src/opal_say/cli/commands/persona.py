@@ -1,4 +1,4 @@
-"""`opal say persona ...` — manage named persona bound to registered voices."""
+"""`opal say persona ...` — manage named persona bound to registered voice."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import typer
 
 from opal_say.cli.common import PERSONA_COLUMNS, _call, _emit
 
-persona_app = typer.Typer(help="Manage named persona bound to registered voices.", no_args_is_help=True)
+persona_app = typer.Typer(help="Manage named persona bound to registered voice.", no_args_is_help=True)
 
 
 @persona_app.command("list")

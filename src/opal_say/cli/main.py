@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from opal_say.cli.client import api_url_from_env
-from opal_say.cli.commands import backup, engine, generate, persona, profiles, root, settings, voices
+from opal_say.cli.commands import backup, engine, generate, persona, profiles, root, settings, voice
 from opal_say.cli.common import CliState, client_factory  # noqa: F401 - re-exported; tests patch main.client_factory
 
 # REST operationId -> CLI command (relative to `opal say`). Verified by the parity tests.
@@ -14,13 +14,13 @@ COMMANDS: dict[str, str] = {
     "opal_engine_get": "engine get",
     "opal_engine_patch": "engine update",
     "validate_engine_api_v1_engine__engine_id__validate_post": "engine validate",
-    "list_voices_api_v1_voices__get": "voices list",
-    "create_voice_api_v1_voices__post": "voices add",
-    "get_voice_api_v1_voices__voice_id__get": "voices get",
-    "update_voice_api_v1_voices__voice_id__patch": "voices update",
-    "delete_voice_api_v1_voices__voice_id__delete": "voices remove",
-    "validate_voice_api_v1_voices__voice_id__validate_post": "voices validate",
-    "test_voice_api_v1_voices__voice_id__test_post": "voices test",
+    "list_voice_api_v1_voice__get": "voice list",
+    "create_voice_api_v1_voice__post": "voice add",
+    "get_voice_api_v1_voice__voice_id__get": "voice get",
+    "update_voice_api_v1_voice__voice_id__patch": "voice update",
+    "delete_voice_api_v1_voice__voice_id__delete": "voice remove",
+    "validate_voice_api_v1_voice__voice_id__validate_post": "voice validate",
+    "test_voice_api_v1_voice__voice_id__test_post": "voice test",
     "opal_profiles_list": "profiles list",
     "opal_profiles_create": "profiles add",
     "opal_profile_get": "profiles get",
@@ -59,7 +59,7 @@ COMMANDS: dict[str, str] = {
 say_app = typer.Typer(
     help="OPAL Say text-to-speech (talks to the opal-say-svc REST API).",
     epilog="Global options (--api-url, --json, --timeout) go before the command group, "
-           "e.g. 'opal say --json voices list'.",
+           "e.g. 'opal say --json voice list'.",
     no_args_is_help=True,
     pretty_exceptions_enable=False,
 )
@@ -75,7 +75,7 @@ def say_callback(
     ctx.obj = CliState(client_factory(api_url or api_url_from_env(), timeout), json_output)
 
 
-for _module in (engine, voices, profiles, persona, generate, settings, backup, root):
+for _module in (engine, voice, profiles, persona, generate, settings, backup, root):
     _module.register(say_app)
 
 

@@ -15,7 +15,7 @@ const EMPTY: PersonaForm = { persona_id: '', name: '', description: '', voice_id
 
 export function PersonaPanel() {
   const persona = useLoad(() => call<Persona[]>('list_persona_api_v1_persona__get'), [])
-  const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get'), [])
+  const voice = useLoad(() => call<Voice[]>('list_voice_api_v1_voice__get'), [])
   const [form, setForm] = useState<PersonaForm>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [selected, setSelected] = useState<Persona | null>(null)
@@ -110,7 +110,7 @@ export function PersonaPanel() {
           Voice
           <select required value={form.voice_id} onChange={(e) => set({ voice_id: e.target.value })}>
             <option value="">choose…</option>
-            {voices.data.map((v) => (
+            {voice.data.map((v) => (
               <option key={v.voice_id} value={v.voice_id}>
                 {v.name} ({v.voice_id})
               </option>

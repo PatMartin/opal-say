@@ -26,10 +26,10 @@ from opal_say.tts.base import (
     VoiceResolutionError,
 )
 
-PIPER_MODEL = Path(os.environ.get("OPAL_SAY_TEST_PIPER_MODEL", "~/piper/voices/en_US-amy-low.onnx")).expanduser()
+PIPER_MODEL = Path(os.environ.get("OPAL_SAY_TEST_PIPER_MODEL", "~/piper/voice/en_US-amy-low.onnx")).expanduser()
 KOKORO_DIR = Path(os.environ.get("OPAL_SAY_TEST_KOKORO_DIR", "~/kokoro")).expanduser()
 KOKORO_MODEL = next(iter(sorted(KOKORO_DIR.glob("kokoro-v1.0*.onnx"))), KOKORO_DIR / "kokoro-v1.0.onnx")
-KOKORO_VOICES = KOKORO_DIR / "voices-v1.0.bin"
+KOKORO_VOICES = KOKORO_DIR / "voice-v1.0.bin"
 
 
 def piper_ready() -> bool:
@@ -63,11 +63,11 @@ class FakeEngine(TtsEngine):
     max_concurrent_inferences = 4
 
     def __init__(self, engine_id: str = "fake", speed_range: tuple[float, float] = (0.25, 4.0),
-                 voices: dict[str, int] | None = None):
+                 voice: dict[str, int] | None = None):
         super().__init__()
         self.engine_id = engine_id
         self.speed_range = speed_range
-        self.VOICES = voices or dict(FakeEngine.VOICES)
+        self.VOICES = voice or dict(FakeEngine.VOICES)
         self.calls: list[dict[str, Any]] = []
 
     def default_options(self) -> dict[str, Any]:
@@ -105,14 +105,14 @@ def _needs_if_match(method: str, url: str) -> bool:
     """Configuration mutations carrying the mandatory If-Match precondition."""
     m = method.upper()
     if m in {"PATCH", "DELETE"} and url.startswith(
-        ("/api/v1/engine/", "/api/v1/voices/", "/api/v1/profiles/", "/api/v1/persona/")
+        ("/api/v1/engine/", "/api/v1/voice/", "/api/v1/profiles/", "/api/v1/persona/")
     ):
         return True
     if m in {"PUT", "DELETE", "PATCH"} and url.startswith("/api/v1/settings/"):
         return True
     if m == "POST":
         return (
-            url == "/api/v1/voices/"
+            url == "/api/v1/voice/"
             or url == "/api/v1/persona/"
             or url == "/api/v1/profiles/"
             or url == "/api/v1/backup/import"
@@ -153,7 +153,7 @@ def config(tmp_path: Path) -> ServiceConfig:
 
 @pytest.fixture
 def engine() -> list[FakeEngine]:
-    return [FakeEngine("fake"), FakeEngine("alt", speed_range=(0.5, 2.0), voices={"tone-a": 24000})]
+    return [FakeEngine("fake"), FakeEngine("alt", speed_range=(0.5, 2.0), voice={"tone-a": 24000})]
 
 
 @pytest.fixture
@@ -189,7 +189,7 @@ def live_server(app) -> Iterator[str]:
 
 def make_voice(client: TestClient, voice_id: str = "v1", engine_id: str = "fake", ref: str = "tone-a", **extra) -> dict:
     resp = client.post(
-        "/api/v1/voices/",
+        "/api/v1/voice/",
         json={"voice_id": voice_id, "name": voice_id.upper(), "engine_id": engine_id, "engine_voice_ref": ref, **extra},
     )
     assert resp.status_code == 201, resp.text

@@ -242,10 +242,10 @@ class VoiceService:
 
 
 class ProfileService:
-    def __init__(self, store: Store, engine: EngineService, voices: VoiceService):
+    def __init__(self, store: Store, engine: EngineService, voice: VoiceService):
         self.store = store
         self.engine = engine
-        self.voices = voices
+        self.voice = voice
 
     def list(self) -> list[dict[str, Any]]:
         return self.store.list_profiles()
@@ -325,9 +325,9 @@ class ProfileService:
 class PersonaService:
     """Named personas: stable identities bound to a registered voice (contract `personas`)."""
 
-    def __init__(self, store: Store, voices: VoiceService):
+    def __init__(self, store: Store, voice: VoiceService):
         self.store = store
-        self.voices = voices
+        self.voice = voice
 
     def get(self, persona_id: str) -> dict[str, Any]:
         persona = self.store.get_persona(persona_id)

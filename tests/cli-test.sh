@@ -3,8 +3,8 @@
 opal say --help
 opal say generate "Hello, I am Opal Say" --play
 
-# Test all voices (skip the header row)
-for v in `opal say voices list | tail -n +2 | cut -f1 -d\ `
+# Test all voice (skip the header row)
+for v in `opal say voice list | tail -n +2 | cut -f1 -d\ `
 do
   echo "VOICE: $v"
   opal say generate --voice $v "hello, my name is Opal" --play

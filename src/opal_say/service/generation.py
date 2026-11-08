@@ -342,7 +342,7 @@ class GenerationService:
         return pcm, "application/octet-stream"
 
     def test_voice(self, voice_id: str, req: VoiceTestRequest) -> tuple[GenerationPlan, bytes, str]:
-        """Lookup + plan + render for POST /voices/{id}/test, in one call."""
+        """Lookup + plan + render for POST /voice/{id}/test, in one call."""
         voice = self.store.get_voice(voice_id)
         if voice is None:
             raise NotFound(f"voice '{voice_id}' not found", "voice_not_found", {"voice_id": voice_id})
