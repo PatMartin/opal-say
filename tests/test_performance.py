@@ -45,7 +45,7 @@ needs_kokoro = pytest.mark.skipif(not kokoro_ready(), reason="kokoro-onnx runtim
 def voices(client):
     make_voice(client, "v1", ref="tone-a")
     make_voice(client, "v2", ref="tone-b")
-    client.put("/api/v1/settings/chunk_max_chars", json={"value": "50"})
+    client.put("/api/v1/setting/chunk_max_chars", json={"value": "50"})
 
 
 def _wait_until(predicate, timeout: float = 5.0) -> bool:
@@ -193,7 +193,7 @@ def test_long_text_generation(client, voices, engines, app):
 
 def test_concurrent_streams_respect_engine_capacity(live_server, client, voices, engines):
     """Parallel streams overlap up to — and never beyond — the configured permit count."""
-    client.patch("/api/v1/engines/fake", json={"options": {"max_concurrent_inferences": 2}})
+    client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 2}})
     engine = engines[0]
     synthesize = engine.synthesize
     lock = threading.Lock()
@@ -252,7 +252,7 @@ def test_piper_stream_smoke(tmp_path):
     app = create_app(cfg)
     try:
         with TestClient(app) as c:
-            resp = c.post("/api/v1/voices/", json={"voice_id": "p", "name": "P", "engine_id": "piper",
+            resp = c.post("/api/v1/voice/", json={"voice_id": "p", "name": "P", "engine_id": "piper",
                                                     "engine_voice_ref": "test-voice"})
             assert resp.status_code == 201, resp.text
             status, headers, arrivals, pcm = _smoke_stream(c, "p")
@@ -276,7 +276,7 @@ def test_kokoro_stream_smoke(tmp_path):
     app = create_app(cfg)
     try:
         with TestClient(app) as c:
-            resp = c.post("/api/v1/voices/", json={"voice_id": "k", "name": "K", "engine_id": "kokoro",
+            resp = c.post("/api/v1/voice/", json={"voice_id": "k", "name": "K", "engine_id": "kokoro",
                                                     "engine_voice_ref": "af_heart"})
             assert resp.status_code == 201, resp.text
             status, headers, arrivals, pcm = _smoke_stream(c, "k")

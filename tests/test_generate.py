@@ -67,8 +67,8 @@ def test_explicit_profile_beats_active_profile(client, setup):
 
 
 def test_service_defaults_from_settings(client, setup):
-    client.put("/api/v1/settings/default_output_format", json={"value": "pcm"})
-    client.put("/api/v1/settings/default_speed", json={"value": "2.0"})
+    client.put("/api/v1/setting/default_output_format", json={"value": "pcm"})
+    client.put("/api/v1/setting/default_speed", json={"value": "2.0"})
     resp = client.post("/api/v1/generate", json={"text": "x", "voice_id": "v1"})
     assert resp.headers["x-opal-audio-format"] == "pcm"
     assert setup.calls[-1]["speed"] == 2.0
@@ -90,7 +90,7 @@ def test_requested_sample_rate_is_honoured(client, setup):
 
 
 def test_long_text_is_chunked_in_order(client, setup):
-    client.put("/api/v1/settings/chunk_max_chars", json={"value": "50"})
+    client.put("/api/v1/setting/chunk_max_chars", json={"value": "50"})
     text = " ".join(f"Sentence number {i}." for i in range(20))
     resp = client.post("/api/v1/generate", json={"text": text, "voice_id": "v1", "output_format": "pcm"})
     assert resp.status_code == 200
@@ -137,20 +137,20 @@ def test_conflicts(client, setup, body, status, code):
 
 
 def test_disabled_voice_and_engine(client, setup):
-    client.patch("/api/v1/voices/v2", json={"enabled": False})
+    client.patch("/api/v1/voice/v2", json={"enabled": False})
     assert client.post("/api/v1/generate", json={"text": "x", "voice_id": "v2"}).json()["error"]["code"] == "voice_disabled"
-    client.patch("/api/v1/engines/fake", json={"enabled": False})
+    client.patch("/api/v1/engine/fake", json={"enabled": False})
     assert client.post("/api/v1/generate", json={"text": "x", "voice_id": "v1"}).json()["error"]["code"] == "engine_disabled"
 
 
 def test_unavailable_engine_is_503(client, setup):
-    client.patch("/api/v1/engines/fake", json={"options": {"available": False}})
+    client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
     resp = client.post("/api/v1/generate", json={"text": "x", "voice_id": "v1"})
     assert resp.status_code == 503 and resp.json()["error"]["code"] == "engine_unavailable"
 
 
 def test_payload_too_large(client, setup):
-    client.put("/api/v1/settings/max_text_chars", json={"value": "10"})
+    client.put("/api/v1/setting/max_text_chars", json={"value": "10"})
     resp = client.post("/api/v1/generate", json={"text": "x" * 11, "voice_id": "v1"})
     assert resp.status_code == 413 and resp.json()["error"]["details"]["max_text_chars"] == 10
 
@@ -185,19 +185,19 @@ def test_generation_failure_is_500(client, setup):
 
 
 def test_voice_test_endpoint(client, setup):
-    resp = client.post("/api/v1/voices/v2/test")
+    resp = client.post("/api/v1/voice/v2/test")
     assert resp.status_code == 200 and resp.headers["content-type"] == "audio/wav"
     assert setup.calls[-1]["text"] == "This is a test of the selected OPAL Say voice."
-    resp = client.post("/api/v1/voices/v1/test", json={"text": "Hi", "output_format": "pcm", "sample_rate": 16000,
+    resp = client.post("/api/v1/voice/v1/test", json={"text": "Hi", "output_format": "pcm", "sample_rate": 16000,
                                                        "speed": 2.0, "engine_options": {"pitch": 900}})
     assert resp.headers["x-opal-sample-rate"] == "16000"
     assert setup.calls[-1]["options"] == {"pitch": 900} and setup.calls[-1]["speed"] == 2.0
-    assert client.post("/api/v1/voices/ghost/test").status_code == 404
-    assert client.post("/api/v1/voices/v1/test", json={"text": ""}).status_code == 422
-    client.patch("/api/v1/voices/v1", json={"enabled": False})
-    assert client.post("/api/v1/voices/v1/test").status_code == 409
-    client.patch("/api/v1/engines/fake", json={"options": {"available": False}})
-    assert client.post("/api/v1/voices/v2/test").status_code == 503
+    assert client.post("/api/v1/voice/ghost/test").status_code == 404
+    assert client.post("/api/v1/voice/v1/test", json={"text": ""}).status_code == 422
+    client.patch("/api/v1/voice/v1", json={"enabled": False})
+    assert client.post("/api/v1/voice/v1/test").status_code == 409
+    client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
+    assert client.post("/api/v1/voice/v2/test").status_code == 503
 
 
 # -- bounded inference admission -------------------------------------------------------
@@ -247,7 +247,7 @@ def test_generation_at_capacity_returns_engine_unavailable(live_server, client, 
             assert resp.status_code == 503
             assert resp.json()["error"]["code"] == "engine_unavailable"
             resp = pool.submit(
-                lambda: httpx.post(f"{live_server}/api/v1/voices/v1/test", json={"text": "hi."}, timeout=10)
+                lambda: httpx.post(f"{live_server}/api/v1/voice/v1/test", json={"text": "hi."}, timeout=10)
             ).result(10)
             assert resp.status_code == 503
             assert json.loads(resp.content)["error"]["code"] == "engine_unavailable"

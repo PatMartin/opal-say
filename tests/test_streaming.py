@@ -35,7 +35,7 @@ def _wait_until(predicate, timeout: float = 5.0) -> bool:
 def voices(client):
     make_voice(client, "v1", ref="tone-a")
     make_voice(client, "v2", ref="tone-b")
-    client.put("/api/v1/settings/chunk_max_chars", json={"value": "50"})
+    client.put("/api/v1/setting/chunk_max_chars", json={"value": "50"})
 
 
 def test_stream_headers_and_raw_pcm(client, voices, engines):
@@ -95,10 +95,10 @@ def test_failures_before_streaming_are_json(client, voices, body, status):
 
 
 def test_too_large_and_unavailable(client, voices):
-    client.put("/api/v1/settings/max_text_chars", json={"value": "5"})
+    client.put("/api/v1/setting/max_text_chars", json={"value": "5"})
     assert client.post("/api/v1/generate/stream", json={"text": "123456", "voice_id": "v1"}).status_code == 413
-    client.delete("/api/v1/settings/max_text_chars")
-    client.patch("/api/v1/engines/fake", json={"options": {"available": False}})
+    client.delete("/api/v1/setting/max_text_chars")
+    client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
     assert client.post("/api/v1/generate/stream", json={"text": "x", "voice_id": "v1"}).status_code == 503
 
 

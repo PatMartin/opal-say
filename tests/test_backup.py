@@ -16,8 +16,8 @@ def populated(client):
     make_voice(client, "v1", engine_options={"pitch": 200})
     make_voice(client, "v2", ref="tone-b", description="second")
     make_profile(client, "main", "v1", is_active=True, speed=1.5, engine_options={"pitch": 220})
-    client.put("/api/v1/settings/chunk_max_chars", json={"value": "120"})
-    client.patch("/api/v1/engines/alt", json={"enabled": False})
+    client.put("/api/v1/setting/chunk_max_chars", json={"value": "120"})
+    client.patch("/api/v1/engine/alt", json={"enabled": False})
 
 
 def write_config(config, files: dict[str, str]) -> None:
@@ -47,10 +47,10 @@ def test_backup_roundtrip_restores_exact_state(client, populated):
     filename = client.post("/api/v1/backup/create").json()["filename"]
     assert filename.startswith("opal-say-") and filename.endswith(".tar.gz")
 
-    client.post("/api/v1/profiles/", json={"name": "extra", "voice_id": "v2"})
-    client.delete("/api/v1/settings/chunk_max_chars")
-    client.patch("/api/v1/engines/alt", json={"enabled": True})
-    client.patch("/api/v1/voices/v2", json={"name": "renamed"})
+    client.post("/api/v1/profile/", json={"name": "extra", "voice_id": "v2"})
+    client.delete("/api/v1/setting/chunk_max_chars")
+    client.patch("/api/v1/engine/alt", json={"enabled": True})
+    client.patch("/api/v1/voice/v2", json={"name": "renamed"})
 
     result = client.post(f"/api/v1/backup/restore/{filename}").json()
     assert result["success"] is True
@@ -112,10 +112,10 @@ def test_invalid_backup_content_is_rejected_atomically(client, populated, config
         info = tarfile.TarInfo("opal-say-config.json")
         info.size = len(payload)
         tar.addfile(info, io.BytesIO(payload))
-    client.post("/api/v1/profiles/", json={"name": "keep-me", "voice_id": "v2"})
+    client.post("/api/v1/profile/", json={"name": "keep-me", "voice_id": "v2"})
     resp = client.post(f"/api/v1/backup/restore/{path.name}")
     assert resp.status_code == 409 and resp.json()["error"]["code"] == "backup_invalid"
-    assert "keep-me" in [p["name"] for p in client.get("/api/v1/profiles/").json()]
+    assert "keep-me" in [p["name"] for p in client.get("/api/v1/profile/").json()]
 
 
 def test_delete_backup(client):
@@ -136,20 +136,20 @@ def test_import_from_config_dir(client, config):
     result = client.post("/api/v1/backup/import").json()
     assert result["success"] is True, result
     assert [w["code"] for w in result["validation"]["warnings"]] == ["engine_not_installed"]
-    assert [v["voice_id"] for v in client.get("/api/v1/voices/").json()] == ["a", "b"]
-    assert client.get("/api/v1/voices/a").json()["native_sample_rate"] == 22050
-    profiles = client.get("/api/v1/profiles/").json()
+    assert [v["voice_id"] for v in client.get("/api/v1/voice/").json()] == ["a", "b"]
+    assert client.get("/api/v1/voice/a").json()["native_sample_rate"] == 22050
+    profiles = client.get("/api/v1/profile/").json()
     assert [(p["id"], p["name"], p["is_active"]) for p in profiles] == [(1, "one", True), (2, "two", False)]
-    assert client.get("/api/v1/settings/").json() == {"chunk_max_chars": 250, "flag": True}
-    assert client.get("/api/v1/engines/alt").json()["enabled"] is False
+    assert client.get("/api/v1/setting/").json() == {"chunk_max_chars": 250, "flag": True}
+    assert client.get("/api/v1/engine/alt").json()["enabled"] is False
     assert client.post("/api/v1/generate", json={"text": "hi"}).headers["x-opal-voice-id"] == "a"
 
 
 def test_import_only_replaces_present_sections(client, config, populated):
     write_config(config, {"settings.yaml": "version: 1\nsettings:\n  default_volume: 0.5\n"})
     assert client.post("/api/v1/backup/import").json()["success"] is True
-    assert [v["voice_id"] for v in client.get("/api/v1/voices/").json()] == ["v1", "v2"]
-    assert client.get("/api/v1/settings/").json() == {"default_volume": 0.5}
+    assert [v["voice_id"] for v in client.get("/api/v1/voice/").json()] == ["v1", "v2"]
+    assert client.get("/api/v1/setting/").json() == {"default_volume": 0.5}
 
 
 @pytest.mark.parametrize(
@@ -207,5 +207,5 @@ def test_first_start_seeds_from_config_dir(config, engines):
                                          "engine_voice_ref: tone-a}\n"})
     app = create_app(config, engines=engines)
     with TestClient(app) as c:
-        assert [v["voice_id"] for v in c.get("/api/v1/voices/").json()] == ["seeded"]
+        assert [v["voice_id"] for v in c.get("/api/v1/voice/").json()] == ["seeded"]
     app.state.services.close()

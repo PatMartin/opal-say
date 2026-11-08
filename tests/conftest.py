@@ -152,13 +152,13 @@ def config(tmp_path: Path) -> ServiceConfig:
 
 
 @pytest.fixture
-def engine() -> list[FakeEngine]:
+def engines() -> list[FakeEngine]:
     return [FakeEngine("fake"), FakeEngine("alt", speed_range=(0.5, 2.0), voice={"tone-a": 24000})]
 
 
 @pytest.fixture
-def app(config: ServiceConfig, engine: list[FakeEngine]):
-    application = create_app(config, engines=engine)
+def app(config: ServiceConfig, engines: list[FakeEngine]):
+    application = create_app(config, engines=engines)
     yield application
     application.state.services.close()
 

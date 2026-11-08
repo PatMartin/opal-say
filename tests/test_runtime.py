@@ -108,8 +108,8 @@ def test_configure_pushes_options_into_the_managed_instance(manager):
 def test_container_wires_the_manager(app):
     runtime = app.state.services.runtime
     assert isinstance(runtime, EngineRuntimeManager)
-    assert runtime is app.state.services.engines.runtime
-    assert runtime.get("fake") is app.state.services.engines.runtime.get("fake")
+    assert runtime is app.state.services.engine.runtime
+    assert runtime.get("fake") is app.state.services.engine.runtime.get("fake")
 
 
 class ConfigBoomEngine(FakeEngine):
@@ -333,7 +333,7 @@ def test_update_rolls_back_runtime_when_store_write_fails(config, monkeypatch):
 
     monkeypatch.setattr(services.store, "upsert_engine_state", boom)
     with pytest.raises(RuntimeError, match="db down"):
-        services.engines.update("fake", {"options": {"available": False}})
+        services.engine.update("fake", {"options": {"available": False}})
     # DB and active runtime stay consistent: both still carry the old options.
     assert services.store.get_engine_state("fake")["options"] == old_options
     assert engine.options.get("available", True) is True
@@ -449,14 +449,14 @@ def test_runtime_option_is_not_visible_to_adapter():
 
 
 def test_engine_update_accepts_runtime_option(client):
-    resp = client.patch("/api/v1/engines/fake", json={"options": {"max_concurrent_inferences": 2}})
+    resp = client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 2}})
     assert resp.status_code == 200, resp.text
     assert resp.json()["options"]["max_concurrent_inferences"] == 2
 
 
 def test_engine_update_rejects_invalid_limit(client):
     client.skip_contract = True
-    resp = client.patch("/api/v1/engines/fake", json={"options": {"max_concurrent_inferences": 0}})
+    resp = client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 0}})
     assert resp.status_code == 422
 
 

@@ -178,11 +178,11 @@ def test_rest_to_piper_end_to_end(tmp_path):
         shutil.copy(f"{PIPER_MODEL}{suffix}", voices_dir / f"test-voice.onnx{suffix}")
     app = _real_app(tmp_path, {"piper": {"options": {"voices_dir": str(voices_dir)}}, "kokoro": {"enabled": False}})
     with TestClient(app) as c:
-        resp = c.post("/api/v1/voices/", json={"voice_id": "p", "name": "P", "engine_id": "piper",
+        resp = c.post("/api/v1/voice/", json={"voice_id": "p", "name": "P", "engine_id": "piper",
                                                 "engine_voice_ref": "test-voice"})
         assert resp.status_code == 201, resp.text
         native = resp.json()["native_sample_rate"]
-        assert c.post("/api/v1/voices/p/validate").json()["valid"] is True
+        assert c.post("/api/v1/voice/p/validate").json()["valid"] is True
 
         resp = c.post("/api/v1/generate", json={"text": "Hello from OPAL Say. Second sentence.", "voice_id": "p"})
         check_response(resp)
@@ -196,10 +196,10 @@ def test_rest_to_piper_end_to_end(tmp_path):
         assert resp.headers["x-opal-sample-rate"] == "8000"
         assert np.abs(np.frombuffer(pcm, "<i2")).max() > 1000
 
-        resp = c.post("/api/v1/voices/p/test", json={"output_format": "pcm", "engine_options": {"bogus": 1}})
+        resp = c.post("/api/v1/voice/p/test", json={"output_format": "pcm", "engine_options": {"bogus": 1}})
         assert resp.status_code == 422
         # Unregistering never touches host files.
-        assert c.delete("/api/v1/voices/p").status_code == 204
+        assert c.delete("/api/v1/voice/p").status_code == 204
         assert (voices_dir / "test-voice.onnx").is_file()
     app.state.services.close()
 
@@ -210,7 +210,7 @@ def test_rest_to_kokoro_end_to_end(tmp_path):
     app = _real_app(tmp_path, {"kokoro": {"options": {"model_path": str(KOKORO_MODEL),
                                                        "voices_path": str(KOKORO_VOICES)}}})
     with TestClient(app) as c:
-        resp = c.post("/api/v1/voices/", json={"voice_id": "k", "name": "K", "engine_id": "kokoro",
+        resp = c.post("/api/v1/voice/", json={"voice_id": "k", "name": "K", "engine_id": "kokoro",
                                                 "engine_voice_ref": "am_adam"})
         assert resp.status_code == 201 and resp.json()["native_sample_rate"] == 24000
         resp = c.post("/api/v1/generate", json={"text": "Hi.", "voice_id": "k", "output_format": "pcm",

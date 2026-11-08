@@ -111,7 +111,7 @@ def _race(client, bodies: list[dict]) -> list[int]:
 def test_simultaneous_requests_same_voice(client, engines):
     make_voice(client, "v1")
     # Raise the engine's inference limit so all four may hold permits at once.
-    assert client.patch("/api/v1/engines/fake", json={"options": {"max_concurrent_inferences": 4}}).status_code == 200
+    assert client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 4}}).status_code == 200
     results = _race(client, [{"text": "x", "voice_id": "v1"} for _ in range(4)])
     assert results == [200] * 4
     assert len(engines[0].calls) == 4
@@ -120,7 +120,7 @@ def test_simultaneous_requests_same_voice(client, engines):
 def test_simultaneous_requests_different_voices(client, engines):
     make_voice(client, "v1", ref="tone-a")
     make_voice(client, "v2", ref="tone-b")
-    assert client.patch("/api/v1/engines/fake", json={"options": {"max_concurrent_inferences": 4}}).status_code == 200
+    assert client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 4}}).status_code == 200
     results = _race(client, [{"text": "x", "voice_id": "v1"}, {"text": "y", "voice_id": "v2"}] * 2)
     assert results == [200] * 4
     assert sorted(c["ref"] for c in engines[0].calls) == ["tone-a", "tone-a", "tone-b", "tone-b"]
@@ -354,7 +354,7 @@ def test_abandoned_stream_releases_bind_and_permit(config):
         stream = services.generation.pcm_stream(_plan(services))
         next(stream)
         stream.close()  # GeneratorExit through the `with` + finally releases everything
-        assert_permits_free(services.engines.runtime, "fake")
+        assert_permits_free(services.engine.runtime, "fake")
     finally:
         services.close()
 
@@ -366,7 +366,7 @@ def test_render_rejects_audio_beyond_max_buffer(client):
     """Non-streaming renders accumulate under `max_audio_bytes` -> 413 before runaway."""
     make_voice(client, "v1")
     client.skip_contract = True
-    client.put("/api/v1/settings/max_audio_bytes", json={"value": str(1 << 16)})
+    client.put("/api/v1/setting/max_audio_bytes", json={"value": str(1 << 16)})
     text = "word " * 5000
     resp = client.post("/api/v1/generate", json={"text": text, "voice_id": "v1"})
     assert resp.status_code == 413
@@ -460,12 +460,12 @@ def test_plan_binds_runtime_generation_through_synthesis(config):
 
         engine.synthesize = tracked
         plan = _plan(services)
-        services.engines.runtime.swap("fake", {"tag": "B"})  # defers: the plan pins the old generation
+        services.engine.runtime.swap("fake", {"tag": "B"})  # defers: the plan pins the old generation
         blocks = list(services.generation.pcm_stream(plan))
         assert blocks
         assert "tag" not in seen[0]  # synthesis ran the generation bound at plan time
         assert engine.options == {"tag": "B"}  # the newest config applied only after drain
-        assert_permits_free(services.engines.runtime, "fake")
+        assert_permits_free(services.engine.runtime, "fake")
     finally:
         services.close()
 
@@ -484,13 +484,13 @@ def test_render_and_voice_test_share_bound_generation(config):
 
         engine.synthesize = tracked
         plan = _plan(services)
-        services.engines.runtime.swap("fake", {"tag": "B"})
+        services.engine.runtime.swap("fake", {"tag": "B"})
         data, _ = services.generation.render(plan)
         assert data and "tag" not in seen[0]
         # The drained swap applied B; a later voice-test binds the new generation.
         _, data2, _ = services.generation.test_voice("v1", VoiceTestRequest())
         assert data2 and seen[-1] == {"tag": "B"}
-        assert_permits_free(services.engines.runtime, "fake")
+        assert_permits_free(services.engine.runtime, "fake")
     finally:
         services.close()
 
@@ -500,7 +500,7 @@ def test_failed_plan_releases_bound_runtime(config):
     engine = FakeEngine("fake")
     services = _services_with_engine(config, engine)
     try:
-        rec = services.engines.runtime._records["fake"]
+        rec = services.engine.runtime._records["fake"]
 
         def boom(ref, options):
             raise VoiceResolutionError("nope", "voice_not_found")

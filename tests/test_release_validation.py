@@ -72,17 +72,17 @@ class TestPiperRelease:
     @pytest.fixture
     def client(self, app):
         with TestClient(app) as c:
-            resp = c.post("/api/v1/voices/", json={
+            resp = c.post("/api/v1/voice/", json={
                 "voice_id": "p", "name": "P", "engine_id": "piper", "engine_voice_ref": "test-voice"})
             assert resp.status_code == 201, resp.text
             yield c
 
     def test_engine_available_and_model_loads(self, client):
-        body = client.get("/api/v1/engines/piper").json()
+        body = client.get("/api/v1/engine/piper").json()
         assert body["available"] and body["enabled"]
 
     def test_wav_generate_format(self, client):
-        native = client.get("/api/v1/voices/p").json()["native_sample_rate"]
+        native = client.get("/api/v1/voice/p").json()["native_sample_rate"]
         resp = client.post("/api/v1/generate", json={"text": TEXT, "voice_id": "p"})
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "audio/wav"
@@ -111,9 +111,9 @@ class TestPiperRelease:
         assert next(iter(engine._models._entries.values())).refs == 0
 
     def test_safe_config_update_between_requests(self, client):
-        resp = client.patch("/api/v1/engines/piper",
+        resp = client.patch("/api/v1/engine/piper",
                             json={"options": {"cache_size": 1}},
-                            headers={"If-Match": client.get("/api/v1/settings/").headers["etag"]})
+                            headers={"If-Match": client.get("/api/v1/setting/").headers["etag"]})
         assert resp.status_code == 200, resp.text
         for _ in range(2):  # requests after the update still succeed
             resp = client.post("/api/v1/generate",
@@ -148,13 +148,13 @@ class TestKokoroRelease:
     @pytest.fixture
     def client(self, app):
         with TestClient(app) as c:
-            resp = c.post("/api/v1/voices/", json={
+            resp = c.post("/api/v1/voice/", json={
                 "voice_id": "k", "name": "K", "engine_id": "kokoro", "engine_voice_ref": "af_heart"})
             assert resp.status_code == 201, resp.text
             yield c
 
     def test_engine_available_and_model_loads(self, client):
-        body = client.get("/api/v1/engines/kokoro").json()
+        body = client.get("/api/v1/engine/kokoro").json()
         assert body["available"] and body["enabled"]
 
     def test_wav_generate_format(self, client):
@@ -174,9 +174,9 @@ class TestKokoroRelease:
         _ = arrivals
 
     def test_safe_config_update_between_requests(self, client):
-        resp = client.patch("/api/v1/engines/kokoro",
+        resp = client.patch("/api/v1/engine/kokoro",
                             json={"options": {"default_lang": "en-gb"}},
-                            headers={"If-Match": client.get("/api/v1/settings/").headers["etag"]})
+                            headers={"If-Match": client.get("/api/v1/setting/").headers["etag"]})
         assert resp.status_code == 200, resp.text
         resp = client.post("/api/v1/generate",
                            json={"text": "Post update.", "voice_id": "k", "output_format": "pcm"})

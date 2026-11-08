@@ -61,10 +61,10 @@ class Services:
         self.store.close()
 
 
-def build_services(config: ServiceConfig, engine: list[TtsEngine] | None = None) -> Services:
+def build_services(config: ServiceConfig, engines: list[TtsEngine] | None = None) -> Services:
     store = Store(config.db_path)
     fresh = store.created
-    runtime = EngineRuntimeManager(EngineRegistry(engine if engine is not None else default_engines()))
+    runtime = EngineRuntimeManager(EngineRegistry(engines if engines is not None else default_engines()))
     engine_svc = EngineService(store, runtime)
     engine_svc.bootstrap(config.engines)
     voice_svc = VoiceService(store, engine_svc)
