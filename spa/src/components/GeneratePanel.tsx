@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { audioMeta, call, callRaw } from '../api/client'
-import type { Engine, Profile, Voice } from '../api/types'
+import type { Engine, Persona, Profile, Voice } from '../api/types'
 import { concatChunks, pcmToWav } from '../audio'
 import { AudioResult, ErrorBanner, OptionsField, parseOptions, useAction, useLoad, type AudioClip } from './common'
 
@@ -9,9 +9,11 @@ export function GeneratePanel() {
   const profiles = useLoad(() => call<Profile[]>('opal_profiles_list'), [])
   const voices = useLoad(() => call<Voice[]>('list_voices_api_v1_voices__get', { query: { enabled: true } }), [])
   const engines = useLoad(() => call<Engine[]>('opal_engines_list'), [])
+  const personas = useLoad(() => call<Persona[]>('list_personas_api_v1_personas__get', { query: { enabled: true } }), [])
 
   const [text, setText] = useState('')
   const [profileId, setProfileId] = useState('')
+  const [personaId, setPersonaId] = useState('')
   const [voiceId, setVoiceId] = useState('')
   const [engineId, setEngineId] = useState('')
   const [speed, setSpeed] = useState('')
@@ -31,6 +33,7 @@ export function GeneratePanel() {
       setReceived(null)
       const body: Record<string, unknown> = { text }
       if (profileId) body.profile_id = Number(profileId)
+      if (personaId) body.persona = personaId
       if (voiceId) body.voice_id = voiceId
       if (engineId) body.engine_id = engineId
       if (speed) body.speed = Number(speed)
@@ -87,6 +90,17 @@ export function GeneratePanel() {
               <option key={p.id} value={p.id}>
                 {p.name}
                 {p.is_active ? ' (active)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Persona
+          <select value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
+            <option value="">(none)</option>
+            {personas.data.map((p) => (
+              <option key={p.persona_id} value={p.persona_id}>
+                {p.name} ({p.voice_id})
               </option>
             ))}
           </select>

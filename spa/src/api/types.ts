@@ -42,6 +42,16 @@ export interface Profile {
   updated_at: string
 }
 
+export interface Persona {
+  persona_id: string
+  name: string
+  description?: string | null
+  voice_id: string
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface ValidationMessage {
   code: string
   message: string

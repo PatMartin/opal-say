@@ -6,6 +6,7 @@ import { useLoad } from './components/common'
 import { EnginesPanel } from './components/EnginesPanel'
 import { GeneratePanel } from './components/GeneratePanel'
 import { HealthPanel } from './components/HealthPanel'
+import { PersonasPanel } from './components/PersonasPanel'
 import { ProfilesPanel } from './components/ProfilesPanel'
 import { SettingsPanel } from './components/SettingsPanel'
 import { VoicesPanel } from './components/VoicesPanel'
@@ -14,6 +15,7 @@ const TABS = {
   Generate: GeneratePanel,
   Voices: VoicesPanel,
   Profiles: ProfilesPanel,
+  Personas: PersonasPanel,
   Engines: EnginesPanel,
   Settings: SettingsPanel,
   Backup: BackupPanel,
