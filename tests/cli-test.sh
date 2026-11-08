@@ -1,16 +1,16 @@
 #!/bin/bash
 
 opal say --help
-opal say "Hello, I am Opal Say"
+opal say generate "Hello, I am Opal Say" --play
 
-# Test all voices
-for v in `opal say voices list | cut -f1 -d\ `
+# Test all voices (skip the header row)
+for v in `opal say voices list | tail -n +2 | cut -f1 -d\ `
 do
   echo "VOICE: $v"
   opal say generate --voice $v "hello, my name is Opal" --play
 done
 
-# Create a persona
-opal say persona create --name "Test Persona" \
-  --voice "en_US-ryan-high" \
+# Create a persona (voice must be a registered voice_id, not the model ref)
+opal say personas add ryan --name "ryan" \
+  --voice "en-us-ryan-high" \
   --description "A test persona"
