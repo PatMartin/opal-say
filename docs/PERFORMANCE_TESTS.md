@@ -56,7 +56,7 @@ Piper engine's `use_cuda` option defaults to false.
 
 Install the CUDA-enabled ONNX Runtime build (`onnxruntime-gpu`) and set the
 Piper engine option `use_cuda: true` (via `config/service.yaml` or
-`PATCH /api/v1/engines/piper`) before running the smoke test. Timing
+`PATCH /api/v1/engine/piper`) before running the smoke test. Timing
 assertions are relative, so GPU speedups cannot trip them. Kokoro runs on CPU
 ONNX regardless.
 

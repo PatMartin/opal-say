@@ -223,11 +223,11 @@ Useful URLs:
 | URL | What |
 |---|---|
 | `http://127.0.0.1:8001/` | Service info |
-| `http://127.0.0.1:8001/healthz` | Liveness probe |
+| `http://127.0.0.1:8001/api/v1/info/ping` | Liveness probe |
 | `http://127.0.0.1:8001/api/v1/health/` | Readiness and engine state |
 | `http://127.0.0.1:8001/docs` | Swagger UI (interactive API docs) |
 | `http://127.0.0.1:8001/redoc` | ReDoc |
-| `http://127.0.0.1:8001/openapi.json` | The authoritative contract, bundled from `openapi/` (v1.5.0), published as is |
+| `http://127.0.0.1:8001/openapi.json` | The authoritative contract, bundled from `openapi/` (v1.6.0), published as is |
 | `http://127.0.0.1:8001/ui/` | Web GUI (after `npm run build` in `spa/`) |
 
 ### 2.6 Verify the installation
@@ -742,8 +742,8 @@ Every message has a `code`, a `message`, an optional `field` (for example
 
 ### 5.1 Conventions
 
-- **Contract-first:** the authoritative contract is `openapi/opal_say_v1.5.0.yaml` plus the
-  shared kernel `openapi/shared/opal_kernel.yaml` (OpenAPI 3.1, API `v1`, contract version 1.5.0),
+- **Contract-first:** the authoritative contract is `openapi/opal_say_v1.6.0.yaml` plus the
+  shared kernel `openapi/shared/opal_kernel.yaml` (OpenAPI 3.1, API `v1`, contract version 1.6.0),
   bundled into `src/opal_say/contract/opal_say.yaml`. Every route uses the contract's `operationId`, and `/openapi.json` publishes
   the packaged contract file itself rather than a generated schema.
 - **Base URL:** `http://<host>:8001`. All resources are under `/api/v1`.
@@ -813,16 +813,16 @@ Request validation errors use FastAPI's `HTTPValidationError` shape, with `loc` 
 curl -s $API/
 ```
 ```json
-{"name": "opal-say-svc", "version": "1.5.0", "api_version": "v1",
+{"name": "opal-say-svc", "version": "1.6.0", "api_version": "v1",
  "description": "Implementation-neutral OPAL text-to-speech service"}
 ```
 
-#### `GET /healthz` — liveness probe
+#### `GET /api/v1/info/ping` — liveness probe
 
 A cheap check that the process is up. For engine state, use `/api/v1/health/`.
 
 ```bash
-curl -s $API/healthz
+curl -s $API/api/v1/info/ping
 ```
 ```json
 {"status": "ok"}
@@ -1227,7 +1227,7 @@ curl -s $API/api/v1/health/
 ```json
 {
   "status": "degraded",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "active_profile_id": 1,
   "engines": [
     {"engine_id": "kokoro", "enabled": true, "available": false, "message": "Kokoro model file '/nope.onnx' not found"},
@@ -1243,7 +1243,7 @@ curl -s $API/api/v1/health/
 | `degraded` | Some enabled engine is unavailable, but at least one is available |
 | `error` | No enabled engine is available |
 
-The response is always `200`. Use `status` for readiness decisions, and `/healthz` for liveness.
+The response is always `200`. Use `status` for readiness decisions, and `/api/v1/info/ping` for liveness.
 
 ---
 
@@ -1596,13 +1596,13 @@ opal say generate "Live" --stream --sample-rate 22050 -o - | aplay -r 22050 -f S
 ### 7.8 `health`, `info`, `ping`
 
 ```bash
-opal say ping          # GET /healthz            -> ok
-opal say info          # GET /                   -> name, version, api_version
+opal say info ping     # GET /api/v1/info/ping  -> ok
+opal say info version  # GET /api/v1/info/      -> name, version, api_version
 opal say health        # GET /api/v1/health/     -> status line + engine table
 ```
 
 ```
-status: ok  version: 1.5.0  active_profile_id: 1
+status: ok  version: 1.6.0  active_profile_id: 1
 ENGINE_ID  ENABLED  AVAILABLE  MESSAGE
 kokoro     yes      yes        -
 piper      yes      yes        -
@@ -1619,7 +1619,7 @@ browser.
 ### 8.1 Layout
 
 - **Header:** service name, version and API version (from `GET /`), and an **online/offline** pill (from
-  `GET /healthz`).
+  `GET /api/v1/info/ping`).
 - **Tabs:** Generate, Voices, Profiles, Engines, Settings, Backup, Health.
 - **Errors** appear as a red banner in the panel, with the same `status code: message` text as the CLI.
   Validation results list each error and warning with its code and field.
@@ -2028,7 +2028,7 @@ never be selected while their version differs from the implementation.
 | Stream stops with an incomplete-read error | The engine failed mid-stream. Check the service log. The audio received so far is incomplete. |
 | First request for a voice is slow | The model is loaded on first use. Warm it up with `voice test`. Raise Piper's `cache_size` if you switch between many voices. |
 | Requests queue up | Synthesis is serialized per engine. Use a smaller `chunk_max_chars` for faster first audio, or spread the load across engines. |
-| `/openapi.json` returns `500`, `/docs` shows nothing | The service publishes `src/opal_say/contract/opal_say.yaml`, the packaged bundle of `openapi/opal_say_v1.5.0.yaml` and the shared kernel. If the file is missing or unreadable, reinstall/re-checkout the package. |
+| `/openapi.json` returns `500`, `/docs` shows nothing | The service publishes `src/opal_say/contract/opal_say.yaml`, the packaged bundle of `openapi/opal_say_v1.6.0.yaml` and the shared kernel. If the file is missing or unreadable, reinstall/re-checkout the package. |
 | Web GUI is `404` at `/ui` | Build it (`make spa-build`), and check that `spa_dir` points at `spa/dist`. |
 | Browser app gets CORS errors | Add its origin to `cors_origins` in `service.yaml` and restart. |
 | `backup restore` → `backup_not_found` for a copied file | It must be in `<data_dir>/backups/` and keep its `opal-say-<timestamp>.tar.gz` name. |
@@ -2084,7 +2084,7 @@ Write a `TtsEngine` adapter and register it under the `opal_say.engines` entry p
 | Operation | REST | CLI (`opal say ...`) | GUI tab |
 |---|---|---|---|
 | Service info | `GET /` | `info` | header |
-| Liveness | `GET /healthz` | `ping` | header (online pill) |
+| Liveness | `GET /api/v1/info/ping` | `info ping` | header (online pill) |
 | Health | `GET /api/v1/health/` | `health` | Health |
 | List engines | `GET /api/v1/engine/` | `engine list` | Engines, Generate, Voices |
 | Get engine | `GET /api/v1/engine/{engine_id}` | `engine get` | Engines → Configure |

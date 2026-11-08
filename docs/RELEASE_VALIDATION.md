@@ -1,6 +1,6 @@
 # Real-engine release validation
 
-`tests/test_release_validation.py` verifies OPAL Say 1.5.0 against actual
+`tests/test_release_validation.py` verifies OPAL Say 1.6.0 against actual
 Piper and Kokoro engines: engine availability and model initialization, WAV
 generation, PCM streaming, output format headers, model caching across
 requests, configuration updates between requests, and performance measurement
