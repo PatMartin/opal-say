@@ -1,4 +1,4 @@
-"""`opal say engines ...` — discover and configure installed TTS engines."""
+"""`opal say engine ...` — discover and configure installed TTS engine."""
 
 from __future__ import annotations
 
@@ -8,23 +8,23 @@ import typer
 
 from opal_say.cli.common import ENGINE_COLUMNS, OptionPairs, OptionsJson, _call, _emit, _parse_options, _validation
 
-engines_app = typer.Typer(help="Discover and configure installed TTS engines.", no_args_is_help=True)
+engine_app = typer.Typer(help="Discover and configure installed TTS engine.", no_args_is_help=True)
 
 
-@engines_app.command("list")
-def engines_list(ctx: typer.Context) -> None:
-    """List installed engines."""
+@engine_app.command("list")
+def engine_list(ctx: typer.Context) -> None:
+    """List installed engine."""
     _emit(ctx, _call(ctx, "opal_engines_list").json(), ENGINE_COLUMNS)
 
 
-@engines_app.command("get")
-def engines_get(ctx: typer.Context, engine_id: str) -> None:
+@engine_app.command("get")
+def engine_get(ctx: typer.Context, engine_id: str) -> None:
     """Show one engine."""
     _emit(ctx, _call(ctx, "opal_engine_get", path_params={"engine_id": engine_id}).json())
 
 
-@engines_app.command("update")
-def engines_update(
+@engine_app.command("update")
+def engine_update(
     ctx: typer.Context,
     engine_id: str,
     enabled: bool = typer.Option(None, "--enable/--disable", help="Enable or disable routing to the engine"),
@@ -44,13 +44,13 @@ def engines_update(
     _emit(ctx, resp.json())
 
 
-@engines_app.command("validate")
-def engines_validate(ctx: typer.Context, engine_id: str) -> None:
+@engine_app.command("validate")
+def engine_validate(ctx: typer.Context, engine_id: str) -> None:
     """Validate an engine's runtime and configuration."""
     _validation(
-        ctx, _call(ctx, "validate_engine_api_v1_engines__engine_id__validate_post", path_params={"engine_id": engine_id})
+        ctx, _call(ctx, "validate_engine_api_v1_engine__engine_id__validate_post", path_params={"engine_id": engine_id})
     )
 
 
 def register(say_app: typer.Typer) -> None:
-    say_app.add_typer(engines_app, name="engines")
+    say_app.add_typer(engine_app, name="engine")

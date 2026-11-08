@@ -1,19 +1,19 @@
 {
   "opal_engines_list": {
     "method": "GET",
-    "path": "/api/v1/engines/"
+    "path": "/api/v1/engine/"
   },
   "opal_engine_get": {
     "method": "GET",
-    "path": "/api/v1/engines/{engine_id}"
+    "path": "/api/v1/engine/{engine_id}"
   },
   "opal_engine_patch": {
     "method": "PATCH",
-    "path": "/api/v1/engines/{engine_id}"
+    "path": "/api/v1/engine/{engine_id}"
   },
-  "validate_engine_api_v1_engines__engine_id__validate_post": {
+  "validate_engine_api_v1_engine__engine_id__validate_post": {
     "method": "POST",
-    "path": "/api/v1/engines/{engine_id}/validate"
+    "path": "/api/v1/engine/{engine_id}/validate"
   },
   "list_voices_api_v1_voices__get": {
     "method": "GET",

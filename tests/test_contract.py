@@ -202,12 +202,12 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.get("/api/v1/info/ping").json() == {"status": "ok"}
     assert c.get("/api/v1/health/").status_code == 200
 
-    assert c.get("/api/v1/engines/").status_code == 200
-    assert c.get("/api/v1/engines/fake").status_code == 200
-    assert c.get("/api/v1/engines/nope").status_code == 404
-    assert c.patch("/api/v1/engines/fake", json={"enabled": True}).status_code == 200
-    assert c.patch("/api/v1/engines/fake", json={}).status_code == 422
-    assert c.post("/api/v1/engines/fake/validate").json()["valid"] is True
+    assert c.get("/api/v1/engine/").status_code == 200
+    assert c.get("/api/v1/engine/fake").status_code == 200
+    assert c.get("/api/v1/engine/nope").status_code == 404
+    assert c.patch("/api/v1/engine/fake", json={"enabled": True}).status_code == 200
+    assert c.patch("/api/v1/engine/fake", json={}).status_code == 422
+    assert c.post("/api/v1/engine/fake/validate").json()["valid"] is True
 
     make_voice(c, "v1")
     make_voice(c, "v2", ref="tone-b")

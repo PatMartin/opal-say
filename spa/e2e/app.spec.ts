@@ -63,7 +63,7 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     }
     if (method === 'GET' && path === '/api/v1/health/live') return json(route, { status: 'ok', ready: true })
     if (method === 'GET' && path === '/api/v1/health/ready') return json(route, { status: 'ok', ready: true })
-    if (method === 'GET' && path === '/api/v1/engines/') return json(route, [engine])
+    if (method === 'GET' && path === '/api/v1/engine/') return json(route, [engine])
     if (method === 'GET' && path === '/api/v1/voices/') return json(route, [voice])
     if (method === 'GET' && path === '/api/v1/profiles/') return json(route, [profile])
     if (method === 'GET' && path === '/api/v1/settings/') return json(route, { greeting: 'hi' })
@@ -120,8 +120,8 @@ test('navigates every tab', async ({ page }) => {
     Generate: /^Generate$/,
     Voices: /^Voices$/,
     Profiles: /^Profiles$/,
-    Personas: /^Personas$/,
-    Engines: /^Engines$/,
+    Persona: /^Persona$/,
+    Engine: /^Engine$/,
     Settings: /^Settings$/,
     Backup: /^Backup/,
     Health: /^Health$/,
@@ -133,7 +133,7 @@ test('navigates every tab', async ({ page }) => {
 })
 
 test('renders persona and creates one', async ({ page }) => {
-  await page.getByRole('button', { name: 'Personas', exact: true }).click()
+  await page.getByRole('button', { name: 'Persona', exact: true }).click()
   // First data fetch can be slow while Vite transforms modules on a cold server.
   await expect(page.getByRole('cell', { name: 'amy', exact: true })).toBeVisible({ timeout: 15_000 })
 

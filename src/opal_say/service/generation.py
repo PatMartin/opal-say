@@ -89,11 +89,11 @@ def translate_engine_error(exc: Exception) -> Exception:
 
 
 class GenerationService:
-    def __init__(self, store: Store, engines: EngineService, settings: SettingsService):
+    def __init__(self, store: Store, engine: EngineService, settings: SettingsService):
         self.store = store
-        self.engines = engines
+        self.engine = engine
         self.settings = settings
-        # Per-engine serialization is owned by EngineRuntimeManager (engines.runtime).
+        # Per-engine serialization is owned by EngineRuntimeManager (engine.runtime).
 
     # -- resolution -----------------------------------------------------------
 
@@ -121,11 +121,11 @@ class GenerationService:
         if not voice["enabled"]:
             raise Conflict(f"voice '{voice_id}' is disabled", "voice_disabled", {"voice_id": voice_id})
         engine_id = engine_override or voice["engine_id"]
-        engine = self.engines.runtime.get(engine_id)
+        engine = self.engine.runtime.get(engine_id)
         if engine is None:
             raise Conflict(f"engine '{engine_id}' is not installed", "engine_not_found", {"engine_id": engine_id})
         try:
-            runtime = self.engines.runtime.acquire(engine_id)
+            runtime = self.engine.runtime.acquire(engine_id)
         except EngineUnavailableError as exc:
             raise translate_engine_error(exc) from exc
         try:
@@ -141,14 +141,14 @@ class GenerationService:
                     engine.describe_voice(voice["engine_voice_ref"], voice["engine_options"])
                 except (VoiceResolutionError, EngineUnavailableError) as exc:
                     raise mismatch from exc
-            if not self.engines.state(engine_id)["enabled"]:
+            if not self.engine.state(engine_id)["enabled"]:
                 raise Conflict(f"engine '{engine_id}' is disabled", "engine_disabled", {"engine_id": engine_id})
             available, message = engine.availability()
             if not available:
                 raise Unavailable(message or f"engine '{engine_id}' is unavailable", details={"engine_id": engine_id})
             return engine, runtime
         except Exception:
-            self.engines.runtime.release(runtime)
+            self.engine.runtime.release(runtime)
             raise
 
     def _plan(
@@ -253,7 +253,7 @@ class GenerationService:
                 runtime=runtime,
             )
         except Exception:
-            self.engines.runtime.release(runtime)
+            self.engine.runtime.release(runtime)
             raise
 
     def plan_voice_test(self, voice: dict[str, Any], req: VoiceTestRequest) -> GenerationPlan:
@@ -276,7 +276,7 @@ class GenerationService:
                 runtime=runtime,
             )
         except Exception:
-            self.engines.runtime.release(runtime)
+            self.engine.runtime.release(runtime)
             raise
 
     # -- synthesis ------------------------------------------------------------

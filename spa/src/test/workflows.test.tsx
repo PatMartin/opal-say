@@ -9,7 +9,7 @@ const BASE_ROUTES = {
   'GET /api/v1/info/ping': { status: 'ok' },
   'GET /api/v1/profiles/': [PROFILE],
   'GET /api/v1/voices/': [VOICE],
-  'GET /api/v1/engines/': [ENGINE],
+  'GET /api/v1/engine/': [ENGINE],
 }
 
 async function openTab(name: string) {
@@ -226,15 +226,15 @@ describe('Profiles', () => {
   })
 })
 
-describe('Engines', () => {
+describe('Engine', () => {
   it('toggles and validates an engine', async () => {
     const calls = mockApi({
       ...BASE_ROUTES,
-      'PATCH /api/v1/engines/piper': { ...ENGINE, enabled: false },
-      'POST /api/v1/engines/piper/validate': { valid: true, errors: [], warnings: [{ code: 'engine_disabled', message: 'disabled' }], details: {} },
+      'PATCH /api/v1/engine/piper': { ...ENGINE, enabled: false },
+      'POST /api/v1/engine/piper/validate': { valid: true, errors: [], warnings: [{ code: 'engine_disabled', message: 'disabled' }], details: {} },
     })
     render(<App />)
-    await openTab('Engines')
+    await openTab('Engine')
     await userEvent.click(await screen.findByRole('button', { name: 'Disable' }))
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ enabled: false }))
     await userEvent.click(screen.getByRole('button', { name: 'Validate' }))

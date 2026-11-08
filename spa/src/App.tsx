@@ -3,7 +3,7 @@ import { call } from './api/client'
 import type { ServiceInfo } from './api/types'
 import { BackupPanel } from './components/BackupPanel'
 import { useLoad } from './components/common'
-import { EnginesPanel } from './components/EnginesPanel'
+import { EnginePanel } from './components/EnginePanel'
 import { GeneratePanel } from './components/GeneratePanel'
 import { HealthPanel } from './components/HealthPanel'
 import { PersonaPanel } from './components/PersonaPanel'
@@ -15,8 +15,8 @@ const TABS = {
   Generate: GeneratePanel,
   Voices: VoicesPanel,
   Profiles: ProfilesPanel,
-  Personas: PersonaPanel,
-  Engines: EnginesPanel,
+  Persona: PersonaPanel,
+  Engine: EnginePanel,
   Settings: SettingsPanel,
   Backup: BackupPanel,
   Health: HealthPanel,

@@ -3,8 +3,8 @@ import { call } from '../api/client'
 import type { Engine, ValidationResult } from '../api/types'
 import { ErrorBanner, OptionsField, ValidationView, parseOptions, useAction, useLoad } from './common'
 
-export function EnginesPanel() {
-  const engines = useLoad(() => call<Engine[]>('opal_engines_list'), [])
+export function EnginePanel() {
+  const engine = useLoad(() => call<Engine[]>('opal_engines_list'), [])
   const [selected, setSelected] = useState<Engine | null>(null)
   const [options, setOptions] = useState('')
   const [validation, setValidation] = useState<ValidationResult | null>(null)
@@ -20,19 +20,19 @@ export function EnginesPanel() {
   const patch = async (id: string, body: Record<string, unknown>) => {
     const engine = await call<Engine>('opal_engine_patch', { path: { engine_id: id }, body })
     if (selected?.engine_id === id) setSelected(engine)
-    await engines.reload()
+    await engine.reload()
   }
   const update = (id: string, body: Record<string, unknown>) => action.run(() => patch(id, body))
 
   const validate = (id: string) =>
     action.run(async () => {
-      setValidation(await call<ValidationResult>('validate_engine_api_v1_engines__engine_id__validate_post', { path: { engine_id: id } }))
+      setValidation(await call<ValidationResult>('validate_engine_api_v1_engine__engine_id__validate_post', { path: { engine_id: id } }))
     })
 
   return (
     <section>
-      <h2>Engines</h2>
-      <ErrorBanner error={engines.error} />
+      <h2>Engine</h2>
+      <ErrorBanner error={engine.error} />
       <table>
         <thead>
           <tr>
@@ -44,7 +44,7 @@ export function EnginesPanel() {
           </tr>
         </thead>
         <tbody>
-          {engines.data.map((e) => (
+          {engine.data.map((e) => (
             <tr key={e.engine_id}>
               <td>{e.engine_id}</td>
               <td title={e.description ?? ''}>{e.name}</td>

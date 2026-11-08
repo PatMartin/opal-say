@@ -54,12 +54,12 @@ def run(http):
 
 
 def test_full_cli_workflow(run, http, tmp_path, config):
-    out = run("--json engines list").stdout
+    out = run("--json engine list").stdout
     assert [e["engine_id"] for e in json.loads(out)] == ["alt", "fake"]
-    assert "fake" in run("engines list").stdout
-    assert json.loads(run("--json engines get fake").stdout)["engine_id"] == "fake"
-    assert json.loads(run("engines update alt --disable -O available=true").stdout)["enabled"] is False
-    assert "valid" in run("engines validate fake").stdout
+    assert "fake" in run("engine list").stdout
+    assert json.loads(run("--json engine get fake").stdout)["engine_id"] == "fake"
+    assert json.loads(run("engine update alt --disable -O available=true").stdout)["enabled"] is False
+    assert "valid" in run("engine validate fake").stdout
 
     run('voices add v1 --name "Voice One" --engine fake --ref tone-a -O pitch=300 --language en-US')
     run("voices add v2 --name Two --engine fake --ref tone-b --disabled")
@@ -151,14 +151,14 @@ def test_error_reporting(run):
     assert "no_voice" in result.stderr
     result = run('generate "x" --stream -o /dev/null', code=1)
     assert "409 no_voice" in result.stderr
-    run("engines update fake", code=2)
+    run("engine update fake", code=2)
     run("generate x --stream --format wav -o -", code=2)
     run("voices add a --name a --engine fake --ref tone-a -O novalue", code=2)
 
 
 def test_invalid_validation_result_exits_nonzero(run):
     run("voices add v --name V --engine fake --ref tone-a")
-    run("engines update fake -O available=false")
+    run("engine update fake -O available=false")
     result = run("voices validate v", code=1)
     assert "INVALID" in result.stdout and "engine_unavailable" in result.stdout
 
@@ -173,7 +173,7 @@ def test_tree_command_prints_command_surface():
     result = CliRunner().invoke(cli.app, ["say", "tree"])
     assert result.exit_code == 0
     out = result.stdout
-    for cmd in ("generate", "engines", "voices", "profiles", "settings", "backup", "health"):
+    for cmd in ("generate", "engine", "voices", "profiles", "settings", "backup", "health"):
         assert cmd in out
     assert "speak" not in out  # hidden default command
     # Required args/options are bare; optional ones are bracketed.

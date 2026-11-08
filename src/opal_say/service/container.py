@@ -26,7 +26,7 @@ class Services:
     config: ServiceConfig
     store: Store
     runtime: EngineRuntimeManager
-    engines: EngineService
+    engine: EngineService
     voices: VoiceService
     profiles: ProfileService
     persona: PersonaService
@@ -35,21 +35,21 @@ class Services:
     config_ops: ConfigService
 
     def health(self) -> dict[str, Any]:
-        engines = []
+        engine_states = []
         for engine in self.runtime.all():
             available, message = engine.availability()
-            enabled = self.engines.state(engine.engine_id)["enabled"]
-            engines.append({"engine_id": engine.engine_id, "enabled": enabled, "available": available,
+            enabled = self.engine.state(engine.engine_id)["enabled"]
+            engine_states.append({"engine_id": engine.engine_id, "enabled": enabled, "available": available,
                             "message": message})
-        usable = [e for e in engines if e["enabled"] and e["available"]]
-        broken = [e for e in engines if e["enabled"] and not e["available"]]
+        usable = [e for e in engine_states if e["enabled"] and e["available"]]
+        broken = [e for e in engine_states if e["enabled"] and not e["available"]]
         status = "error" if not usable else ("degraded" if broken else "ok")
         active = self.store.active_profile()
         return {
             "status": status,
             "version": __version__,
             "active_profile_id": active["id"] if active else None,
-            "engines": engines,
+            "engines": engine_states,
             "details": {
                 "voices": len(self.store.list_voices()),
                 "enabled_voices": len(self.store.list_voices(enabled=True)),
@@ -61,10 +61,10 @@ class Services:
         self.store.close()
 
 
-def build_services(config: ServiceConfig, engines: list[TtsEngine] | None = None) -> Services:
+def build_services(config: ServiceConfig, engine: list[TtsEngine] | None = None) -> Services:
     store = Store(config.db_path)
     fresh = store.created
-    runtime = EngineRuntimeManager(EngineRegistry(engines if engines is not None else default_engines()))
+    runtime = EngineRuntimeManager(EngineRegistry(engine if engine is not None else default_engines()))
     engine_svc = EngineService(store, runtime)
     engine_svc.bootstrap(config.engines)
     voice_svc = VoiceService(store, engine_svc)
@@ -73,7 +73,7 @@ def build_services(config: ServiceConfig, engines: list[TtsEngine] | None = None
         config=config,
         store=store,
         runtime=runtime,
-        engines=engine_svc,
+        engine=engine_svc,
         voices=voice_svc,
         profiles=ProfileService(store, engine_svc, voice_svc),
         persona=PersonaService(store, voice_svc),

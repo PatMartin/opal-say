@@ -64,7 +64,7 @@ export function PersonaPanel() {
 
   return (
     <section>
-      <h2>Personas</h2>
+      <h2>Persona</h2>
       <ErrorBanner error={persona.error} />
       <table>
         <thead>

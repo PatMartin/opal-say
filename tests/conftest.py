@@ -105,7 +105,7 @@ def _needs_if_match(method: str, url: str) -> bool:
     """Configuration mutations carrying the mandatory If-Match precondition."""
     m = method.upper()
     if m in {"PATCH", "DELETE"} and url.startswith(
-        ("/api/v1/engines/", "/api/v1/voices/", "/api/v1/profiles/", "/api/v1/persona/")
+        ("/api/v1/engine/", "/api/v1/voices/", "/api/v1/profiles/", "/api/v1/persona/")
     ):
         return True
     if m in {"PUT", "DELETE", "PATCH"} and url.startswith("/api/v1/settings/"):
@@ -152,13 +152,13 @@ def config(tmp_path: Path) -> ServiceConfig:
 
 
 @pytest.fixture
-def engines() -> list[FakeEngine]:
+def engine() -> list[FakeEngine]:
     return [FakeEngine("fake"), FakeEngine("alt", speed_range=(0.5, 2.0), voices={"tone-a": 24000})]
 
 
 @pytest.fixture
-def app(config: ServiceConfig, engines: list[FakeEngine]):
-    application = create_app(config, engines=engines)
+def app(config: ServiceConfig, engine: list[FakeEngine]):
+    application = create_app(config, engines=engine)
     yield application
     application.state.services.close()
 

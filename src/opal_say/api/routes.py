@@ -181,34 +181,34 @@ def report_dict(report: Report) -> dict[str, Any]:
     }
 
 
-# -- engines ---------------------------------------------------------------------
+# -- engine ---------------------------------------------------------------------
 
 
-@router.get("/api/v1/engines/", tags=["engines"], operation_id="opal_engines_list",
+@router.get("/api/v1/engine/", tags=["engine"], operation_id="opal_engines_list",
             response_model=list[EngineRead])
-def list_engines(response: Response, svc: Services = Depends(services)):
+def list_engine(response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.engines.list()
+    return svc.engine.list()
 
 
-@router.get("/api/v1/engines/{engine_id}", tags=["engines"], operation_id="opal_engine_get",
+@router.get("/api/v1/engine/{engine_id}", tags=["engine"], operation_id="opal_engine_get",
             response_model=EngineRead)
 def get_engine(engine_id: str, response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.engines.get(engine_id)
+    return svc.engine.get(engine_id)
 
 
-@router.patch("/api/v1/engines/{engine_id}", tags=["engines"],
+@router.patch("/api/v1/engine/{engine_id}", tags=["engine"],
               operation_id="opal_engine_patch", response_model=EngineRead)
 def update_engine(engine_id: str, body: EngineUpdate, if_match: str | None = Header(None),
                   svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.engines.update(engine_id, body.changes()))
+    return mutate_with_revision(svc.store, if_match, lambda: svc.engine.update(engine_id, body.changes()))
 
 
-@router.post("/api/v1/engines/{engine_id}/validate", tags=["engines"],
-             operation_id="validate_engine_api_v1_engines__engine_id__validate_post", response_model=ValidationResult)
+@router.post("/api/v1/engine/{engine_id}/validate", tags=["engine"],
+             operation_id="validate_engine_api_v1_engine__engine_id__validate_post", response_model=ValidationResult)
 def validate_engine(engine_id: str, svc: Services = Depends(services)):
-    return report_dict(svc.engines.validate(engine_id))
+    return report_dict(svc.engine.validate(engine_id))
 
 
 # -- voices ----------------------------------------------------------------------

@@ -5,15 +5,15 @@ from __future__ import annotations
 import typer
 
 from opal_say.cli.client import api_url_from_env
-from opal_say.cli.commands import backup, engines, generate, persona, profiles, root, settings, voices
+from opal_say.cli.commands import backup, engine, generate, persona, profiles, root, settings, voices
 from opal_say.cli.common import CliState, client_factory  # noqa: F401 - re-exported; tests patch main.client_factory
 
 # REST operationId -> CLI command (relative to `opal say`). Verified by the parity tests.
 COMMANDS: dict[str, str] = {
-    "opal_engines_list": "engines list",
-    "opal_engine_get": "engines get",
-    "opal_engine_patch": "engines update",
-    "validate_engine_api_v1_engines__engine_id__validate_post": "engines validate",
+    "opal_engines_list": "engine list",
+    "opal_engine_get": "engine get",
+    "opal_engine_patch": "engine update",
+    "validate_engine_api_v1_engine__engine_id__validate_post": "engine validate",
     "list_voices_api_v1_voices__get": "voices list",
     "create_voice_api_v1_voices__post": "voices add",
     "get_voice_api_v1_voices__voice_id__get": "voices get",
@@ -75,7 +75,7 @@ def say_callback(
     ctx.obj = CliState(client_factory(api_url or api_url_from_env(), timeout), json_output)
 
 
-for _module in (engines, voices, profiles, persona, generate, settings, backup, root):
+for _module in (engine, voices, profiles, persona, generate, settings, backup, root):
     _module.register(say_app)
 
 

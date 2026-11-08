@@ -31,7 +31,7 @@ class EngineService:
         self.runtime = runtime
 
     def bootstrap(self, seed: dict[str, dict[str, Any]]) -> None:
-        """Create persisted state for newly discovered engines and push options into adapters."""
+        """Create persisted state for newly discovered engine and push options into adapters."""
         for engine in self.runtime.all():
             state = self.store.get_engine_state(engine.engine_id)
             if state is None:
@@ -124,9 +124,9 @@ class EngineService:
 
 
 class VoiceService:
-    def __init__(self, store: Store, engines: EngineService):
+    def __init__(self, store: Store, engine: EngineService):
         self.store = store
-        self.engines = engines
+        self.engine = engine
 
     def get(self, voice_id: str) -> dict[str, Any]:
         voice = self.store.get_voice(voice_id)
@@ -153,7 +153,7 @@ class VoiceService:
         return {"native_sample_rate": desc.native_sample_rate, "metadata": desc.metadata, "language": desc.language}
 
     def create(self, body: VoiceCreate) -> dict[str, Any]:
-        engine = self.engines.engine(body.engine_id)
+        engine = self.engine.engine(body.engine_id)
         if self.store.get_voice(body.voice_id) is not None:
             raise Conflict(f"voice '{body.voice_id}' is already registered", "voice_exists", {"voice_id": body.voice_id})
         desc = self._describe(engine, body.engine_voice_ref, body.engine_options)
@@ -180,7 +180,7 @@ class VoiceService:
         voice = self.get(voice_id)
         changes = body.changes()
         merged = {**voice, **changes}
-        engine = self.engines.engine(merged["engine_id"])
+        engine = self.engine.engine(merged["engine_id"])
 
         if changes.get("enabled") is False:
             active = self.store.active_profile()
@@ -230,21 +230,21 @@ class VoiceService:
 
     def validate(self, voice_id: str) -> Report:
         voice = self.get(voice_id)
-        engine = self.engines.runtime.get(voice["engine_id"])
+        engine = self.engine.runtime.get(voice["engine_id"])
         if engine is None:
             return Report(errors=[Issue("engine_not_found", f"engine '{voice['engine_id']}' is not installed", "engine_id")])
         report = engine.validate_voice(voice["engine_voice_ref"], voice["engine_options"])
         if not voice["enabled"]:
             report.warnings.append(Issue("voice_disabled", f"voice '{voice_id}' is disabled", "enabled"))
-        if not self.engines.state(engine.engine_id)["enabled"]:
+        if not self.engine.state(engine.engine_id)["enabled"]:
             report.warnings.append(Issue("engine_disabled", f"engine '{engine.engine_id}' is disabled", "engine_id"))
         return report
 
 
 class ProfileService:
-    def __init__(self, store: Store, engines: EngineService, voices: VoiceService):
+    def __init__(self, store: Store, engine: EngineService, voices: VoiceService):
         self.store = store
-        self.engines = engines
+        self.engine = engine
         self.voices = voices
 
     def list(self) -> list[dict[str, Any]]:
@@ -263,7 +263,7 @@ class ProfileService:
         return voice
 
     def _check_options(self, voice: dict[str, Any], options: dict[str, Any]) -> None:
-        engine = self.engines.runtime.get(voice["engine_id"])
+        engine = self.engine.runtime.get(voice["engine_id"])
         if engine is None:
             return
         issues = engine.validate_options(options, "generation")
@@ -273,7 +273,7 @@ class ProfileService:
     def _check_activatable(self, voice: dict[str, Any]) -> None:
         if not voice["enabled"]:
             raise Conflict(f"voice '{voice['voice_id']}' is disabled", "voice_disabled", {"voice_id": voice["voice_id"]})
-        problem = self.engines.usability_problem(voice["engine_id"])
+        problem = self.engine.usability_problem(voice["engine_id"])
         if problem:
             raise Conflict(problem[1], problem[0], {"engine_id": voice["engine_id"]})
 

@@ -3,8 +3,8 @@ info:
   title: OPAL Say API
   version: 1.6.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides\
-    \ a stable REST contract over one or more host-installed TTS\nengines such as Piper or Kokoro. Clients\
-    \ interact with OPAL concepts—engines,\nvoices, profiles, generation settings, and audio output—without\
+    \ a stable REST contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients\
+    \ interact with OPAL concepts—engine,\nvoices, profiles, generation settings, and audio output—without\
     \ depending on a\nspecific engine's command line, model layout, Python API, or native output format.\n\n\
     Design principles:\n\n* The OpenAPI contract is the public source of truth for service behavior.\n* Engines\
     \ are installed and discovered by the implementation; they are not created\n  or deleted through this API.\n\
@@ -42,8 +42,8 @@ info:
     \ keeps media-specific transports but exposes correlation headers, defined failure behavior, and no unsupported\
     \ replay guarantee. Configuration export/import/validation excludes secrets and history.\n"
 tags:
-- name: engines
-  description: 'Discover and configure TTS engines installed by the service implementation.
+- name: engine
+  description: 'Discover and configure TTS engine installed by the service implementation.
 
     Engines are not created or deleted through this API.
 
@@ -90,11 +90,11 @@ servers:
 - url: http://127.0.0.1:8080
   description: Illustrative local endpoint; actual bind address and port are configurable.
 paths:
-  /api/v1/engines/:
+  /api/v1/engine/:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/engines_collection'
-  /api/v1/engines/{engine_id}:
+  /api/v1/engine/{engine_id}:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/engine_item'
-  /api/v1/engines/{engine_id}/validate:
+  /api/v1/engine/{engine_id}/validate:
     parameters:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/EngineId'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalSessionIdParameter'
@@ -103,7 +103,7 @@ paths:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
     post:
       tags:
-      - engines
+      - engine
       summary: Validate Engine
       description: 'Validate that the engine is correctly configured and usable by the service.
 
@@ -115,7 +115,7 @@ paths:
         diagnostic messages because the validation operation itself completed normally.
 
         '
-      operationId: validate_engine_api_v1_engines__engine_id__validate_post
+      operationId: validate_engine_api_v1_engine__engine_id__validate_post
       responses:
         '401':
           $ref: './shared/opal_kernel.yaml#/components/responses/Unauthorized'

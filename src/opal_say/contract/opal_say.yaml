@@ -3,7 +3,7 @@ info:
   title: OPAL Say API
   version: 1.6.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides a stable REST\
-    \ contract over one or more host-installed TTS\nengines such as Piper or Kokoro. Clients interact with OPAL concepts—engines,\n\
+    \ contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients interact with OPAL concepts—engine,\n\
     voices, profiles, generation settings, and audio output—without depending on a\nspecific engine's command line, model\
     \ layout, Python API, or native output format.\n\nDesign principles:\n\n* The OpenAPI contract is the public source of\
     \ truth for service behavior.\n* Engines are installed and discovered by the implementation; they are not created\n  or\
@@ -37,8 +37,8 @@ info:
     \ 202, empty deletion 204. Streaming keeps media-specific transports but exposes correlation headers, defined failure\
     \ behavior, and no unsupported replay guarantee. Configuration export/import/validation excludes secrets and history.\n"
 tags:
-- name: engines
-  description: 'Discover and configure TTS engines installed by the service implementation.
+- name: engine
+  description: 'Discover and configure TTS engine installed by the service implementation.
 
     Engines are not created or deleted through this API.
 
@@ -85,7 +85,7 @@ servers:
 - url: http://127.0.0.1:8080
   description: Illustrative local endpoint; actual bind address and port are configurable.
 paths:
-  /api/v1/engines/:
+  /api/v1/engine/:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
@@ -123,7 +123,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /api/v1/engines/{engine_id}:
+  /api/v1/engine/{engine_id}:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
     - $ref: '#/components/parameters/OpalTransactionIdParameter'
@@ -208,7 +208,7 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
-  /api/v1/engines/{engine_id}/validate:
+  /api/v1/engine/{engine_id}/validate:
     parameters:
     - $ref: '#/components/parameters/EngineId'
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -217,7 +217,7 @@ paths:
     - $ref: '#/components/parameters/OpalCausationIdParameter'
     post:
       tags:
-      - engines
+      - engine
       summary: Validate Engine
       description: 'Validate that the engine is correctly configured and usable by the service.
 
@@ -229,7 +229,7 @@ paths:
         diagnostic messages because the validation operation itself completed normally.
 
         '
-      operationId: validate_engine_api_v1_engines__engine_id__validate_post
+      operationId: validate_engine_api_v1_engine__engine_id__validate_post
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
