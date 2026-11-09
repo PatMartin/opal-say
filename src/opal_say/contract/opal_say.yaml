@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: OPAL Say API
-  version: 1.6.0
+  version: 1.7.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides a stable REST\
     \ contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients interact with OPAL concepts—engine,\n\
     voice, profile, generation setting, and audio output—without depending on a\nspecific engine's command line, model layout,\
@@ -2837,7 +2837,12 @@ components:
 
             '
           example: amy
-        engine_id: null
+        engine_id:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          description: Optional advanced engine override; incompatible overrides are rejected.
         speed:
           anyOf:
           - type: number

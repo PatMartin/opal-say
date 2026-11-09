@@ -4,7 +4,7 @@
 openapi: 3.1.0
 info:
   title: OPAL Suite Kernel
-  version: 1.2.0
+  version: 1.7.0
   description: 'Shared contract kernel for the OPAL suite (SUITE STANDARD v1.2).
 
 
