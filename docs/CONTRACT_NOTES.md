@@ -1,6 +1,6 @@
 # OPAL Say contract notes
 
-Authoritative contract: `openapi/opal_say_v1.6.0.yaml` together with the shared
+Authoritative contract: `openapi/opal_say_v1.7.0.yaml` together with the shared
 OPAL kernel `openapi/shared/opal_kernel.yaml`.
 
 ## Kernel split
@@ -55,7 +55,7 @@ same identifiers). Generation requests accept `persona` on both
   time (`404` otherwise), and a voice cannot be deleted while persona
   reference it (`409 voice_in_use`).
 
-## v1.6.0 surface conventions
+## v1.7.0 surface conventions
 
 - **Singular resources.** Collection paths are singular — `/api/v1/voice/`,
   `/api/v1/engine/`, `/api/v1/profile/`, `/api/v1/setting/`, `/api/v1/persona/`

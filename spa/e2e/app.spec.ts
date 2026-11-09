@@ -56,7 +56,7 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     const path = url.pathname
     const method = route.request().method()
 
-    if (method === 'GET' && path === '/api/v1/info/') return json(route, { name: 'opal-say-svc', version: '1.6.0', api_version: 'v1' })
+    if (method === 'GET' && path === '/api/v1/info/') return json(route, { name: 'opal-say-svc', version: '1.7.0', api_version: 'v1' })
     if (method === 'GET' && path === '/api/v1/info/ping') return json(route, { status: 'ok' })
     if (method === 'GET' && path === '/api/v1/health/') {
       return json(route, { status: 'ok', version: '1.5.0', active_profile_id: 1, engines: [{ ...engine, message: '' }], details: {} })

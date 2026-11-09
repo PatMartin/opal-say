@@ -1133,7 +1133,7 @@ opal say info
 ```json
 {
   "name": "opal-say-svc",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "api_version": "v1",
   "description": "Implementation-neutral OPAL text-to-speech service"
 }
@@ -1143,7 +1143,7 @@ opal say info
 opal say health
 ```
 ```
-status: degraded  version: 1.6.0  active_profile_id: 1
+status: degraded  version: 1.7.0  active_profile_id: 1
 ENGINE_ID  ENABLED  AVAILABLE  MESSAGE
 kokoro     yes      no         Kokoro model file '/nope.onnx' not found
 piper      yes      yes        -
@@ -1476,7 +1476,7 @@ See the [User Guide](USER_GUIDE.md#10-integrating-with-your-application) for str
 | First `generate` with a voice is slow | The model is loaded on first use. Later calls reuse it (Piper keeps `cache_size` models). Raise `--timeout` for very long texts. |
 | `backup restore` says `backup_not_found` for a copied file | The file must be in the service's `<data_dir>/backups/` and keep its `opal-say-<timestamp>.tar.gz` name. |
 | `backup import` says `config_not_found` | The service's `config_dir` has none of `engines.yaml`, `voices.yaml`, `profiles.yaml`, `settings.yaml`. |
-| `/docs` loads but shows no operations, `/openapi.json` returns `500` | The service publishes `src/opal_say/contract/opal_say.yaml`, the packaged bundle of `openapi/opal_say_v1.6.0.yaml` and the shared kernel. If it is missing or unreadable, reinstall/re-checkout the package. The CLI is not affected. |
+| `/docs` loads but shows no operations, `/openapi.json` returns `500` | The service publishes `src/opal_say/contract/opal_say.yaml`, the packaged bundle of `openapi/opal_say_v1.7.0.yaml` and the shared kernel. If it is missing or unreadable, reinstall/re-checkout the package. The CLI is not affected. |
 
 ---
 
