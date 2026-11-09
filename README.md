@@ -151,9 +151,9 @@ The default address is **`http://127.0.0.1:8001`**. Keep the service terminal ru
 ~~~bash
 source .venv/bin/activate
 
-opal say ping
+opal say info ping
 opal say info
-opal say health
+opal say info health
 opal say engine list
 opal say voice list
 ~~~
@@ -198,7 +198,7 @@ npm run build
 cd ..
 ~~~
 
-Restart the service if needed and open `http://127.0.0.1:8001/ui/`. The React/Vite SPA offers engine and voice management, profiles, generation and playback, settings, health, and backups—all through the REST API.
+Restart the service if needed and open `http://127.0.0.1:8001/ui/`. The React/Vite SPA offers engine and voice management, profiles, personas, generation and playback, settings, health, and backups—all through the REST API.
 
 For frontend development:
 
@@ -222,9 +222,12 @@ opal
     │  --json                                   raw JSON output
     │  --timeout SECONDS                        default: 120
     │
-    ├── health                                  [--live | --ready]
-    ├── info
-    ├── ping
+    ├── info                                    (bare: same as info version)
+    │   ├── version
+    │   ├── health
+    │   ├── live
+    │   ├── ready
+    │   └── ping
     ├── tree                                    prints this command tree
     │
     ├── engine
@@ -238,6 +241,7 @@ opal
     ├── voice
     │   ├── list                                [--engine ENGINE_ID]
     │   │                                       [--enabled/--disabled]
+    │   │                                       [--language CODE]
     │   ├── get VOICE_ID
     │   ├── add VOICE_ID                         --name NAME --engine ENGINE_ID
     │   │                                       --ref ENGINE_VOICE_REF
@@ -281,10 +285,23 @@ opal
     │   ├── activate PROFILE_ID
     │   └── remove PROFILE_ID
     │
+    ├── persona
+    │   ├── list                                [--enabled/--disabled]
+    │   ├── add PERSONA_ID                       --name NAME --voice VOICE_ID
+    │   │                                       [--description TEXT]
+    │   │                                       [--enabled/--disabled]
+    │   ├── get PERSONA_ID
+    │   ├── update PERSONA_ID                    [--name NAME] [--voice VOICE_ID]
+    │   │                                       [--description TEXT | --clear-description]
+    │   │                                       [--enabled/--disabled]
+    │   ├── validate PERSONA_ID
+    │   └── remove PERSONA_ID
+    │
     ├── TEXT                                    speaks aloud (generate + play)
     ├── generate TEXT                           [-o OUTPUT] [--play] [--stream]
     │                                           [--profile PROFILE_ID]
-    │                                           [--voice VOICE_ID] [--engine ENGINE_ID]
+    │                                           [--voice VOICE_ID] [--persona PERSONA_ID]
+    │                                           [--engine ENGINE_ID]
     │                                           [--speed FLOAT] [--volume FLOAT]
     │                                           [--format wav|pcm]
     │                                           [--sample-rate HZ]
@@ -333,6 +350,7 @@ opal-say --help
 | **Voice** | A named registration of a host-resident model/voice | `en-us-amy-low` |
 | **Voice reference** | Engine-specific location or name used by an adapter | `en_US-amy-low`, `af_heart` |
 | **Profile** | A reusable delivery style: voice, speed, volume, format, rate | `default`, `telephony` |
+| **Persona** | A named character bound to one registered voice | `amy` |
 | **Generation** | Turn text into a finished or streaming audio body | `generate "Hello" -o hello.wav` |
 | **Engine option** | A control relevant to a particular TTS runtime | `noise_scale`, `lang` |
 | **Setting** | A stored service-wide default or limit | `chunk_max_chars` |
@@ -801,11 +819,11 @@ opal say backup validate
 ### Use case 14: Know what broke before users hear silence
 
 ~~~bash
-opal say ping
+opal say info ping
 opal say info
-opal say health
-opal say health --live
-opal say health --ready
+opal say info health
+opal say info live
+opal say info ready
 
 opal say engine list
 opal say engine validate piper
@@ -817,7 +835,7 @@ If your pipeline can't speak, troubleshoot from the bottom up:
 
 | Symptom | First place to look |
 | --- | --- |
-| Can't reach the service | `opal say ping`, URL, port, process |
+| Can't reach the service | `opal say info ping`, URL, port, process |
 | Engine reports unavailable | `engine validate`, installed Python extra, model paths |
 | Voice doesn't synthesize | `voice validate`, voice ref and model config |
 | No active default voice | `profile list`, active profile or explicit `--voice` |
@@ -916,7 +934,7 @@ make test-spa       # React/Vitest and frontend type checking
 make spa-dev        # Vite development server
 ~~~
 
-Real-engine tests require installed model files — they look for `~/piper/voices/en_US-amy-low.onnx` and `~/kokoro/` (override with `OPAL_SAY_TEST_PIPER_MODEL` / `OPAL_SAY_TEST_KOKORO_DIR`) — and skip cleanly when the resources aren't available. Standard CI runs `make test-fast`; real-engine validation is a manual-dispatch job only, so no model downloads ever happen on push or PR. The test suite checks OpenAPI route alignment, CLI/SPA operation parity, output formats, error handling, and streaming behavior. See [docs/PERFORMANCE_TESTS.md](docs/PERFORMANCE_TESTS.md) for CPU/GPU/Raspberry Pi notes and [docs/RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md) for the real-engine release checklist.
+Real-engine tests require installed model files — they look for `~/piper/voices/en_US-amy-low.onnx` and `~/kokoro/` (override with `OPAL_SAY_TEST_PIPER_MODEL` / `OPAL_SAY_TEST_KOKORO_DIR`) — and skip cleanly when the resources aren't available. Standard CI runs `make test-fast`; real-engine validation is a manual-dispatch job only, so no model downloads ever happen on push or PR. The test suite checks OpenAPI route alignment, CLI/SPA operation parity, output formats, error handling, and streaming behavior. See [docs/RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md) for the real-engine release checklist.
 
 ### Find your way around
 
@@ -950,12 +968,11 @@ opal-say/
 │   ├── CONTRACT_NOTES.md               contract interpretation notes
 │   ├── PIPER_INSTALL.md                Piper engine installation guide
 │   ├── KOKORO_INSTALL.md               Kokoro engine installation guide
-│   ├── PERFORMANCE_TESTS.md            performance testing notes
 │   └── RELEASE_VALIDATION.md           real-engine release checklist
 └── tests/                              Python and contract tests
 ~~~
 
-For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs/USER_GUIDE.md), [Contract Notes](docs/CONTRACT_NOTES.md), [Piper](docs/PIPER_INSTALL.md) and [Kokoro](docs/KOKORO_INSTALL.md) install guides, [Performance Tests](docs/PERFORMANCE_TESTS.md), and [Release Validation](docs/RELEASE_VALIDATION.md).
+For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs/USER_GUIDE.md), [Contract Notes](docs/CONTRACT_NOTES.md), [Piper](docs/PIPER_INSTALL.md) and [Kokoro](docs/KOKORO_INSTALL.md) install guides, and [Release Validation](docs/RELEASE_VALIDATION.md).
 
 ---
 

@@ -62,6 +62,7 @@ There are three ways to use it, and all three can do the same things:
 | **Voice** | A registration that points at a voice/model resource **already installed on the host**. It has a globally unique `voice_id` and is bound to one engine. | `en-us-amy-low` |
 | **Engine voice ref** | The opaque, engine-specific reference stored on a voice (`engine_voice_ref`). Only the adapter interprets it. | Piper: `en_US-amy-low` or `/opt/voices/x.onnx`. Kokoro: `af_heart` |
 | **Profile** | A reusable set of generation settings: voice, speed, volume, output format, sample rate and engine options. Profiles have a numeric id and a unique name. | `default`, `telephony` |
+| **Persona** | A named character bound to one registered voice. Passing `persona` in a generation request selects that persona's voice; an explicit `voice_id` still wins. | `amy` |
 | **Active profile** | At most one profile is active. It's used whenever a request doesn't name a profile. | `default` (id 1) |
 | **Engine options** | Opaque, engine-specific settings (`engine_options` / `options`). Each adapter declares the keys it accepts and their scope. | `{"noise_scale": 0.5}`, `{"lang": "en-gb"}` |
 | **Setting** | A service-wide key/value pair, stored as a native JSON value. Known keys are validated. | `max_text_chars = 20000` |
@@ -95,7 +96,7 @@ These controls have the same meaning on every engine:
 
 | Scope | Set on | Typical keys |
 |---|---|---|
-| `engine` | The engine (`PATCH /engines/{id}`). Applies service-wide. | Piper `voices_dir`, `use_cuda`, `cache_size`; Kokoro `model_path`, `voices_path`, `default_lang` |
+| `engine` | The engine (`PATCH /engine/{id}`). Applies service-wide. | Piper `voices_dir`, `use_cuda`, `cache_size`; Kokoro `model_path`, `voices_path`, `default_lang` |
 | `voice` | A voice registration. Voices also accept generation keys as per-voice defaults. | Piper `config_path` (+ generation keys) |
 | `generation` | A profile, a generate request, or a voice test | Piper `noise_scale`, `speaker_id`, ...; Kokoro `lang` |
 
@@ -222,7 +223,7 @@ Useful URLs:
 
 | URL | What |
 |---|---|
-| `http://127.0.0.1:8001/` | Service info |
+| `http://127.0.0.1:8001/api/v1/info/` | Service info |
 | `http://127.0.0.1:8001/api/v1/info/ping` | Liveness probe |
 | `http://127.0.0.1:8001/api/v1/health/` | Readiness and engine state |
 | `http://127.0.0.1:8001/docs` | Swagger UI (interactive API docs) |
@@ -233,15 +234,15 @@ Useful URLs:
 ### 2.6 Verify the installation
 
 ```bash
-opal say ping                      # ok
-opal say health                    # status: ok, both engines available
+opal say info ping                      # ok
+opal say info health                    # status: ok, both engines available
 opal say voice list               # native_sample_rate is filled in when a voice resolves
 opal say backup validate           # valid
 opal say generate "Hello from OPAL Say." -o hello.wav && aplay hello.wav
 opal say generate "Streaming works too." --stream -o - | aplay -r 16000 -f S16_LE -c 1 -t raw
 ```
 
-`health` should say `status: ok`. An engine that shows `available: no` has a missing runtime or missing
+`info health` should say `status: ok`. An engine that shows `available: no` has a missing runtime or missing
 files, and the `MESSAGE` column says which.
 
 ### 2.7 Access from other machines
@@ -253,7 +254,7 @@ interfaces and point clients at it:
 OPAL_SAY_HOST=0.0.0.0 opal-say-svc              # on the Pi
 hostname -I                                       # find its address
 export OPAL_SAY_API_URL=http://192.168.1.50:8001 # on your laptop
-opal say health
+opal say info health
 ```
 
 If a firewall is active, open the port for your subnet only:
@@ -296,7 +297,7 @@ WantedBy=multi-user.target
 sudo systemctl daemon-reload
 sudo systemctl enable --now opal-say
 journalctl -u opal-say -f
-opal say health
+opal say info health
 ```
 
 Engine options such as `~/piper/voices` are expanded for the service's user, so run the service as the
@@ -326,7 +327,7 @@ git pull
 pip install -e '.[engines,dev]'
 (cd spa && npm install && npm run build)
 sudo systemctl restart opal-say     # the database schema is created/updated on startup
-opal say health
+opal say info health
 opal say backup validate
 ```
 
@@ -438,22 +439,23 @@ becomes a normal JSON error (see [6.3](#63-streaming)).
 
 Each portable value comes from the first source that sets it:
 
-| Value | 1. Request | 2. Profile (explicit `profile_id`, else active) | 3. Setting | 4. Built-in |
-|---|---|---|---|---|
-| Voice | `voice_id` | `voice_id` | | — (`409 no_voice`) |
-| Engine | `engine_id` | | | the voice's `engine_id` |
-| Speed | `speed` | `speed` | `default_speed` | `1.0` |
-| Volume | `volume` | `volume` | `default_volume` | `1.0` |
-| Format | `output_format` | `output_format` | `default_output_format` | `wav` |
-| Sample rate | `sample_rate` | `sample_rate` | | the voice's native rate |
+| Value | 1. Request | 2. Persona (`persona`) | 3. Profile (explicit `profile_id`, else active) | 4. Setting | 5. Built-in |
+|---|---|---|---|---|---|
+| Voice | `voice_id` | persona's bound `voice_id` | `voice_id` | | — (`409 no_voice`) |
+| Engine | `engine_id` | | | | the voice's `engine_id` |
+| Speed | `speed` | | `speed` | `default_speed` | `1.0` |
+| Volume | `volume` | | `volume` | `default_volume` | `1.0` |
+| Format | `output_format` | | `output_format` | `default_output_format` | `wav` |
+| Sample rate | `sample_rate` | | `sample_rate` | | the voice's native rate |
 
 `engine_options` are merged as shallow layers, later wins: **voice → profile → request**. Profile options
 are only used when the request is routed to the same engine as the profile's own voice. Because
 engine options are engine-specific, a profile's Piper options are never sent to Kokoro when a request
 overrides the voice.
 
-`POST /voices/{id}/test` is different. It uses only the voice and the test request (and the test
-request's own defaults): no profile and no `default_*` settings.
+An unknown or disabled `persona` is rejected with `422`. `POST /voice/{id}/test` is different. It uses
+only the voice and the test request (and the test request's own defaults): no persona, no profile and
+no `default_*` settings.
 
 ### 3.5 Chunking
 
@@ -478,8 +480,8 @@ Resources on the host are treated differently depending on the operation:
 
 | Operation | Voice reference doesn't resolve |
 |---|---|
-| `POST /voices/`, `PATCH /voices/{id}` | `422` (if the engine is available; otherwise it's stored unresolved) |
-| `POST /voices/{id}/validate`, `GET /backup/validate` | **error** |
+| `POST /voice/`, `PATCH /voice/{id}` | `422` (if the engine is available; otherwise it's stored unresolved) |
+| `POST /voice/{id}/validate`, `GET /backup/validate` | **error** |
 | `POST /backup/import`, `POST /backup/restore/{f}` | **warning** (so a configuration can be moved to a host that's still missing models) |
 
 ### 3.7 Storage
@@ -561,8 +563,8 @@ The top-level `service:` key is optional; a flat mapping works too. See
 | File | Top-level key | Content | Validated as |
 |---|---|---|---|
 | `engines.yaml` | `engine` | Map of `engine_id` → `{enabled, options}` | `enabled` boolean, `options` a map. Options are checked against the engine's specs. |
-| `voices.yaml` | `voice` | List of voices | Same fields and rules as `POST /voices/`; unknown fields are rejected |
-| `profiles.yaml` | `profile` | List of profiles | Same fields and rules as `POST /profiles/`; unknown fields (including `id`) are rejected |
+| `voices.yaml` | `voice` | List of voices | Same fields and rules as `POST /voice/`; unknown fields are rejected |
+| `profiles.yaml` | `profile` | List of profiles | Same fields and rules as `POST /profile/`; unknown fields (including `id`) are rejected |
 | `settings.yaml` | `setting` | Map of key → native JSON value | Known keys are range-checked. |
 
 Every file starts with an optional `version: 1`. Only the files that are present replace their section;
@@ -658,7 +660,7 @@ profiles are numbered `1..N` in file order.
 Values are always strings in the API (`"value": "400"`). Known keys are validated on `PUT` (`422` if
 invalid). Unknown keys are stored as they are, so you can keep your own metadata there. `GET` only returns
 **stored** keys. A known key that isn't stored uses its default internally, but
-`GET /settings/{key}` returns `404` for it. Deleting a key restores its default.
+`GET /setting/{key}` returns `404` for it. Deleting a key restores its default.
 
 ### 4.4 Profiles
 
@@ -760,12 +762,14 @@ Every message has a `code`, a `message`, an optional `field` (for example
   for every other field, `null` is a `422`.
 - **Timestamps:** ISO 8601, UTC, with a `Z` suffix, for example `2026-10-12T16:19:33.361017Z`.
 - **Authentication:** none (see [Security](#27-access-from-other-machines)).
-- **Concurrency:** optimistic, via strong ETags. `GET` on settings returns an `ETag`; mutations to
-  settings require `If-Match` (`428` when missing, `412` when stale).
+- **Concurrency:** optimistic, via a strong ETag on the whole logical configuration. `GET` on any
+  configuration collection or item returns the current `ETag`; **every** configuration mutation —
+  voices, profiles, personas, engines, settings, profile activation, backup import/restore — requires
+  `If-Match` (`428` when missing, `412` when stale).
 
 > The contract adopted the OPAL Suite Standard conventions: `X-Opal-*` correlation headers on every
 > request and response, ETag/`If-Match` optimistic concurrency on configuration mutations,
-> `health/live` and `health/ready` probes, an atomic `PATCH /settings/`, `POST /backup/validate`,
+> `health/live` and `health/ready` probes, an atomic `PATCH /setting/`, `POST /backup/validate`,
 > native-JSON setting values, and `201 + Location` from `POST /backup/create`.
 
 The examples below use:
@@ -776,26 +780,35 @@ API=http://127.0.0.1:8001
 
 ### 5.2 Errors
 
-Service errors use one envelope:
+Service errors use the shared OPAL envelope — an `error` object carrying a stable `code`, a
+human-readable `message`, optional `details`, and the correlation identifiers echoed from the
+response headers:
 
 ```json
-{"code": "voice_in_use", "message": "voice 'en-us-amy-low' is referenced by 2 profile(s)", "details": {"profile_ids": [1, 3]}}
+{"error": {"code": "voice_in_use", "message": "voice 'en-us-amy-low' is referenced by 2 profile(s)",
+           "details": {"profile_ids": [1, 3]}, "request_id": "...", "transaction_id": "..."}}
 ```
 
-Request validation errors use FastAPI's `HTTPValidationError` shape, with `loc` pointing at the field:
+Request validation failures (`422`) use the same envelope with `code: unprocessable_entity`; the
+individual field errors land under `error.details.errors`, with `loc` pointing at the field:
 
 ```json
-{"detail": [{"type": "unsupported_option", "loc": ["body", "engine_options", "lang"],
+{"error": {"code": "unprocessable_entity", "message": "request validation failed",
+           "details": {"errors": [{"type": "unsupported_option", "loc": ["body", "engine_options", "lang"],
              "msg": "unsupported option 'lang' (allowed: ['noise_scale', 'noise_w_scale', 'normalize_audio', 'speaker', 'speaker_id'])",
-             "input": "en-us"}]}
+             "input": "en-us"}]}, "request_id": "...", "transaction_id": "..."}}
 ```
 
 | Status | When | Codes |
 |---|---|---|
-| `404` | Resource not found | `engine_not_found`, `voice_not_found`, `profile_not_found`, `backup_not_found`, `not_found` |
-| `409` | Conflict with the current state | `voice_exists`, `voice_in_use`, `voice_disabled`, `profile_name_exists`, `profile_active`, `profile_options_incompatible`, `engine_disabled`, `engine_unavailable`, `engine_not_found`, `profile_not_found`/`voice_not_found`/`no_voice`/`voice_engine_mismatch`/`unsupported_speed` (generation), `invalid_backup`, `backup_invalid`, `config_not_found` |
+| `401` | Missing or invalid credentials (authentication is disabled by default on loopback) | `unauthorized` |
+| `403` | Authenticated but not permitted | `forbidden` |
+| `404` | Resource not found | `engine_not_found`, `voice_not_found`, `persona_not_found`, `profile_not_found`, `backup_not_found`, `not_found` |
+| `409` | Conflict with the current state | `voice_exists`, `persona_exists`, `voice_in_use`, `voice_disabled`, `profile_name_exists`, `profile_active`, `profile_options_incompatible`, `engine_disabled`, `engine_unavailable`, `engine_not_found`, `profile_not_found`/`voice_not_found`/`no_voice`/`voice_engine_mismatch`/`unsupported_speed` (generation), `invalid_backup`, `backup_invalid`, `config_not_found` |
+| `412` | `If-Match` ETag is stale | `precondition_failed` |
 | `413` | Text longer than `max_text_chars` | `payload_too_large` (`details`: `max_text_chars`, `text_length`) |
-| `422` | Request validation, unsupported/invalid engine options, unresolvable voice reference, invalid known setting | `detail[]` |
+| `422` | Request validation, malformed `If-Match`, unsupported/invalid engine options, unresolvable voice reference, invalid known setting, unknown or disabled `persona` | `unprocessable_entity` |
+| `428` | `If-Match` required but missing | `precondition_required` |
 | `500` | Synthesis or I/O failure | `generation_failed`, `backup_failed`, `import_failed`, `restore_failed`, `internal_error` |
 | `503` | The engine runtime or its resources are missing | `engine_unavailable` |
 
@@ -807,10 +820,10 @@ Request validation errors use FastAPI's `HTTPValidationError` shape, with `loc` 
 
 ### 5.3 Service
 
-#### `GET /` — service info
+#### `GET /api/v1/info/` — service info
 
 ```bash
-curl -s $API/
+curl -s $API/api/v1/info/
 ```
 ```json
 {"name": "opal-say-svc", "version": "1.7.0", "api_version": "v1",
@@ -1086,7 +1099,64 @@ profile's voice can't be used right now.
 
 ---
 
-### 5.7 Generation — `/api/v1/generate`
+### 5.7 Personas — `/api/v1/persona`
+
+A persona is a named character bound to one registered voice. Generation requests accept `persona`
+instead of looking up a `voice_id` by hand; see [3.4](#34-how-a-request-is-resolved) for precedence.
+Writes carry the same strong `If-Match` precondition as other configuration mutations.
+
+#### `GET /api/v1/persona/` — list personas
+
+```bash
+curl -s $API/api/v1/persona/ | jq -r '.[] | "\(.persona_id)\t\(.name)\t\(.voice_id)\t\(.enabled)"'
+curl -s "$API/api/v1/persona/?enabled=false"          # only disabled personas
+```
+
+#### `POST /api/v1/persona/` — create a persona → `201` (+ `Location`)
+
+```bash
+curl -s -X POST $API/api/v1/persona/ -H "If-Match: $ETAG" -H 'Content-Type: application/json' -d '{
+  "persona_id": "amy", "name": "Amy", "voice_id": "en-us-amy-low",
+  "description": "Warm receptionist voice"}'
+```
+
+| Error | When |
+|---|---|
+| `404 voice_not_found` | The bound `voice_id` isn't registered |
+| `409 persona_exists` | `persona_id` already taken |
+| `428` / `412` | `If-Match` missing / stale |
+
+#### `GET /api/v1/persona/{persona_id}` — get one persona → `404 persona_not_found`
+
+#### `PATCH /api/v1/persona/{persona_id}` — partial update
+
+Any subset of `name`, `description`, `voice_id`, `enabled`. Rebinding to a voice that isn't registered
+returns `404 voice_not_found`.
+
+```bash
+curl -s -X PATCH $API/api/v1/persona/amy -H "If-Match: $ETAG" -H 'Content-Type: application/json' \
+  -d '{"voice_id": "en-gb-alan-low"}'
+```
+
+#### `DELETE /api/v1/persona/{persona_id}` — delete → `204`
+
+The bound voice registration is unaffected. The reverse direction is guarded: deleting a voice that a
+persona still references fails with `409 voice_in_use`.
+
+#### `POST /api/v1/persona/{persona_id}/validate` — check resolution
+
+Reports whether the persona is registered and enabled, its bound voice exists, and the voice validates
+against its engine. Always `200` with an `OpalValidationReport` (`404 persona_not_found` for unknown
+ids); a disabled persona reports a `persona_disabled` warning, a missing voice a `voice_not_found`
+error.
+
+```bash
+curl -s -X POST $API/api/v1/persona/amy/validate | jq '{valid, errors, warnings}'
+```
+
+---
+
+### 5.8 Generation — `/api/v1/generate`
 
 Request fields (all optional except `text`):
 
@@ -1094,7 +1164,8 @@ Request fields (all optional except `text`):
 |---|---|---|
 | `text` | str, ≥1 char | Plain text. Must contain something speakable. Limited by `max_text_chars`. |
 | `profile_id` | int ≥1 | Default: the active profile |
-| `voice_id` | str | Overrides the profile's voice |
+| `voice_id` | str | Overrides the persona's and profile's voice |
+| `persona` | str | Named persona supplying the voice; unknown or disabled → `422` |
 | `engine_id` | str | Advanced routing override; the engine must be able to use the voice |
 | `speed` | float 0.25–4.0 | |
 | `volume` | float 0.0–2.0 | |
@@ -1154,7 +1225,7 @@ Generation errors:
 | `409` | `voice_engine_mismatch` | `engine_id` can't use the voice |
 | `409` | `unsupported_speed` | Outside the engine's speed range |
 | `413` | `payload_too_large` | Text longer than `max_text_chars` |
-| `422` | | Empty/blank text, schema errors, unknown fields, invalid `engine_options` |
+| `422` | | Empty/blank text, schema errors, unknown fields, unknown or disabled `persona`, invalid `engine_options` |
 | `503` | `engine_unavailable` | Runtime or resources missing |
 | `500` | `generation_failed` | The engine failed |
 
@@ -1172,7 +1243,7 @@ curl -sN -X POST $API/api/v1/generate/stream -H 'Content-Type: application/json'
 
 ---
 
-### 5.8 Settings — `/api/v1/setting`
+### 5.9 Settings — `/api/v1/setting`
 
 See [4.3 Settings](#43-settings) for the known keys.
 
@@ -1217,7 +1288,7 @@ curl -s -X DELETE $API/api/v1/setting/default_speed -o /dev/null -w '%{http_code
 
 ---
 
-### 5.9 Health — `/api/v1/health`
+### 5.10 Health — `/api/v1/health`
 
 #### `GET /api/v1/health/` — readiness and engine state
 
@@ -1247,7 +1318,7 @@ The response is always `200`. Use `status` for readiness decisions, and `/api/v1
 
 ---
 
-### 5.10 Backup and configuration — `/api/v1/backup`
+### 5.11 Backup and configuration — `/api/v1/backup`
 
 #### `GET /api/v1/backup/list` — list backups (newest first)
 
@@ -1365,7 +1436,7 @@ Unlike import and restore, a voice reference that doesn't resolve on this host i
 
 ### 6.1 Response headers
 
-Every audio response (`/generate`, `/generate/stream`, `/voices/{id}/test`) describes itself in headers.
+Every audio response (`/generate`, `/generate/stream`, `/voice/{id}/test`) describes itself in headers.
 They're exposed to browsers through CORS.
 
 | Header | Example | Meaning |
@@ -1502,7 +1573,7 @@ Exit codes:
 
 ```bash
 opal say --json voice list | jq -r '.[].voice_id'
-opal say --api-url http://pi5.local:8001 health
+opal say --api-url http://pi5.local:8001 info health
 OPAL_SAY_API_URL=http://pi5.local:8001 opal say generate "Hello" -o hello.wav
 ```
 
@@ -1525,7 +1596,7 @@ opal say engine validate kokoro
 
 | Command | REST | Description |
 |---|---|---|
-| `voice list [--engine E] [--enabled/--disabled]` | `GET /api/v1/voice/` | Table |
+| `voice list [--engine E] [--enabled/--disabled] [--language L]` | `GET /api/v1/voice/` | Table |
 | `voice get VOICE` | `GET /api/v1/voice/{id}` | JSON |
 | `voice add VOICE --name N --engine E --ref R [--description D] [--language L] [--enabled/--disabled] [-O k=v]...` | `POST /api/v1/voice/` | Register a host-installed voice |
 | `voice update VOICE [--name] [--engine] [--ref] [--description\|--clear-description] [--language\|--clear-language] [--enabled/--disabled] [-O k=v]...` | `PATCH /api/v1/voice/{id}` | `engine_options` are replaced |
@@ -1556,11 +1627,29 @@ opal say profile update 4 --sample-rate 16000 -O lang=en-gb
 opal say profile activate 1
 ```
 
-### 7.5 `generate`
+### 7.5 `persona`
 
 | Command | REST |
 |---|---|
-| `generate TEXT -o OUT [--profile ID] [--voice V] [--engine E] [--speed] [--volume] [--format] [--sample-rate] [-O k=v]...` | `POST /api/v1/generate` |
+| `persona list [--enabled/--disabled]` | `GET /api/v1/persona/` |
+| `persona add PERSONA_ID --name NAME --voice VOICE_ID [--description TEXT] [--enabled/--disabled]` | `POST /api/v1/persona/` |
+| `persona get PERSONA_ID` | `GET /api/v1/persona/{persona_id}` |
+| `persona update PERSONA_ID [--name] [--voice] [--description | --clear-description] [--enabled/--disabled]` | `PATCH /api/v1/persona/{persona_id}` |
+| `persona validate PERSONA_ID` | `POST /api/v1/persona/{persona_id}/validate` |
+| `persona remove PERSONA_ID` | `DELETE /api/v1/persona/{persona_id}` |
+
+```bash
+opal say persona add amy --name "Amy" --voice en-us-amy-low
+opal say persona list
+opal say generate "Hello, I am Amy." --persona amy --play
+opal say generate "same persona, different voice" --persona amy --voice en-gb-alan-low --play
+```
+
+### 7.6 `generate`
+
+| Command | REST |
+|---|---|
+| `generate TEXT -o OUT [--profile ID] [--voice V] [--persona P] [--engine E] [--speed] [--volume] [--format] [--sample-rate] [-O k=v]...` | `POST /api/v1/generate` |
 | `generate TEXT -o OUT --stream [same options except --format]` | `POST /api/v1/generate/stream` |
 
 `TEXT` can be `-` to read stdin. `-o -` writes to stdout.
@@ -1571,7 +1660,7 @@ opal say generate - --profile 3 -o prompt.raw < prompt.txt
 opal say generate "Live" --stream --sample-rate 22050 -o - | aplay -r 22050 -f S16_LE -c 1 -t raw
 ```
 
-### 7.6 `setting`
+### 7.7 `setting`
 
 | Command | REST | Description |
 |---|---|---|
@@ -1580,7 +1669,7 @@ opal say generate "Live" --stream --sample-rate 22050 -o - | aplay -r 22050 -f S
 | `setting set KEY VALUE` | `PUT /api/v1/setting/{key}` | Known keys validated |
 | `setting delete KEY` | `DELETE /api/v1/setting/{key}` | The default applies again |
 
-### 7.7 `backup`
+### 7.8 `backup`
 
 | Command | REST | Description |
 |---|---|---|
@@ -1593,12 +1682,22 @@ opal say generate "Live" --stream --sample-rate 22050 -o - | aplay -r 22050 -f S
 | `backup import` | `POST /api/v1/backup/import` | From the service's `config_dir`; exit `1` if invalid |
 | `backup validate` | `GET /api/v1/backup/validate` | Exit `1` if invalid |
 
-### 7.8 `health`, `info`, `ping`
+### 7.9 `info`
+
+Bare `opal say info` prints service identity (same as `info version`).
+
+| Command | REST | Description |
+|---|---|---|
+| `info` / `info version` | `GET /api/v1/info/` | Name, version, API version |
+| `info health` | `GET /api/v1/health/` | Status line + per-engine table |
+| `info live` | `GET /api/v1/health/live` | `{"status": "ok", "ready": true}` |
+| `info ready` | `GET /api/v1/health/ready` | Readiness probe; prints the body even on `503` |
+| `info ping` | `GET /api/v1/info/ping` | Prints `ok` |
 
 ```bash
 opal say info ping     # GET /api/v1/info/ping  -> ok
 opal say info version  # GET /api/v1/info/      -> name, version, api_version
-opal say health        # GET /api/v1/health/     -> status line + engine table
+opal say info health        # GET /api/v1/health/     -> status line + engine table
 ```
 
 ```
@@ -1618,7 +1717,7 @@ browser.
 
 ### 8.1 Layout
 
-- **Header:** service name, version and API version (from `GET /`), and an **online/offline** pill (from
+- **Header:** service name, version and API version (from `GET /api/v1/info/`), and an **online/offline** pill (from
   `GET /api/v1/info/ping`).
 - **Tabs:** Generate, Voices, Profiles, Engines, Settings, Backup, Health.
 - **Errors** appear as a red banner in the panel, with the same `status code: message` text as the CLI.
@@ -1631,6 +1730,7 @@ browser.
 | **Generate** | Type text and pick a **Profile** (default: the active one), **Voice**, **Engine override**, **Speed**, **Volume**, **Sample rate (Hz)** and **Format**. You can also add engine options as JSON. Tick **Stream (raw PCM)** to use `/generate/stream`. The result shows an audio player, the byte count, format, rate, voice, engine and profile, plus a **download** link. Streamed PCM is wrapped as WAV in the browser so it can play. |
 | **Voices** | Filter by engine and enabled state (**Refresh**). Per voice: **Details**, **Edit**, **Validate**, **Test** (plays the test utterance) and **Unregister**. The **Register voice** form has id, name, description, engine, reference, language, **Enabled** and engine options (JSON). |
 | **Profiles** | A table with id, name, active, voice, speed, volume, format and rate. Per profile: **Details**, **Edit**, **Activate**, **Delete**. The **Create profile** / **Edit profile** form covers every field, including engine options (JSON). Leave the rate empty for the native rate. |
+| **Persona** | A table with id, name, bound voice and enabled state. Per persona: **Details**, **Edit**, **Validate** (checks that the bound voice resolves) and **Delete**. The **Create persona** / **Edit persona** form has id, name, bound voice, description and **Enabled**. |
 | **Engines** | A table with id, name, enabled and available. Per engine: **Enable**/**Disable**, **Configure** (edit the options JSON and save; the save is a merge-patch, so set a key to `null` to remove it) and **Validate**. |
 | **Settings** | All stored settings with **Edit**, **Details** and **Delete**, plus a key/value form with **Set**. |
 | **Backup** | **Create backup**, **Export JSON** (downloads `opal-say-config.json`), **Import ./config** and **Validate config**. The backup table has a download link, **Restore** (with a confirmation dialog) and **Delete**. |
@@ -2002,10 +2102,12 @@ missing.
 | SPA | `spa/src/test/*.test.ts(x)` | Important GUI workflows, and the SPA operation map against the contract |
 
 The contract and parity tests read the packaged contract at `src/opal_say/contract/opal_say.yaml`,
-a byte-for-byte copy of the authoritative `opal_say_v{version}.yaml` in the repository root. The two
-are real files (symlinks break on Windows checkouts and in built wheels); a contract test asserts
-they never drift. Other `opal_say_v*.yaml` files at the root are not-yet-adopted revisions and must
-never be selected while their version differs from the implementation.
+the self-contained bundle produced by `tools/bundle_contract.py` from the authoritative
+`openapi/opal_say_v{version}.yaml` and `openapi/shared/opal_kernel.yaml`. The packaged file is a real
+file (symlinks break on Windows checkouts and in built wheels); a contract test asserts it always
+equals a fresh bundle of the source. Other `opal_say_v*.yaml` files under `openapi/` are
+not-yet-adopted revisions and must never be selected while their version differs from the
+implementation.
 
 ---
 
@@ -2016,7 +2118,7 @@ never be selected while their version differs from the implementation.
 | Symptom | Cause / fix |
 |---|---|
 | `cannot reach OPAL Say API` | The service isn't running, or the URL is wrong. The default is `http://127.0.0.1:8001`. Set `OPAL_SAY_API_URL` / `--api-url`. To reach it from other machines, start the service with `OPAL_SAY_HOST=0.0.0.0`. |
-| Health `degraded` / `error` | `opal say health` shows the reason per engine. Typical causes: the runtime isn't installed (`pip install -e '.[piper]'` / `'.[kokoro]'`), or Kokoro's `model_path`/`voices_path` are wrong. |
+| Health `degraded` / `error` | `opal say info health` shows the reason per engine. Typical causes: the runtime isn't installed (`pip install -e '.[piper]'` / `'.[kokoro]'`), or Kokoro's `model_path`/`voices_path` are wrong. |
 | `422 ... could not be resolved on this host` when registering | The model file doesn't exist where the **service** looks: check `voices_dir` (Piper), the absolute path, or the Kokoro voice name. Paths are resolved on the service host, as the service's user. |
 | Voice shows `native_sample_rate: null` | It was registered while its engine was unavailable. Fix the engine, then run `opal say voice update V --ref <same ref>` to re-resolve it. |
 | `409 no_voice` | No profile is active. Activate one, or pass `voice_id` / `profile_id`. |
@@ -2083,9 +2185,9 @@ Write a `TtsEngine` adapter and register it under the `opal_say.engines` entry p
 
 | Operation | REST | CLI (`opal say ...`) | GUI tab |
 |---|---|---|---|
-| Service info | `GET /` | `info` | header |
+| Service info | `GET /api/v1/info/` | `info version` | header |
 | Liveness | `GET /api/v1/info/ping` | `info ping` | header (online pill) |
-| Health | `GET /api/v1/health/` | `health` | Health |
+| Health | `GET /api/v1/health/` | `info health` | Health |
 | List engines | `GET /api/v1/engine/` | `engine list` | Engines, Generate, Voices |
 | Get engine | `GET /api/v1/engine/{engine_id}` | `engine get` | Engines → Configure |
 | Update engine | `PATCH /api/v1/engine/{engine_id}` | `engine update` | Engines → Enable/Disable, Configure |
@@ -2103,6 +2205,12 @@ Write a `TtsEngine` adapter and register it under the `opal_say.engines` entry p
 | Update profile | `PATCH /api/v1/profile/{profile_id}` | `profile update` | Profiles → Edit |
 | Delete profile | `DELETE /api/v1/profile/{profile_id}` | `profile remove` | Profiles → Delete |
 | Activate profile | `POST /api/v1/profile/{profile_id}/activate` | `profile activate` | Profiles → Activate |
+| List personas | `GET /api/v1/persona/` | `persona list` | Persona |
+| Create persona | `POST /api/v1/persona/` | `persona add` | Persona → Create persona |
+| Get persona | `GET /api/v1/persona/{persona_id}` | `persona get` | Persona → Details |
+| Update persona | `PATCH /api/v1/persona/{persona_id}` | `persona update` | Persona → Edit |
+| Delete persona | `DELETE /api/v1/persona/{persona_id}` | `persona remove` | Persona → Delete |
+| Validate persona | `POST /api/v1/persona/{persona_id}/validate` | `persona validate` | Persona → Validate |
 | Generate audio | `POST /api/v1/generate` | `generate` | Generate |
 | Stream audio | `POST /api/v1/generate/stream` | `generate --stream` | Generate → Stream (raw PCM) |
 | List settings | `GET /api/v1/setting/` | `setting list` | Settings |

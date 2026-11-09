@@ -26,7 +26,7 @@ player such as `aplay`, and — when the optional `audio` extra is installed —
 9. [`generate`: speech generation and streaming](#9-generate-speech-generation-and-streaming)
 10. [`setting`: service settings](#10-settings-service-settings)
 11. [`backup`: backup, restore, import, export and validation](#11-backup-backup-restore-import-export-and-validation)
-12. [`health`, `info`, `ping`: service status](#12-health-info-ping-service-status)
+12. [`info`: service status](#12-info-service-status)
 12. [Engine options reference](#13-engine-options-reference)
 13. [Walkthroughs](#14-walkthroughs)
 14. [Scripting and automation](#15-scripting-and-automation)
@@ -125,7 +125,7 @@ opal-say [--api-url URL] [--json] [--timeout SECONDS] <group> <command> [ARGS] [
 ```bash
 # Correct: global options come right after 'say'
 opal say --json voice list
-opal say --api-url http://pi5.local:8001 --timeout 300 health
+opal say --api-url http://pi5.local:8001 --timeout 300 info health
 
 # Wrong: --json after the group is rejected as an unknown option (exit code 2)
 opal say voice list --json
@@ -138,10 +138,10 @@ Set `OPAL_SAY_API_URL` once so you don't have to pass `--api-url` on every call:
 
 ```bash
 export OPAL_SAY_API_URL=http://192.168.1.50:8001
-opal say ping                     # talks to 192.168.1.50
+opal say info ping                     # talks to 192.168.1.50
 
 # One-off override for a single command
-OPAL_SAY_API_URL=http://pi5.local:8001 opal say health
+OPAL_SAY_API_URL=http://pi5.local:8001 opal say info health
 
 # --api-url takes precedence over the environment variable
 opal say --api-url http://127.0.0.1:8001 info
@@ -153,9 +153,9 @@ opal say --api-url http://127.0.0.1:8001 info
 ### Checking the connection
 
 ```bash
-opal say ping                     # ok
+opal say info ping                     # ok
 opal say info                     # service name, version and API version
-opal say health                   # readiness and engine state
+opal say info health                   # readiness and engine state
 ```
 
 If the service cannot be reached, the CLI prints the connection error and exits with code `2`:
@@ -196,13 +196,13 @@ By default the CLI prints human-friendly output:
 | `get`, `add`, `update`, `activate`, `info`, `setting list`, `backup create/restore/import` | Pretty-printed JSON of the API response |
 | `remove`, `delete` | A one-line confirmation, e.g. `voice 'test-voice' unregistered` |
 | `validate` (engines, voices, backup) | `valid` or `INVALID`, followed by one line per error and warning |
-| `health` | A status line, then an engine table |
+| `info health` | A status line, then an engine table |
 | `generate`, `voice test` | Audio goes to the `-o` target and/or the local speaker. A summary line goes to **stderr**. |
 
 In tables, `null` values are shown as `-`, booleans as `yes`/`no`, and nested lists and maps as compact
 JSON.
 
-With `--json`, list, `health` and `validate` commands print the raw API response instead. This is the
+With `--json`, list, `info health` and `validate` commands print the raw API response instead. This is the
 output to use in scripts. `--json` doesn't change audio commands (the audio is the output), and `remove` /
 `delete` commands still print their confirmation line (the API returns `204 No Content`).
 
@@ -1118,16 +1118,17 @@ The service also runs this import automatically on its first start, when the dat
 
 ---
 
-## 12. `health`, `info`, `ping`: service status
+## 12. `info`: service status
 
 | Command | Description |
 |---|---|
 | `info ping` | Liveness probe (`GET /api/v1/info/ping`). Prints `ok`. |
-| `info` | Service name, version and API version (`GET /`) |
-| `health` | Readiness: overall status, active profile, and per-engine state (`GET /api/v1/health/`) |
+| `info` / `info version` | Service name, version and API version (`GET /api/v1/info/`) |
+| `info health` | Readiness: overall status, active profile, and per-engine state (`GET /api/v1/health/`) |
+| `info live` / `info ready` | Liveness and readiness probes (`GET /api/v1/health/live`, `GET /api/v1/health/ready`) |
 
 ```bash
-opal say ping
+opal say info ping
 opal say info
 ```
 ```json
@@ -1140,7 +1141,7 @@ opal say info
 ```
 
 ```bash
-opal say health
+opal say info health
 ```
 ```
 status: degraded  version: 1.7.0  active_profile_id: 1
@@ -1155,11 +1156,11 @@ piper      yes      yes        -
 | `degraded` | At least one enabled engine is unavailable, but at least one works |
 | `error` | No enabled engine is available. Generation can't succeed. |
 
-`health` always exits `0` when the service answers. Use `--json` and check `.status` in scripts. The JSON
+`info health` always exits `0` when the service answers. Use `--json` and check `.status` in scripts. The JSON
 also has `details` with voice, enabled-voice and profile counts:
 
 ```bash
-opal say --json health | jq -r .status
+opal say --json info health | jq -r .status
 ```
 
 ---
@@ -1222,9 +1223,9 @@ the seeded configuration.
 
 ```bash
 # --- sanity -------------------------------------------------------------------------------
-opal say ping
+opal say info ping
 opal say info
-opal say health
+opal say info health
 opal say backup create                                          # safety copy
 
 # --- engine ------------------------------------------------------------------------------
@@ -1345,7 +1346,7 @@ export OPAL_SAY_API_URL=http://new-pi.local:8001
 opal say backup list
 opal say backup restore opal-say-2026-10-12T162205Z.tar.gz
 opal say backup validate            # voice references must resolve on the new host
-opal say health
+opal say info health
 ```
 
 > The backup file must keep its `opal-say-<timestamp>.tar.gz` name, otherwise the service doesn't see
@@ -1385,7 +1386,7 @@ opal say --json profile list | jq -r '.[] | select(.is_active) | "\(.id) \(.name
 opal say --json profile list | jq '.[] | select(.name=="telephony") | .id'
 
 # Unavailable engine and why
-opal say --json health | jq -r '.engines[] | select(.available | not) | "\(.engine_id): \(.message)"'
+opal say --json info health | jq -r '.engines[] | select(.available | not) | "\(.engine_id): \(.message)"'
 
 # Validation errors only
 opal say --json backup validate | jq -r '.errors[] | "\(.code) \(.field): \(.message)"'
@@ -1397,8 +1398,8 @@ opal say --json backup validate | jq -r '.errors[] | "\(.code) \(.field): \(.mes
 #!/usr/bin/env bash
 set -euo pipefail
 
-opal-say ping
-[ "$(opal-say --json health | jq -r .status)" = ok ] || { echo "service not healthy"; exit 1; }
+opal-say info ping
+[ "$(opal-say --json info health | jq -r .status)" = ok ] || { echo "service not healthy"; exit 1; }
 opal-say backup validate
 for v in $(opal-say --json voice list --enabled | jq -r '.[].voice_id'); do
   opal-say voice validate "$v"
@@ -1469,7 +1470,7 @@ See the [User Guide](USER_GUIDE.md#10-integrating-with-your-application) for str
 | `409 voice_in_use` | The voice is used by a profile (or by the active profile, when disabling). Change or remove those profiles first. |
 | `409 profile_active` | Activate another profile before you remove this one. |
 | `409 engine_disabled` | Run `opal say engine update E --enable`. |
-| `503 engine_unavailable` / health `degraded` | Install the runtime (`pip install -e '.[piper]'` or `'.[kokoro]'`), or fix the engine's paths. `opal say health` shows the reason. |
+| `503 engine_unavailable` / health `degraded` | Install the runtime (`pip install -e '.[piper]'` or `'.[kokoro]'`), or fix the engine's paths. `opal say info health` shows the reason. |
 | `413 payload_too_large` | Raise `max_text_chars`, or split the text. |
 | Streamed audio plays too fast, too slow, or as noise | The player's rate doesn't match the output. Use the rate from the summary line, or force one with `--sample-rate`. Raw PCM is always S16LE mono. |
 | `stream terminated prematurely` | The engine failed mid-stream. Check the service log. The output file contains only the audio received before the failure. |
@@ -1487,43 +1488,48 @@ contract. The parity tests check that the CLI covers every operation.
 
 | CLI (`opal say ...`) | REST | operationId |
 |---|---|---|
-| `engine list` | `GET /api/v1/engine/` | `list_engines_api_v1_engines__get` |
-| `engine get` | `GET /api/v1/engine/{engine_id}` | `get_engine_api_v1_engines__engine_id__get` |
-| `engine update` | `PATCH /api/v1/engine/{engine_id}` | `update_engine_api_v1_engines__engine_id__patch` |
-| `engine validate` | `POST /api/v1/engine/{engine_id}/validate` | `validate_engine_api_v1_engines__engine_id__validate_post` |
-| `voice list` | `GET /api/v1/voice/` | `list_voices_api_v1_voices__get` |
-| `voice add` | `POST /api/v1/voice/` | `create_voice_api_v1_voices__post` |
-| `voice get` | `GET /api/v1/voice/{voice_id}` | `get_voice_api_v1_voices__voice_id__get` |
-| `voice update` | `PATCH /api/v1/voice/{voice_id}` | `update_voice_api_v1_voices__voice_id__patch` |
-| `voice remove` | `DELETE /api/v1/voice/{voice_id}` | `delete_voice_api_v1_voices__voice_id__delete` |
-| `voice validate` | `POST /api/v1/voice/{voice_id}/validate` | `validate_voice_api_v1_voices__voice_id__validate_post` |
-| `voice test` | `POST /api/v1/voice/{voice_id}/test` | `test_voice_api_v1_voices__voice_id__test_post` |
-| `profile list` | `GET /api/v1/profile/` | `list_profiles_api_v1_profiles__get` |
-| `profile add` | `POST /api/v1/profile/` | `create_profile_api_v1_profiles__post` |
-| `profile get` | `GET /api/v1/profile/{profile_id}` | `get_profile_api_v1_profiles__profile_id__get` |
-| `profile update` | `PATCH /api/v1/profile/{profile_id}` | `update_profile_api_v1_profiles__profile_id__patch` |
-| `profile remove` | `DELETE /api/v1/profile/{profile_id}` | `delete_profile_api_v1_profiles__profile_id__delete` |
-| `profile activate` | `POST /api/v1/profile/{profile_id}/activate` | `activate_profile_api_v1_profiles__profile_id__activate_post` |
+| `engine list` | `GET /api/v1/engine/` | `opal_engine_list` |
+| `engine get` | `GET /api/v1/engine/{engine_id}` | `opal_engine_get` |
+| `engine update` | `PATCH /api/v1/engine/{engine_id}` | `opal_engine_patch` |
+| `engine validate` | `POST /api/v1/engine/{engine_id}/validate` | `opal_engine_validate` |
+| `voice list` | `GET /api/v1/voice/` | `opal_voice_list` |
+| `voice add` | `POST /api/v1/voice/` | `opal_voice_create` |
+| `voice get` | `GET /api/v1/voice/{voice_id}` | `opal_voice_get` |
+| `voice update` | `PATCH /api/v1/voice/{voice_id}` | `opal_voice_patch` |
+| `voice remove` | `DELETE /api/v1/voice/{voice_id}` | `opal_voice_delete` |
+| `voice validate` | `POST /api/v1/voice/{voice_id}/validate` | `opal_voice_validate` |
+| `voice test` | `POST /api/v1/voice/{voice_id}/test` | `opal_voice_test` |
+| `profile list` | `GET /api/v1/profile/` | `opal_profile_list` |
+| `profile add` | `POST /api/v1/profile/` | `opal_profile_create` |
+| `profile get` | `GET /api/v1/profile/{profile_id}` | `opal_profile_get` |
+| `profile update` | `PATCH /api/v1/profile/{profile_id}` | `opal_profile_patch` |
+| `profile remove` | `DELETE /api/v1/profile/{profile_id}` | `opal_profile_delete` |
+| `profile activate` | `POST /api/v1/profile/{profile_id}/activate` | `opal_profile_activate` |
 | `persona list` | `GET /api/v1/persona/` | `opal_persona_list` |
 | `persona add` | `POST /api/v1/persona/` | `opal_persona_create` |
 | `persona get` | `GET /api/v1/persona/{persona_id}` | `opal_persona_get` |
 | `persona update` | `PATCH /api/v1/persona/{persona_id}` | `opal_persona_patch` |
 | `persona remove` | `DELETE /api/v1/persona/{persona_id}` | `opal_persona_delete` |
+| `persona validate` | `POST /api/v1/persona/{persona_id}/validate` | `opal_persona_validate` |
 | `generate` | `POST /api/v1/generate` | `opal_generate` |
 | `generate --stream` | `POST /api/v1/generate/stream` | `opal_generate_stream` |
-| `setting list` | `GET /api/v1/setting/` | `get_all_settings_api_v1_settings__get` |
-| `setting get` | `GET /api/v1/setting/{key}` | `get_setting_api_v1_settings__key__get` |
-| `setting set` | `PUT /api/v1/setting/{key}` | `upsert_setting_api_v1_settings__key__put` |
-| `setting delete` | `DELETE /api/v1/setting/{key}` | `delete_setting_api_v1_settings__key__delete` |
-| `health` | `GET /api/v1/health/` | `health_check_api_v1_health__get` |
-| `backup list` | `GET /api/v1/backup/list` | `list_backups_api_v1_backup_list_get` |
-| `backup create` | `POST /api/v1/backup/create` | `create_backup_api_v1_backup_create_post` |
-| `backup download` | `GET /api/v1/backup/download/{filename}` | `download_backup_api_v1_backup_download__filename__get` |
-| `backup restore` | `POST /api/v1/backup/restore/{filename}` | `restore_backup_api_v1_backup_restore__filename__post` |
-| `backup delete` | `DELETE /api/v1/backup/{filename}` | `delete_backup_api_v1_backup__filename__delete` |
-| `backup export` | `GET /api/v1/backup/export` | `export_config_api_v1_backup_export_get` |
-| `backup import` | `POST /api/v1/backup/import` | `import_config_api_v1_backup_import_post` |
-| `backup validate` | `GET /api/v1/backup/validate` | `validate_config_api_v1_backup_validate_get` |
+| `setting list` | `GET /api/v1/setting/` | `opal_setting_list` |
+| `setting get` | `GET /api/v1/setting/{key}` | `opal_setting_get` |
+| `setting set` | `PUT /api/v1/setting/{key}` | `opal_setting_put` |
+| `setting delete` | `DELETE /api/v1/setting/{key}` | `opal_setting_delete` |
+| `setting patch` | `PATCH /api/v1/setting/` | `opal_setting_patch` |
+| `info health` | `GET /api/v1/health/` | `opal_health_get` |
+| `info live` | `GET /api/v1/health/live` | `opal_health_live_get` |
+| `info ready` | `GET /api/v1/health/ready` | `opal_health_ready_get` |
+| `backup list` | `GET /api/v1/backup/list` | `opal_backup_list` |
+| `backup create` | `POST /api/v1/backup/create` | `opal_backup_create` |
+| `backup download` | `GET /api/v1/backup/download/{filename}` | `opal_backup_download` |
+| `backup restore` | `POST /api/v1/backup/restore/{filename}` | `opal_backup_restore` |
+| `backup delete` | `DELETE /api/v1/backup/{filename}` | `opal_backup_delete` |
+| `backup export` | `GET /api/v1/backup/export` | `opal_backup_export` |
+| `backup import` | `POST /api/v1/backup/import` | `opal_backup_import` |
+| `backup validate --payload` | `POST /api/v1/backup/validate` | `opal_backup_validate` |
+| `backup validate` | `GET /api/v1/backup/validate` | `opal_backup_validate_stored` |
 | `info version` | `GET /api/v1/info/` | `opal_info_get` |
 | `info ping` | `GET /api/v1/info/ping` | `opal_info_ping` |
 
