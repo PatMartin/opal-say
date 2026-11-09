@@ -65,6 +65,10 @@ def bundle(source: Path = SOURCE) -> dict:
                         merged = {k: resolve(v, src_file) for k, v in node.items() if k != "$ref"}
                         return {**resolve(copy.deepcopy(target), target_file), **merged}
                     key = (target_file, kind, name)
+                    # True when this node itself occupies the bundle's component
+                    # slot (e.g. securitySchemes.BearerAuth aliasing the kernel):
+                    # the resolved content must replace it, not a self-ref.
+                    self_slot = bundle_doc["components"].get(kind, {}).get(name) is node
                     if key not in seen:
                         seen.add(key)
                         target = _load(target_file)["components"][kind][name]
@@ -81,6 +85,9 @@ def bundle(source: Path = SOURCE) -> dict:
                                 raise ValueError(f"component name collision: {kind}/{name}")
                         comps[name] = resolved
                     merged = {k: resolve(v, src_file) for k, v in node.items() if k != "$ref"}
+                    if self_slot:
+                        content = bundle_doc["components"][kind][name]
+                        return {**content, **merged} if merged else content
                     return {"$ref": f"#/components/{kind}/{name}", **merged}
                 return node  # internal ref of the root document: already bundle-local
             return {k: resolve(v, src_file) for k, v in node.items()}

@@ -2061,7 +2061,11 @@ paths:
 components:
   securitySchemes:
     BearerAuth:
-      $ref: '#/components/securitySchemes/BearerAuth'
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Optional on loopback deployments; required on non-loopback interfaces. Bearer credentials are configured
+        via token_env. Correlation headers are transport context, never authorization credentials.
   parameters:
     VoiceId:
       name: voice_id
