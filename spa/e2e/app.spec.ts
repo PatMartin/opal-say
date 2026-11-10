@@ -68,6 +68,15 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     if (method === 'GET' && path === '/api/v1/profile/') return json(route, [profile])
     if (method === 'GET' && path === '/api/v1/setting/') return json(route, { greeting: 'hi' })
     if (method === 'GET' && path === '/api/v1/backup/list') return json(route, [])
+    if (method === 'GET' && path === '/api/v1/service/log') {
+      return json(route, { log_file: 'logs/opal_say.log', lines: ['boot', 'ready'] })
+    }
+    if (method === 'POST' && path === '/api/v1/service/start') {
+      return json(route, { state: 'running', pid: 4242, previous_pid: null, log_file: 'logs/opal_say.log' })
+    }
+    if (method === 'POST' && path === '/api/v1/service/stop') {
+      return json(route, { state: 'stopped', pid: null, previous_pid: 4242, log_file: 'logs/opal_say.log' })
+    }
 
     if (path === '/api/v1/persona/') {
       if (method === 'GET') return json(route, personas)
@@ -81,7 +90,7 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
         })
       }
     }
-    const personaMatch = path.match(/^\/api\/v1\/personas\/([^/]+)$/)
+    const personaMatch = path.match(/^\/api\/v1\/persona\/([^/]+)$/)
     if (personaMatch) {
       const found = personas.find((p: any) => p.persona_id === personaMatch[1]) as any
       if (method === 'GET') return found ? json(route, found) : json(route, { error: { code: 'not_found' } }, 404)
@@ -125,6 +134,7 @@ test('navigates every tab', async ({ page }) => {
     Setting: /^Setting$/,
     Backup: /^Backup/,
     Health: /^Health$/,
+    Service: /^Service$/,
   }
   for (const [tab, heading] of Object.entries(tabs)) {
     await page.getByRole('button', { name: tab, exact: true }).click()
@@ -159,4 +169,16 @@ test('shows an error banner when generation fails', async ({ page }) => {
   await page.getByLabel('Text').fill('this will fail')
   await page.getByRole('button', { name: 'Generate audio' }).click()
   await expect(page.getByRole('alert')).toContainText('engine_unavailable')
+})
+
+test('service panel starts, tails the log and stops', async ({ page }) => {
+  await page.getByRole('button', { name: 'Service', exact: true }).click()
+  await expect(page.getByTestId('service-log')).toContainText('ready')
+
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
+  await expect(page.getByTestId('service-status')).toContainText('running')
+
+  page.once('dialog', (d) => void d.accept())
+  await page.getByRole('button', { name: 'Stop', exact: true }).click()
+  await expect(page.getByTestId('service-status')).toContainText('stopped')
 })
