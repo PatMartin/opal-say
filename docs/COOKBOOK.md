@@ -221,8 +221,8 @@ Smaller chunks can start the first stream sooner. This is a service-wide trade-o
 inspect the existing setting and choose a value appropriate to your hardware.
 
 ```bash
-opal say setting get chunk_max_chars
-opal say setting set chunk_max_chars 200
+opal say config setting show chunk_max_chars
+opal say config setting set chunk_max_chars 200
 ```
 
 ## 18. Give a large deployment a consistent default speaking pace
@@ -231,8 +231,8 @@ Service settings are fallbacks only: an explicit profile or generation option st
 This is a good way to adjust behavior of simple callers without editing each caller.
 
 ```bash
-opal say setting set default_speed 1.08
-opal say setting set default_volume 0.9
+opal say config setting set default_speed 1.08
+opal say config setting set default_volume 0.9
 ```
 
 ## 19. Export configuration for review or version control

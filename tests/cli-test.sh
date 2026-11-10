@@ -14,3 +14,15 @@ done
 opal say persona add ryan --name "ryan" \
   --voice "en-us-ryan-high" \
   --description "A test persona"
+
+# Managed server lifecycle (REST when reachable, local fallback when down)
+opal say service log --lines 5
+opal say service stop
+opal say service start
+opal say service log --lines 20
+
+# Canonical config setting spellings (setting get/delete remain aliases)
+opal say config setting list
+opal say config setting set deployment_note "cli smoke"
+opal say config setting show deployment_note
+opal say config setting remove deployment_note

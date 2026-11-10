@@ -1,7 +1,31 @@
 # OPAL Say contract notes
 
-Authoritative contract: `openapi/opal_say_v1.7.0.yaml` together with the shared
+Authoritative contract: `openapi/opal_say_v1.7.1.yaml` together with the shared
 OPAL kernel `openapi/shared/opal_kernel.yaml`.
+
+## v1.7.1 surface conventions
+
+- **`service` lifecycle.** `/api/v1/service/start|stop|log` mount the kernel
+  `service_start`/`service_stop`/`service_log` pathItems. "The service's server
+  process" is the pidfile-tracked detached child (`logs/opal_say.pid`,
+  `logs/opal_say.log`) managed by `ServiceProcessManager`. `start` spawns
+  `python -m opal_say` detached (log truncated unless `append`), replacing a
+  running managed instance; when the managed pid is the serving process itself,
+  termination is deferred to a BackgroundTask so the `200` lands first and the
+  replacement child waits on `OPAL_SAY_WAIT_FOR_PID` before binding. A short
+  post-spawn poll turns immediate child death (e.g. port held by an unmanaged
+  foreground server) into `500 operation_failed` rather than a phantom `running`.
+- **`x-opal-cli` bindings.** Setting ops get canonical spellings under a
+  `config` parent: `config setting list|show|set|update|remove`, with
+  `config setting patch`, `setting get` and `setting delete` as declared
+  aliases. Service ops bind `service start|stop|log`; the CLI calls REST first
+  and falls back to local bookkeeping when the API is unreachable (cold start).
+- **`PersonaRead.origin` dropped.** Persona stays flat; `origin` survives only
+  as an internal store column driving owner-vs-local conflict resolution.
+- Cosmetic only for us: `persona` now refs kernel `OpalPersonaRef` (same string
+  shape), `GenerateRequest`/`GenerateStreamRequest` compose `GenerateRequestBase`
+  (`unevaluatedProperties: false` ≡ our `extra="forbid"`), and the suite
+  pagination note switched to bounded arrays (Say has no history endpoints).
 
 ## Kernel split
 
@@ -55,7 +79,7 @@ same identifiers). Generation requests accept `persona` on both
   time (`404` otherwise), and a voice cannot be deleted while persona
   reference it (`409 voice_in_use`).
 
-## v1.7.0 surface conventions
+## v1.7.1 surface conventions
 
 - **Singular resources.** Collection paths are singular — `/api/v1/voice/`,
   `/api/v1/engine/`, `/api/v1/profile/`, `/api/v1/setting/`, `/api/v1/persona/`

@@ -308,12 +308,23 @@ opal
     │                                           [-O KEY=VALUE]...
     │                                           [--options-json JSON]
     │
-    ├── setting
-    │   ├── list
+    ├── config
+    │   └── setting
+    │       ├── list
+    │       ├── show KEY                        (alias: setting get)
+    │       ├── set KEY VALUE
+    │       ├── update                          --json JSON
+    │       │                                   (alias: config setting update)
+    │       └── remove KEY                      (alias: setting delete)
+    │
+    ├── service                                 managed server process
+    │   ├── start                               [--append]
+    │   ├── stop
+    │   └── log                                 [--lines N]
+    │
+    ├── setting                                 declared aliases only
     │   ├── get KEY
-    │   ├── set KEY VALUE
-    │   ├── delete KEY
-    │   └── patch                               --json JSON
+    │   └── delete KEY
     │
     └── backup
         ├── list
@@ -338,7 +349,7 @@ opal say profile update --help
 opal-say --help
 ~~~
 
-**Global options belong immediately after `say`:** `opal say --json voice list` is correct; `opal say voice list --json` is not. The root `--json` controls **output formatting**, while `setting patch --json` carries a JSON **input payload**.
+**Global options belong immediately after `say`:** `opal say --json voice list` is correct; `opal say voice list --json` is not. The root `--json` controls **output formatting**, while `config setting update --json` carries a JSON **input payload**.
 
 ## In-depth CLI guide: from first voice to real use cases
 
@@ -556,8 +567,8 @@ To influence how quickly the first chunk becomes available:
 
 ~~~bash
 # Smaller chunks often improve first-audio latency at the cost of more overhead.
-opal say setting get chunk_max_chars
-opal say setting set chunk_max_chars 200
+opal say config setting show chunk_max_chars
+opal say config setting set chunk_max_chars 200
 ~~~
 
 Text is chunked internally at sentence boundaries. It is **not** one independent audio file per sentence, and smaller chunks are not a guarantee of a particular latency. Model load, hardware, and engine affect first audio too.
@@ -580,8 +591,8 @@ opal say generate - --voice kokoro-af-heart \
 The configured `max_text_chars` limits accepted text (default: 20,000). You can inspect and adjust it deliberately:
 
 ~~~bash
-opal say setting list
-opal say setting set max_text_chars 50000
+opal say config setting list
+opal say config setting set max_text_chars 50000
 ~~~
 
 The limit guards the service from unexpectedly large synthesis requests. For a full book, consider dividing it into chapters with one output file per chapter rather than one giant generation call.
@@ -857,16 +868,16 @@ opal say voice test en-us-amy-low --text "Ready." -o /dev/null
 Service-wide defaults can be set individually:
 
 ~~~bash
-opal say setting list
-opal say setting get chunk_max_chars
-opal say setting set chunk_max_chars 200
-opal say setting set default_speed 1.1
+opal say config setting list
+opal say config setting show chunk_max_chars
+opal say config setting set chunk_max_chars 200
+opal say config setting set default_speed 1.1
 
 # Remove a stored override; fall back to the built-in behavior.
-opal say setting delete default_speed
+opal say config setting remove default_speed
 
 # Atomic multi-key merge patch, when desired:
-opal say setting patch --json '{"default_volume":0.85,"chunk_max_chars":250}'
+opal say config setting update --json '{"default_volume":0.85,"chunk_max_chars":250}'
 ~~~
 
 | Key | Built-in default | Purpose |
@@ -878,7 +889,7 @@ opal say setting patch --json '{"default_volume":0.85,"chunk_max_chars":250}'
 | `default_volume` | 1.0 | Service-wide fallback gain |
 | `default_output_format` | `wav` | Service-wide fallback output |
 
-`setting list` returns **stored** settings, not every built-in default. A missing `setting get KEY` result doesn't mean the default doesn't exist. Streaming responses are governed by text and runtime resource limits, not `max_audio_bytes`.
+`config setting list` returns **stored** settings, not every built-in default. A missing `config setting show KEY` result doesn't mean the default doesn't exist. Streaming responses are governed by text and runtime resource limits, not `max_audio_bytes`.
 
 For a generation request, the precedence is: **explicit request → selected/active profile → service setting → built-in default**. The voice usually determines the engine and its native sample rate.
 
@@ -894,7 +905,7 @@ For low-latency pipelines, set `--sample-rate` to a known value, especially when
 
 ### Configuration and API philosophy
 
-The implemented API is **v1.7.0**. The contract's source of truth is decomposed under [`openapi/`](openapi/): [`opal_say_v1.7.0.yaml`](openapi/opal_say_v1.7.0.yaml) holds the Say-specific surface, and [`shared/opal_kernel.yaml`](openapi/shared/opal_kernel.yaml) holds the OPAL suite-standard operations shared across services. `tools/bundle_contract.py` flattens the two into the packaged document `src/opal_say/contract/opal_say.yaml`, which is loaded by `opal_say.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. A test enforces that the packaged copy never drifts from a fresh bundle of the source. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
+The implemented API is **v1.7.1**. The contract's source of truth is decomposed under [`openapi/`](openapi/): [`opal_say_v1.7.1.yaml`](openapi/opal_say_v1.7.1.yaml) holds the Say-specific surface, and [`shared/opal_kernel.yaml`](openapi/shared/opal_kernel.yaml) holds the OPAL suite-standard operations shared across services. `tools/bundle_contract.py` flattens the two into the packaged document `src/opal_say/contract/opal_say.yaml`, which is loaded by `opal_say.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. A test enforces that the packaged copy never drifts from a fresh bundle of the source. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
 
 The full service is **API-first**:
 
@@ -943,7 +954,7 @@ opal-say/
 ├── opal-say.png                       project artwork
 ├── README.md                           this guide
 ├── openapi/
-│   ├── opal_say_v1.7.0.yaml            Say-specific OpenAPI contract (v1.7.0)
+│   ├── opal_say_v1.7.1.yaml            Say-specific OpenAPI contract (v1.7.1)
 │   └── shared/opal_kernel.yaml         OPAL suite-standard contract components
 ├── tools/bundle_contract.py            flattens openapi/ into the packaged contract
 ├── pyproject.toml                      packaging and entry points

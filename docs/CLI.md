@@ -24,8 +24,9 @@ player such as `aplay`, and — when the optional `audio` extra is installed —
 7. [`profile`: generation profiles](#7-profiles-generation-profiles)
 8. [`persona`: named persona](#8-persona-named-persona)
 9. [`generate`: speech generation and streaming](#9-generate-speech-generation-and-streaming)
-10. [`setting`: service settings](#10-settings-service-settings)
+10. [`config setting`: service settings](#10-settings-service-settings)
 11. [`backup`: backup, restore, import, export and validation](#11-backup-backup-restore-import-export-and-validation)
+- [`service`: managed server lifecycle](#service-managed-server-lifecycle)
 12. [`info`: service status](#12-info-service-status)
 12. [Engine options reference](#13-engine-options-reference)
 13. [Walkthroughs](#14-walkthroughs)
@@ -193,7 +194,7 @@ By default the CLI prints human-friendly output:
 | Command kind | Default output |
 |---|---|
 | `list` (engines, voices, profiles, backups) | A table with the most important columns. An empty list prints `(none)`. |
-| `get`, `add`, `update`, `activate`, `info`, `setting list`, `backup create/restore/import` | Pretty-printed JSON of the API response |
+| `get`, `add`, `update`, `activate`, `info`, `config setting list`, `backup create/restore/import` | Pretty-printed JSON of the API response |
 | `remove`, `delete` | A one-line confirmation, e.g. `voice 'test-voice' unregistered` |
 | `validate` (engines, voices, backup) | `valid` or `INVALID`, followed by one line per error and warning |
 | `info health` | A status line, then an engine table |
@@ -283,7 +284,7 @@ opal say engine update piper -O voices_dir='"~/piper/voices"'   # JSON string, '
 
 ### No confirmation prompts
 
-No command asks for confirmation. `voice remove`, `profile remove`, `setting delete`,
+No command asks for confirmation. `voice remove`, `profile remove`, `config setting remove`,
 `backup delete`, `backup restore` and `backup import` take effect immediately, and `restore`/`import` do
 **not** take an automatic safety backup. Run `opal say backup create` first if you're unsure.
 
@@ -317,7 +318,9 @@ opal (or opal-say, which starts at 'say')
     ├── profile  list | get | add | update | remove | activate
     ├── persona  list | get | add | update | remove
     ├── generate  TEXT [-o OUT] [--stream] [--play] ...
-    ├── setting  list | get | set | delete
+    ├── config    setting list | show | set | update | remove
+    ├── setting   get | delete            (declared aliases)
+    ├── service   start | stop | log
     ├── backup    list | create | download | restore | delete | export | import | validate
     ├── info      version | health | live | ready | ping
     └── tree        prints the full command tree (introspected from the Typer app)
@@ -877,7 +880,7 @@ ffmpeg -f s16le -ar 16000 -ac 1 -i s.pcm s.wav
 
 ---
 
-## 10. `setting`: service settings
+## 10. `config setting`: service settings
 
 Settings are service-wide key/value pairs whose values are **native JSON** — numbers, booleans and
 objects round-trip with their type. Known keys are validated when you set them (a string that parses
@@ -886,9 +889,10 @@ is still accepted). Unknown keys are stored with whatever JSON type you send.
 | Command | Description |
 |---|---|
 | `list` | Show all **stored** settings as a JSON map |
-| `get KEY` | Show one stored setting (`404` if it isn't stored) |
+| `show KEY` | Show one stored setting (`404` if it isn't stored) — alias: `setting get KEY` |
 | `set KEY VALUE` | Create or replace a setting |
-| `delete KEY` | Delete a stored setting so the built-in default applies again |
+| `update --json JSON` | Atomically merge-patch the whole document — alias: `config setting patch` |
+| `remove KEY` | Delete a stored setting so the built-in default applies again — alias: `setting delete KEY` |
 
 ### Known keys
 
@@ -909,7 +913,7 @@ is still accepted). Unknown keys are stored with whatever JSON type you send.
 
 ```bash
 # Show stored setting
-opal say setting list
+opal say config setting list
 ```
 ```json
 {
@@ -920,29 +924,50 @@ opal say setting list
 
 ```bash
 # Show one setting
-opal say setting get chunk_max_chars
+opal say config setting show chunk_max_chars
 
 # Allow longer texts
-opal say setting set max_text_chars 100000
+opal say config setting set max_text_chars 100000
 
 # Smaller chunks: streaming starts sooner
-opal say setting set chunk_max_chars 200
+opal say config setting set chunk_max_chars 200
 
 # Service-wide fallbacks (when the profile/request doesn't set them)
-opal say setting set default_speed 1.1
-opal say setting set default_output_format pcm
+opal say config setting set default_speed 1.1
+opal say config setting set default_output_format pcm
 
 # Invalid values are rejected
-opal say setting set chunk_max_chars 10
+opal say config setting set chunk_max_chars 10
 # Error: HTTP 422 validation error: body.value: setting 'chunk_max_chars' must be between 50 and 5000
 
 # Unknown keys keep your JSON type — `5` stores a number, `'"5"'` a string,
 # `true` a boolean, `'{"a": 1}'` an object (useful for your own tooling)
-opal say setting set deployment_note "kitchen pi"
+opal say config setting set deployment_note "kitchen pi"
 
 # Go back to the built-in default
-opal say setting delete default_speed
+opal say config setting remove default_speed
 ```
+
+---
+
+## `service`: managed server lifecycle
+
+`service start|stop|log` control the pidfile-tracked detached server process
+(`logs/opal_say.log` / `logs/opal_say.pid`). Each command calls its REST operation
+first; when the API is unreachable the CLI falls back to the same bookkeeping
+locally, which is what lets `service start` cold-start a stopped service.
+
+| Command | REST | Description |
+|---|---|---|
+| `service start [--append]` | `POST /api/v1/service/start` | Launch the managed server in the background; a running managed instance is replaced (`start` doubles as restart). `--append` appends to the log instead of truncating it. |
+| `service stop` | `POST /api/v1/service/stop` | Stop the managed server if running; not an error when none is. |
+| `service log [--lines N]` | `GET /api/v1/service/log` | Tail the service log (default 10, max 1000). |
+
+Note the endpoints manage the *managed* (pidfile-tracked) process: when the
+serving process is not the managed one (e.g. a foreground `make run`), `start`
+spawns a child that cannot bind the port and the REST call fails `500
+operation_failed` — use the local fallback (`opal say service start` with the
+API down) or stop the foreground server first.
 
 ---
 
@@ -1134,7 +1159,7 @@ opal say info
 ```json
 {
   "name": "opal-say-svc",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "api_version": "v1",
   "description": "Implementation-neutral OPAL text-to-speech service"
 }
@@ -1144,7 +1169,7 @@ opal say info
 opal say info health
 ```
 ```
-status: degraded  version: 1.7.0  active_profile_id: 1
+status: degraded  version: 1.7.1  active_profile_id: 1
 ENGINE_ID  ENABLED  AVAILABLE  MESSAGE
 kokoro     yes      no         Kokoro model file '/nope.onnx' not found
 piper      yes      yes        -
@@ -1252,10 +1277,10 @@ opal say generate "And this one is streamed." --stream -o tour.pcm
 opal say profile activate 1                                    # back to default before removing
 
 # --- setting -----------------------------------------------------------------------------
-opal say setting list
-opal say setting set default_volume 0.9
-opal say setting get default_volume
-opal say setting delete default_volume
+opal say config setting list
+opal say config setting set default_volume 0.9
+opal say config setting show default_volume
+opal say config setting remove default_volume
 
 # --- configuration ------------------------------------------------------------------------
 opal say backup validate
@@ -1310,7 +1335,7 @@ done
 
 ```bash
 # Smaller chunks mean the first audio arrives sooner
-opal say setting set chunk_max_chars 200
+opal say config setting set chunk_max_chars 200
 
 # A fixed output rate keeps the player setting the same for every voice
 opal say generate - --stream --sample-rate 22050 -o - < article.txt \
@@ -1477,7 +1502,7 @@ See the [User Guide](USER_GUIDE.md#10-integrating-with-your-application) for str
 | First `generate` with a voice is slow | The model is loaded on first use. Later calls reuse it (Piper keeps `cache_size` models). Raise `--timeout` for very long texts. |
 | `backup restore` says `backup_not_found` for a copied file | The file must be in the service's `<data_dir>/backups/` and keep its `opal-say-<timestamp>.tar.gz` name. |
 | `backup import` says `config_not_found` | The service's `config_dir` has none of `engines.yaml`, `voices.yaml`, `profiles.yaml`, `settings.yaml`. |
-| `/docs` loads but shows no operations, `/openapi.json` returns `500` | The service publishes `src/opal_say/contract/opal_say.yaml`, the packaged bundle of `openapi/opal_say_v1.7.0.yaml` and the shared kernel. If it is missing or unreadable, reinstall/re-checkout the package. The CLI is not affected. |
+| `/docs` loads but shows no operations, `/openapi.json` returns `500` | The service publishes `src/opal_say/contract/opal_say.yaml`, the packaged bundle of `openapi/opal_say_v1.7.1.yaml` and the shared kernel. If it is missing or unreadable, reinstall/re-checkout the package. The CLI is not affected. |
 
 ---
 
@@ -1513,11 +1538,14 @@ contract. The parity tests check that the CLI covers every operation.
 | `persona validate` | `POST /api/v1/persona/{persona_id}/validate` | `opal_persona_validate` |
 | `generate` | `POST /api/v1/generate` | `opal_generate` |
 | `generate --stream` | `POST /api/v1/generate/stream` | `opal_generate_stream` |
-| `setting list` | `GET /api/v1/setting/` | `opal_setting_list` |
-| `setting get` | `GET /api/v1/setting/{key}` | `opal_setting_get` |
-| `setting set` | `PUT /api/v1/setting/{key}` | `opal_setting_put` |
-| `setting delete` | `DELETE /api/v1/setting/{key}` | `opal_setting_delete` |
-| `setting patch` | `PATCH /api/v1/setting/` | `opal_setting_patch` |
+| `config setting list` | `GET /api/v1/setting/` | `opal_setting_list` |
+| `config setting show` | `GET /api/v1/setting/{key}` | `opal_setting_get` |
+| `config setting set` | `PUT /api/v1/setting/{key}` | `opal_setting_put` |
+| `config setting remove` | `DELETE /api/v1/setting/{key}` | `opal_setting_delete` |
+| `config setting update` | `PATCH /api/v1/setting/` | `opal_setting_patch` |
+| `service start` | `POST /api/v1/service/start` | `opal_service_start` |
+| `service stop` | `POST /api/v1/service/stop` | `opal_service_stop` |
+| `service log` | `GET /api/v1/service/log` | `opal_service_log` |
 | `info health` | `GET /api/v1/health/` | `opal_health_get` |
 | `info live` | `GET /api/v1/health/live` | `opal_health_live_get` |
 | `info ready` | `GET /api/v1/health/ready` | `opal_health_ready_get` |
