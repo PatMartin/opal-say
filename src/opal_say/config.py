@@ -24,6 +24,9 @@ class ServiceConfig:
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
     spa_dir: Path | None = None
+    log_dir: Path = Path("logs")  # managed server log (opal_say.log) and pidfile (opal_say.pid)
+    # The YAML file this config was loaded from, when any; propagated to managed children.
+    source_path: Path | None = None
     # engine_id -> {"enabled": bool, "options": {...}}; used to seed engine state on first start.
     engines: dict[str, dict[str, Any]] = field(default_factory=dict)
 
@@ -64,6 +67,8 @@ def load_config(path: Path | str | None = None) -> ServiceConfig:
         cfg.cors_origins = [str(o) for o in raw["cors_origins"] or []]
     if isinstance(raw.get("engines"), dict):
         cfg.engines = {str(k): dict(v or {}) for k, v in raw["engines"].items()}
+    if path is not None:
+        cfg.source_path = Path(path).resolve()
 
     env_map = {
         "OPAL_SAY_HOST": ("host", str),
@@ -71,6 +76,7 @@ def load_config(path: Path | str | None = None) -> ServiceConfig:
         "OPAL_SAY_DATA_DIR": ("data_dir", lambda v: Path(v).expanduser()),
         "OPAL_SAY_CONFIG_DIR": ("config_dir", lambda v: Path(v).expanduser()),
         "OPAL_SAY_SPA_DIR": ("spa_dir", lambda v: Path(v).expanduser()),
+        "OPAL_SAY_LOG_DIR": ("log_dir", lambda v: Path(v).expanduser()),
         "OPAL_SAY_PERSONA_OWNER_URL": ("persona_owner_url", str),
     }
     for env_key, (attr, conv) in env_map.items():

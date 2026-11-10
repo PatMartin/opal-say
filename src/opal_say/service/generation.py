@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
+
+import httpx
 
 from opal_say.persistence.store import Store
 from opal_say.schemas import GenerateRequest, GenerateStreamRequest, VoiceTestRequest
@@ -19,10 +22,6 @@ from opal_say.service.errors import (
     Unavailable,
 )
 from opal_say.service.settings import SettingsService
-
-import httpx
-
-from datetime import UTC, datetime
 from opal_say.tts.audio import WAV_HEADER_BYTES, resample, to_pcm16, wav_bytes
 from opal_say.tts.base import (
     EngineOptionsError,

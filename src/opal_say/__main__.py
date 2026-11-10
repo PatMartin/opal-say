@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+from pathlib import Path
 
 import uvicorn
 
 from opal_say.config import load_config
+from opal_say.service.lifecycle import wait_for_pids, write_pid_file
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -23,6 +26,14 @@ def main(argv: list[str] | None = None) -> None:
     if args.port:
         config.port = args.port
     logging.basicConfig(level=config.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    # Managed-server handshake (service lifecycle): a replacement child waits for the
+    # pids it was launched against to exit before binding, then records its real pid.
+    wait = os.environ.get("OPAL_SAY_WAIT_FOR_PID")
+    if wait:
+        wait_for_pids(wait.split(","))
+    if pid_file := os.environ.get("OPAL_SAY_PID_FILE"):
+        write_pid_file(Path(pid_file))
 
     from opal_say.api.app import create_app
 

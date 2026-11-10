@@ -13,6 +13,7 @@ from opal_say.service.catalog import EngineService, PersonaService, ProfileServi
 from opal_say.service.config_ops import ConfigService
 from opal_say.service.errors import ApiError
 from opal_say.service.generation import GenerationService
+from opal_say.service.lifecycle import ServiceProcessManager
 from opal_say.service.settings import SettingsService
 from opal_say.tts.base import TtsEngine
 from opal_say.tts.registry import EngineRegistry, default_engines
@@ -33,6 +34,7 @@ class Services:
     setting: SettingsService
     generation: GenerationService
     config_ops: ConfigService
+    lifecycle: ServiceProcessManager
 
     def health(self) -> dict[str, Any]:
         engine_states = []
@@ -80,6 +82,7 @@ def build_services(config: ServiceConfig, engines: list[TtsEngine] | None = None
         setting=setting_svc,
         generation=GenerationService(store, engine_svc, setting_svc, owner_url=config.persona_owner_url),
         config_ops=ConfigService(store, engine_svc, config.config_dir, config.backup_dir),
+        lifecycle=ServiceProcessManager(config),
     )
     if fresh and config.config_dir.is_dir():
         try:

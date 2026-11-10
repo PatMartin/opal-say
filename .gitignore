@@ -14,3 +14,4 @@ resources/voices/
 resources/kokoro/
 spa/test-results/
 spa/playwright-report/
+logs/
