@@ -198,6 +198,32 @@ class GenerateRequest(GenerateStreamRequest):
     output_format: AudioFormat | None = None
 
 
+# -- service lifecycle ---------------------------------------------------------
+
+
+class ServiceStartOptions(BaseModel):
+    """`OpalServiceStartOptions`: open body; only `append` is portable."""
+
+    model_config = ConfigDict(extra="allow")
+    append: bool = False
+
+
+class ServiceStatus(BaseModel):
+    """`OpalServiceStatus` for service start/stop."""
+
+    state: Literal["running", "stopped"]
+    pid: int | None = None
+    previous_pid: int | None = None
+    log_file: str
+
+
+class ServiceLogTail(BaseModel):
+    """`OpalServiceLogTail` for service log."""
+
+    log_file: str | None = None
+    lines: list[str]
+
+
 # -- settings / health / backup -------------------------------------------------
 
 

@@ -8,6 +8,7 @@ import { GeneratePanel } from './components/GeneratePanel'
 import { HealthPanel } from './components/HealthPanel'
 import { PersonaPanel } from './components/PersonaPanel'
 import { ProfilePanel } from './components/ProfilePanel'
+import { ServicePanel } from './components/ServicePanel'
 import { SettingPanel } from './components/SettingPanel'
 import { VoicePanel } from './components/VoicePanel'
 
@@ -20,6 +21,7 @@ const TABS = {
   Setting: SettingPanel,
   Backup: BackupPanel,
   Health: HealthPanel,
+  Service: ServicePanel,
 } as const
 type Tab = keyof typeof TABS
 

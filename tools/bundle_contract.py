@@ -19,7 +19,12 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "openapi" / "opal_say_v1.7.0.yaml"
+# The authoritative source follows the package version so a contract rename cannot
+# silently orphan this tool (importable directly from src/ without the venv).
+sys.path.insert(0, str(ROOT / "src"))
+from opal_say import __version__  # noqa: E402
+
+SOURCE = ROOT / "openapi" / f"opal_say_v{__version__}.yaml"
 TARGET = ROOT / "src" / "opal_say" / "contract" / "opal_say.yaml"
 
 _docs: dict[Path, dict] = {}
@@ -90,7 +95,9 @@ def bundle(source: Path = SOURCE) -> dict:
                         return {**content, **merged} if merged else content
                     return {"$ref": f"#/components/{kind}/{name}", **merged}
                 return node  # internal ref of the root document: already bundle-local
-            return {k: resolve(v, src_file) for k, v in node.items()}
+            # Snapshot: resolving a child may import a new component into the very
+            # dict being iterated (e.g. a kernel $ref inside components.schemas).
+            return {k: resolve(v, src_file) for k, v in list(node.items())}
         if isinstance(node, list):
             return [resolve(v, src_file) for v in node]
         return node

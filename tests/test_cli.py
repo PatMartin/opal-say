@@ -117,6 +117,11 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert json.loads(run("info version").stdout)["name"] == "opal-say-svc"
     assert run("info ping").stdout.strip() == "ok"
 
+    assert json.loads(run("--json service start").stdout)["state"] == "running"
+    assert "ready" in run("service log").stdout
+    assert json.loads(run("--json service log --lines 1").stdout)["lines"] == ["ready"]
+    assert json.loads(run("--json service stop").stdout)["state"] == "stopped"
+
     filename = json.loads(run("backup create").stdout)["filename"]
     assert filename in run("backup list").stdout
     target = tmp_path / "b.tar.gz"

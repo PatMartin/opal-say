@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: OPAL Say API
-  version: 1.7.0
+  version: 1.7.1
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides a stable REST\
     \ contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients interact with OPAL concepts—engine,\n\
     voice, profile, generation setting, and audio output—without depending on a\nspecific engine's command line, model layout,\
@@ -31,9 +31,8 @@ info:
     \ routes: /api/v1/health/, /api/v1/health/live, /api/v1/health/ready. Setting: GET and PATCH /api/v1/setting/ for the\
     \ whole map, plus GET, PUT and DELETE /api/v1/setting/{key} for individual keys retained for OPAL suite consistency; PATCH\
     \ is atomic. Mutable configuration uses strong ETags and mandatory If-Match with 428 missing, 412 stale. For bounded configuration\
-    \ catalogs return full arrays (subject to explicit deployment caps); for growing histories use cursor pagination with\
-    \ stable deterministic ordering, opaque next_cursor and has_more. Cursors are scoped to the exact filter set and invalidate\
-    \ on mismatch (422); cursor values expire explicitly. Standard HTTP creation 201 Location, async admission 202, empty\
+    \ catalogs return full arrays (subject to explicit deployment caps); growing histories return bounded arrays in stable\
+    \ deterministic order and `limit` caps the returned items. Standard HTTP creation 201 Location, async admission 202, empty\
     \ deletion 204. Streaming keeps media-specific transports but exposes correlation headers, defined failure behavior, and\
     \ no unsupported replay guarantee. Configuration export/import/validation excludes secrets and history.\n"
 tags:
@@ -60,7 +59,8 @@ tags:
 - name: persona
   description: 'Manage named persona: identities that bind a registered voice so requests can
 
-    select a consistent character with a single `persona` field. The schema is kept
+    select a consistent character with a single `persona` field. Personas and profiles are explained together in the shared
+    kernel doc `x-opal-persona` (`profiles_vs_personas`). The schema is kept
 
     flat for Say v1; sister OPAL services may adopt the same persona identifiers for
 
@@ -81,6 +81,8 @@ tags:
   description: Service readiness and health information. Playback devices are out of scope.
 - name: backup
   description: Backup, restore, import, export, and validate OPAL Say configuration.
+- name: service
+  description: Service process lifecycle (start, stop, log tail).
 servers:
 - url: http://127.0.0.1:8080
   description: Illustrative local endpoint; actual bind address and port are configurable.
@@ -1236,6 +1238,25 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenerateRequest'
+            examples:
+              profile-default-voice:
+                summary: Active profile supplies the voice. "amy" is active with voice en-us-lessac-medium; the request names
+                  nothing, so the profile voice is used.
+                value:
+                  text: Hello from the default profile voice.
+              persona-selected-voice:
+                summary: Persona supplies a different voice. Persona "amy" binds en-gb-alan-low; naming the persona overrides
+                  the active profile's voice for this request.
+                value:
+                  text: Hello from Amy.
+                  persona: amy
+              explicit-voice-overrides:
+                summary: Explicit voice_id wins. Even with persona "amy" selected, the request voice en-us-ryan-high overrides
+                  both the persona and the profile.
+                value:
+                  text: Hello in Ryan's voice.
+                  persona: amy
+                  voice_id: en-us-ryan-high
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1386,6 +1407,18 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+    x-opal-cli:
+      get:
+        parent: config
+        group: setting
+        command: list
+        aliases: null
+      patch:
+        parent: config
+        group: setting
+        command: update
+        aliases:
+        - config setting patch
   /api/v1/setting/{key}:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -1499,6 +1532,24 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+    x-opal-cli:
+      get:
+        parent: config
+        group: setting
+        command: show
+        aliases:
+        - setting get
+      put:
+        parent: config
+        group: setting
+        command: set
+        aliases: null
+      delete:
+        parent: config
+        group: setting
+        command: remove
+        aliases:
+        - setting delete
   /api/v1/health/:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -2058,6 +2109,139 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OpalHealthProbe'
+  /api/v1/service/start:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    post:
+      tags:
+      - service
+      summary: Start service
+      operationId: opal_service_start
+      description: Start the service's server process in the background and return immediately. Server output is written to
+        `logs/opal_<service>.log`; the log file is overwritten by default unless `append` is requested. If another server
+        process is already running it is terminated before the new one is launched, so `start` doubles as restart. The response
+        reports the launched process; readiness is reported separately by `/api/v1/health/ready`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpalServiceStartOptions'
+      responses:
+        '200':
+          description: Server process launched.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalServiceStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/OperationFailed'
+    x-opal-cli:
+      post:
+        group: service
+        command: start
+  /api/v1/service/stop:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    post:
+      tags:
+      - service
+      summary: Stop service
+      operationId: opal_service_stop
+      description: Stop the service's server process if it is running. Not an error when no server is running; the response
+        reports the resulting state.
+      responses:
+        '200':
+          description: Resulting process state.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalServiceStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/OperationFailed'
+    x-opal-cli:
+      post:
+        group: service
+        command: stop
+  /api/v1/service/log:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    get:
+      tags:
+      - service
+      summary: Tail service log
+      operationId: opal_service_log
+      description: Return the trailing lines of the service's log file (`logs/opal_<service>.log`); defaults to the last 10
+        lines.
+      parameters:
+      - $ref: '#/components/parameters/ServiceLogLines'
+      responses:
+        '200':
+          description: Trailing log lines.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalServiceLogTail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    x-opal-cli:
+      get:
+        group: service
+        command: log
 components:
   securitySchemes:
     BearerAuth:
@@ -2179,6 +2363,16 @@ components:
         maxLength: 255
         pattern: ^[^/\\]+$
       example: opal-say-2026-10-04T230000Z.tar.gz
+    ServiceLogLines:
+      name: lines
+      in: query
+      required: false
+      description: Number of trailing log lines to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 10
   headers:
     AudioFormat:
       description: Logical output format returned in the response body.
@@ -2783,28 +2977,21 @@ components:
           example: en-gb-alan-low
         enabled:
           type: boolean
-        origin:
-          type: string
-          enum:
-          - local
-          - owner
-          default: local
-          description: 'Provenance: `local` (authored here, standalone) or `owner` (synced from the authoritative registry
-            at OPAL Think). Optional and additive; absent means `local`.'
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
-    GenerateRequest:
+    GenerateRequestBase:
       type: object
-      additionalProperties: false
       required:
       - text
-      description: 'Request for completed speech audio. Any omitted generation setting is resolved
+      description: 'Shared speech-generation settings. Applicable settings resolve in order:
 
-        from the selected/active profile and then service defaults.
+        explicit request values, persona, the selected/active profile, then service
+
+        defaults.
 
         '
       properties:
@@ -2818,7 +3005,6 @@ components:
             by the OpenAPI schema.
 
             '
-          example: Hello from OPAL Say.
         profile_id:
           anyOf:
           - type: integer
@@ -2834,10 +3020,7 @@ components:
           example: en-us-lessac-medium
         persona:
           anyOf:
-          - type: string
-            minLength: 1
-            maxLength: 200
-            pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
+          - $ref: '#/components/schemas/OpalPersonaRef'
           - type: 'null'
           description: 'Named persona supplying a default voice. An explicit `voice_id` in this
 
@@ -2871,20 +3054,33 @@ components:
             maximum: 2.0
           - type: 'null'
           description: Request-level linear gain override; `1.0` is unchanged.
-        output_format:
-          anyOf:
-          - $ref: '#/components/schemas/AudioFormat'
-          - type: 'null'
-          description: Request-level completed-audio format override.
         sample_rate:
           anyOf:
           - type: integer
             minimum: 8000
             maximum: 192000
           - type: 'null'
-          description: Optional requested output sample rate in Hz.
+          description: Optional requested output PCM sample rate in Hz.
         engine_options:
           $ref: '#/components/schemas/EngineOptions'
+    GenerateRequest:
+      description: 'Request for completed speech audio. Applicable settings resolve in order:
+
+        explicit request values, persona, the selected/active profile, then service
+
+        defaults.
+
+        '
+      unevaluatedProperties: false
+      allOf:
+      - $ref: '#/components/schemas/GenerateRequestBase'
+      - type: object
+        properties:
+          output_format:
+            anyOf:
+            - $ref: '#/components/schemas/AudioFormat'
+            - type: 'null'
+            description: Request-level completed-audio format override.
       example:
         text: The quick brown fox jumps over the lazy dog.
         voice_id: en-us-lessac-medium
@@ -2893,71 +3089,18 @@ components:
         output_format: wav
         engine_options: {}
     GenerateStreamRequest:
-      type: object
-      additionalProperties: false
-      required:
-      - text
       description: 'Request for progressively streamed speech. The wire format is fixed to raw PCM,
 
-        so there is intentionally no `output_format` property.
+        so there is intentionally no `output_format` property. Applicable settings
+
+        resolve in order: explicit request values, persona, the selected/active
+
+        profile, then service defaults.
 
         '
-      properties:
-        text:
-          type: string
-          minLength: 1
-          description: Plain text to speak. Long text may be internally chunked.
-          example: This audio begins streaming as it is generated.
-        profile_id:
-          anyOf:
-          - type: integer
-            minimum: 1
-          - type: 'null'
-          description: Explicit profile to use; otherwise the active profile may provide defaults.
-        voice_id:
-          anyOf:
-          - type: string
-            minLength: 1
-          - type: 'null'
-          description: Request-level voice override.
-        persona:
-          anyOf:
-          - type: string
-            minLength: 1
-            maxLength: 200
-            pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
-          - type: 'null'
-          description: Named persona supplying a default voice; `voice_id` takes precedence.
-          example: amy
-        engine_id:
-          anyOf:
-          - type: string
-            minLength: 1
-          - type: 'null'
-          description: Optional advanced engine override; incompatible overrides are rejected.
-        speed:
-          anyOf:
-          - type: number
-            format: float
-            minimum: 0.25
-            maximum: 4.0
-          - type: 'null'
-        volume:
-          anyOf:
-          - type: number
-            format: float
-            minimum: 0.0
-            maximum: 2.0
-          - type: 'null'
-        sample_rate:
-          anyOf:
-          - type: integer
-            minimum: 8000
-            maximum: 192000
-          - type: 'null'
-          description: Optional requested PCM stream sample rate in Hz.
-        engine_options:
-          $ref: '#/components/schemas/EngineOptions'
+      unevaluatedProperties: false
+      allOf:
+      - $ref: '#/components/schemas/GenerateRequestBase'
       example:
         text: Stream this sentence as raw PCM audio.
         profile_id: 1
@@ -3832,12 +3975,64 @@ components:
           type: string
           description: Service implementation version; conditionally present.
       additionalProperties: true
+    OpalServiceStartOptions:
+      type: object
+      properties:
+        append:
+          type: boolean
+          default: false
+          description: Append to the existing service log file instead of truncating it. By default `logs/opal_<service>.log`
+            is overwritten on each start.
+      required: []
+      additionalProperties: true
+      description: Options for service start.
+    OpalServiceStatus:
+      type: object
+      required:
+      - state
+      properties:
+        state:
+          type: string
+          enum:
+          - running
+          - stopped
+          description: Whether the service's server process is running after the operation.
+        pid:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Process identifier of the running server; null when stopped or unknown.
+        previous_pid:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Process identifier of a prior instance terminated by `service start`; null when none was running.
+        log_file:
+          type: string
+          description: Path of the log file receiving server output (`logs/opal_<service>.log`).
+      additionalProperties: true
+      description: Lifecycle state of the service's server process as reported by start/stop.
+    OpalServiceLogTail:
+      type: object
+      required:
+      - lines
+      properties:
+        log_file:
+          type: string
+          description: Path of the service log file (`logs/opal_<service>.log`).
+        lines:
+          type: array
+          items:
+            type: string
+          description: Trailing log lines, oldest first; at most `lines` entries.
+      additionalProperties: true
+      description: Trailing lines of the service log file.
 x-opal-context-standard:
   version: '1.2'
   headers:
     metadata_schema_version: '1.0'
   pagination:
-    history: cursor
+    history: none
     configuration: none
     default_limit: 100
     max_limit: 500

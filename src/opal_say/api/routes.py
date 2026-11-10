@@ -7,7 +7,7 @@ import threading
 from typing import Any
 
 import anyio
-from fastapi import APIRouter, Body, Depends, Header, Path, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Header, Path, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -32,6 +32,9 @@ from opal_say.schemas import (
     ProfileRead,
     ProfileUpdate,
     ServiceInfo,
+    ServiceLogTail,
+    ServiceStartOptions,
+    ServiceStatus,
     SettingRead,
     SettingUpdate,
     ValidationResult,
@@ -43,6 +46,7 @@ from opal_say.schemas import (
 from opal_say.service.concurrency import config_etag, mutate_with_revision
 from opal_say.service.config_candidate import Candidate
 from opal_say.service.container import Services
+from opal_say.service.errors import NotFound
 from opal_say.service.settings import settings_to_str
 from opal_say.tts.base import Report
 
@@ -532,6 +536,42 @@ def validate_backup_payload(body: ConfigExport, svc: Services = Depends(services
 def delete_backup(filename: str = BackupFilename, svc: Services = Depends(services)):
     svc.config_ops.delete_backup(filename)
     return Response(status_code=204)
+
+
+# -- service process lifecycle -----------------------------------------------------
+
+# "The service's server process" is the pidfile-tracked detached child managed by
+# ServiceProcessManager. When the tracked pid is this process itself (the service was
+# launched via `service start`), the response is still 200 — termination is deferred
+# to a BackgroundTask so it lands after the response is sent.
+
+
+@router.post("/api/v1/service/start", tags=["service"], operation_id="opal_service_start",
+             response_model=ServiceStatus)
+def start_service(background_tasks: BackgroundTasks, body: ServiceStartOptions | None = Body(None),
+                  svc: Services = Depends(services)):
+    status, terminate_self = svc.lifecycle.start(append=body.append if body else False)
+    if terminate_self:
+        background_tasks.add_task(svc.lifecycle.terminate_self)
+    return status
+
+
+@router.post("/api/v1/service/stop", tags=["service"], operation_id="opal_service_stop",
+             response_model=ServiceStatus)
+def stop_service(background_tasks: BackgroundTasks, svc: Services = Depends(services)):
+    status, terminate_self = svc.lifecycle.stop()
+    if terminate_self:
+        background_tasks.add_task(svc.lifecycle.terminate_self)
+    return status
+
+
+@router.get("/api/v1/service/log", tags=["service"], operation_id="opal_service_log",
+            response_model=ServiceLogTail)
+def tail_service_log(lines: int = Query(10, ge=1, le=1000), svc: Services = Depends(services)):
+    tail = svc.lifecycle.tail_log(lines)
+    if tail is None:
+        raise NotFound(f"no service log at {svc.lifecycle.log_file}")
+    return tail
 
 
 # -- service identity ---------------------------------------------------------------

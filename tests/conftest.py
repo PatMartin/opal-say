@@ -156,9 +156,48 @@ def engines() -> list[FakeEngine]:
     return [FakeEngine("fake"), FakeEngine("alt", speed_range=(0.5, 2.0), voice={"tone-a": 24000})]
 
 
+class FakeLifecycle:
+    """Test double for ServiceProcessManager: never spawns or kills a real process.
+
+    Returns contract-valid status/log bodies and lets tests flag whether the
+    tracked pid would have been this process (termination scheduling)."""
+
+    log_file = "logs/opal_say.log"
+
+    def __init__(self):
+        self.starts: list[bool] = []
+        self.stops = 0
+        self.self_managed = False  # simulate tracked pid == the serving process
+        self.terminated = False
+        self.lines: list[str] | None = ["boot", "ready"]
+
+    def start(self, append: bool = False):
+        self.starts.append(append)
+        status = {"state": "running", "pid": 4242, "previous_pid": None, "log_file": self.log_file}
+        if self.self_managed:
+            status["previous_pid"] = os.getpid()
+        return status, self.self_managed
+
+    def stop(self):
+        self.stops += 1
+        status = {"state": "stopped", "pid": None, "previous_pid": None, "log_file": self.log_file}
+        if self.self_managed:
+            status["previous_pid"] = os.getpid()
+        return status, self.self_managed
+
+    def tail_log(self, lines: int):
+        if self.lines is None:
+            return None
+        return {"log_file": self.log_file, "lines": self.lines[-lines:]}
+
+    def terminate_self(self):  # pragma: no cover - never actually terminates in tests
+        self.terminated = True
+
+
 @pytest.fixture
 def app(config: ServiceConfig, engines: list[FakeEngine]):
     application = create_app(config, engines=engines)
+    application.state.services.lifecycle = FakeLifecycle()
     yield application
     application.state.services.close()
 

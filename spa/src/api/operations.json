@@ -174,5 +174,17 @@
   "opal_health_ready_get": {
     "method": "GET",
     "path": "/api/v1/health/ready"
+  },
+  "opal_service_start": {
+    "method": "POST",
+    "path": "/api/v1/service/start"
+  },
+  "opal_service_stop": {
+    "method": "POST",
+    "path": "/api/v1/service/stop"
+  },
+  "opal_service_log": {
+    "method": "GET",
+    "path": "/api/v1/service/log"
   }
 }

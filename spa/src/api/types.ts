@@ -92,3 +92,15 @@ export interface ServiceInfo {
   api_version: string
   description?: string
 }
+
+export interface ServiceStatus {
+  state: 'running' | 'stopped'
+  pid?: number | null
+  previous_pid?: number | null
+  log_file: string
+}
+
+export interface ServiceLogTail {
+  log_file?: string | null
+  lines: string[]
+}

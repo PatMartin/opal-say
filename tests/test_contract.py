@@ -111,7 +111,7 @@ def test_operation_ids_are_unique():
 
 
 PATH_PARAM = re.compile(r"\{([^{}]+)\}")
-PATH_ITEM_KEYS = frozenset((*METHODS, "parameters", "summary", "description", "servers"))
+PATH_ITEM_KEYS = frozenset((*METHODS, "parameters", "summary", "description", "servers", "x-opal-cli"))
 
 
 def test_paths_are_valid_templates_with_declared_params():
@@ -249,6 +249,10 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
 
     assert c.get("/api/v1/health/live").json() == {"status": "ok", "ready": True}
     assert c.get("/api/v1/health/ready").json()["ready"] is True
+
+    assert c.post("/api/v1/service/start", json={"append": True}).json()["state"] == "running"
+    assert c.get("/api/v1/service/log", params={"lines": 1}).json()["lines"] == ["ready"]
+    assert c.post("/api/v1/service/stop").json()["state"] == "stopped"
 
     created = c.post("/api/v1/backup/create")
     assert created.status_code == 201
