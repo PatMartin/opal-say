@@ -2783,6 +2783,14 @@ components:
           example: en-gb-alan-low
         enabled:
           type: boolean
+        origin:
+          type: string
+          enum:
+          - local
+          - owner
+          default: local
+          description: 'Provenance: `local` (authored here, standalone) or `owner` (synced from the authoritative registry
+            at OPAL Think). Optional and additive; absent means `local`.'
         created_at:
           type: string
           format: date-time

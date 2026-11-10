@@ -78,7 +78,7 @@ def build_services(config: ServiceConfig, engines: list[TtsEngine] | None = None
         profile=ProfileService(store, engine_svc, voice_svc),
         persona=PersonaService(store, voice_svc),
         setting=setting_svc,
-        generation=GenerationService(store, engine_svc, setting_svc),
+        generation=GenerationService(store, engine_svc, setting_svc, owner_url=config.persona_owner_url),
         config_ops=ConfigService(store, engine_svc, config.config_dir, config.backup_dir),
     )
     if fresh and config.config_dir.is_dir():

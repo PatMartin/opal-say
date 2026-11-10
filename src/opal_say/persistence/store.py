@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS personas (
     description TEXT,
     voice_id TEXT NOT NULL,
     enabled INTEGER NOT NULL,
+    origin TEXT NOT NULL DEFAULT 'local',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -102,6 +103,8 @@ class Store:
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._lock = threading.RLock()
         self._conn.executescript(SCHEMA)
+        if "origin" not in {r[1] for r in self._conn.execute("PRAGMA table_info(personas)")}:
+            self._conn.execute("ALTER TABLE personas ADD COLUMN origin TEXT NOT NULL DEFAULT 'local'")
 
     def close(self) -> None:
         self._conn.close()

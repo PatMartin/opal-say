@@ -19,6 +19,7 @@ class ServiceConfig:
     data_dir: Path = Path("var")
     config_dir: Path = Path("config")
     log_level: str = "info"
+    persona_owner_url: str | None = None
     cors_origins: list[str] = field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
@@ -57,6 +58,8 @@ def load_config(path: Path | str | None = None) -> ServiceConfig:
     for key in ("data_dir", "config_dir", "spa_dir"):
         if raw.get(key):
             setattr(cfg, key, Path(str(raw[key])).expanduser())
+    if raw.get("persona_owner_url"):
+        cfg.persona_owner_url = str(raw["persona_owner_url"]).rstrip("/")
     if "cors_origins" in raw:
         cfg.cors_origins = [str(o) for o in raw["cors_origins"] or []]
     if isinstance(raw.get("engines"), dict):
@@ -68,6 +71,7 @@ def load_config(path: Path | str | None = None) -> ServiceConfig:
         "OPAL_SAY_DATA_DIR": ("data_dir", lambda v: Path(v).expanduser()),
         "OPAL_SAY_CONFIG_DIR": ("config_dir", lambda v: Path(v).expanduser()),
         "OPAL_SAY_SPA_DIR": ("spa_dir", lambda v: Path(v).expanduser()),
+        "OPAL_SAY_PERSONA_OWNER_URL": ("persona_owner_url", str),
     }
     for env_key, (attr, conv) in env_map.items():
         if os.environ.get(env_key):

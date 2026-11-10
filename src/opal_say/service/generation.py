@@ -19,6 +19,10 @@ from opal_say.service.errors import (
     Unavailable,
 )
 from opal_say.service.settings import SettingsService
+
+import httpx
+
+from datetime import UTC, datetime
 from opal_say.tts.audio import WAV_HEADER_BYTES, resample, to_pcm16, wav_bytes
 from opal_say.tts.base import (
     EngineOptionsError,
@@ -89,11 +93,40 @@ def translate_engine_error(exc: Exception) -> Exception:
 
 
 class GenerationService:
-    def __init__(self, store: Store, engine: EngineService, setting: SettingsService):
+    def __init__(
+        self, store: Store, engine: EngineService, setting: SettingsService, owner_url: str | None = None
+    ):
         self.store = store
         self.engine = engine
         self.setting = setting
+        self.owner_url = owner_url
         # Per-engine serialization is owned by EngineRuntimeManager (engine.runtime).
+
+    def _fetch_owner_persona(self, persona_id: str) -> dict[str, Any] | None:
+        """Fetch an unknown persona from the authoritative owner (OPAL Think) and
+        store it as a synced ``origin: owner`` record. Any fetch failure falls back
+        to the normal not-registered error."""
+        try:
+            resp = httpx.get(f"{self.owner_url}/api/v1/persona/{persona_id}", timeout=5.0)
+        except httpx.HTTPError:
+            return None
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        now = datetime.now(UTC).isoformat()
+        row = {
+            "persona_id": data["persona_id"],
+            "name": data["name"],
+            "description": data.get("description"),
+            "voice_id": data.get("voice_id"),
+            "enabled": int(data.get("enabled", True)),
+            "origin": "owner",
+            "created_at": data.get("created_at") or now,
+            "updated_at": data.get("updated_at") or now,
+        }
+        self.store.insert_persona(row)
+        return self.store.get_persona(persona_id)
+
 
     # -- resolution -----------------------------------------------------------
 
@@ -209,6 +242,8 @@ class GenerationService:
         persona_voice: str | None = None
         if req.persona is not None:
             persona = self.store.get_persona(req.persona)
+            if persona is None and self.owner_url:
+                persona = self._fetch_owner_persona(req.persona)
             if persona is None:
                 raise InvalidRequest.single(["body", "persona"], f"persona '{req.persona}' is not registered")
             if not persona["enabled"]:
