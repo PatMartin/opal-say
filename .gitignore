@@ -15,3 +15,5 @@ resources/kokoro/
 spa/test-results/
 spa/playwright-report/
 logs/
+.env
+!.env.example

@@ -75,7 +75,16 @@ def say_callback(
     api_url: str = typer.Option(None, "--api-url", help="REST API base URL [env: OPAL_SAY_API_URL]"),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON responses"),
     timeout: float = typer.Option(120.0, "--timeout", help="HTTP timeout in seconds"),
+    env_file: str = typer.Option(None, "--env-file", help="Load this dotenv file instead of ./.env"),
+    no_env_file: bool = typer.Option(False, "--no-env-file", help="Disable dotenv loading and .env initialization"),
 ) -> None:
+    from opal_say.config import dotenv_baseline
+    from opal_say.dotenv import DotenvError, prepare
+
+    try:
+        prepare(env_file=env_file, no_env_file=no_env_file, baseline=dotenv_baseline())
+    except DotenvError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     ctx.obj = CliState(client_factory(api_url or api_url_from_env(), timeout), json_output)
 
 

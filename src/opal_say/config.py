@@ -39,10 +39,10 @@ class ServiceConfig:
         return self.data_dir / "backups"
 
 
-def load_config(path: Path | str | None = None) -> ServiceConfig:
+def load_config(path: Path | str | None = None, *, apply_env: bool = True) -> ServiceConfig:
     """Load YAML config from `path`, $OPAL_SAY_CONFIG or ./config/service.yaml (if present)."""
     if path is None:
-        env = os.environ.get("OPAL_SAY_CONFIG")
+        env = os.environ.get("OPAL_SAY_CONFIG") if apply_env else None
         path = Path(env) if env else (DEFAULT_CONFIG_FILE if DEFAULT_CONFIG_FILE.is_file() else None)
     raw: dict[str, Any] = {}
     if path is not None:
@@ -79,7 +79,24 @@ def load_config(path: Path | str | None = None) -> ServiceConfig:
         "OPAL_SAY_LOG_DIR": ("log_dir", lambda v: Path(v).expanduser()),
         "OPAL_SAY_PERSONA_OWNER_URL": ("persona_owner_url", str),
     }
-    for env_key, (attr, conv) in env_map.items():
-        if os.environ.get(env_key):
-            setattr(cfg, attr, conv(os.environ[env_key]))
+    if apply_env:
+        for env_key, (attr, conv) in env_map.items():
+            if env_key in os.environ:
+                setattr(cfg, attr, conv(os.environ[env_key]))
     return cfg
+
+
+def dotenv_baseline(path: Path | str | None = None) -> dict[str, object]:
+    cfg = load_config(path, apply_env=False)
+    values = {
+        "OPAL_SAY_HOST": cfg.host,
+        "OPAL_SAY_PORT": cfg.port,
+        "OPAL_SAY_DATA_DIR": cfg.data_dir,
+        "OPAL_SAY_CONFIG_DIR": cfg.config_dir,
+        "OPAL_SAY_SPA_DIR": cfg.spa_dir or "",
+        "OPAL_SAY_LOG_DIR": cfg.log_dir,
+        "OPAL_SAY_PERSONA_OWNER_URL": cfg.persona_owner_url or "",
+    }
+    if path is not None or DEFAULT_CONFIG_FILE.is_file():
+        values["OPAL_SAY_CONFIG"] = str(path or DEFAULT_CONFIG_FILE)
+    return values

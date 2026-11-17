@@ -9,7 +9,8 @@ from pathlib import Path
 
 import uvicorn
 
-from opal_say.config import load_config
+from opal_say.config import dotenv_baseline, load_config
+from opal_say.dotenv import DotenvError, prepare
 from opal_say.service.lifecycle import wait_for_pids, write_pid_file
 
 
@@ -18,8 +19,18 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--config", help="service YAML config (default: $OPAL_SAY_CONFIG or ./config/service.yaml)")
     parser.add_argument("--host")
     parser.add_argument("--port", type=int)
+    parser.add_argument("--env-file")
+    parser.add_argument("--no-env-file", action="store_true")
     args = parser.parse_args(argv)
 
+    try:
+        prepare(
+            env_file=args.env_file,
+            no_env_file=args.no_env_file,
+            baseline=dotenv_baseline(args.config),
+        )
+    except DotenvError as exc:
+        parser.error(str(exc))
     config = load_config(args.config)
     if args.host:
         config.host = args.host

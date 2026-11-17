@@ -990,3 +990,7 @@ For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs
 **OPAL Say doesn't decide what to say. It makes the words audible.** Put a local speech engine behind a simple REST contract, give it the voice that fits the moment, and let the rest of OPAL decide when it's time to speak.
 
 [Explore OPAL](https://github.com/PatMartin/opal) · [OPAL Listen](https://github.com/PatMartin/opal-listen) · [OPAL Event](https://github.com/PatMartin/opal-event) · [OPAL Look](https://github.com/PatMartin/opal-look) · [OPAL Think](https://github.com/PatMartin/opal-think)
+
+## Dotenv configuration
+
+See [docs/DOTENV.md](docs/DOTENV.md) for `.env` loading, initialization, precedence, and `--env-file` / `--no-env-file` behavior.
