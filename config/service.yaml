@@ -12,6 +12,12 @@ service:
     - http://localhost:5173
     - http://127.0.0.1:5173
 
+  # Persona owner (OPAL Think): unknown personas are adopted from this service
+  # and origin=owner records are revalidated per the persona_refresh_seconds
+  # setting. The bearer token is read from the environment variable named here.
+  # persona_owner_url: http://127.0.0.1:8080
+  # persona_owner_token_env: OPAL_SAY_PERSONA_OWNER_TOKEN
+
   # Initial engine state, applied only when an engine is first seen (later changes are made
   # through PATCH /api/v1/engines/{engine_id} and persisted).
   engines:

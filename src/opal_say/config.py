@@ -20,6 +20,7 @@ class ServiceConfig:
     config_dir: Path = Path("config")
     log_level: str = "info"
     persona_owner_url: str | None = None
+    persona_owner_token_env: str = "OPAL_SAY_PERSONA_OWNER_TOKEN"
     cors_origins: list[str] = field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
@@ -63,6 +64,8 @@ def load_config(path: Path | str | None = None, *, apply_env: bool = True) -> Se
             setattr(cfg, key, Path(str(raw[key])).expanduser())
     if raw.get("persona_owner_url"):
         cfg.persona_owner_url = str(raw["persona_owner_url"]).rstrip("/")
+    if raw.get("persona_owner_token_env"):
+        cfg.persona_owner_token_env = str(raw["persona_owner_token_env"])
     if "cors_origins" in raw:
         cfg.cors_origins = [str(o) for o in raw["cors_origins"] or []]
     if isinstance(raw.get("engines"), dict):
@@ -78,6 +81,7 @@ def load_config(path: Path | str | None = None, *, apply_env: bool = True) -> Se
         "OPAL_SAY_SPA_DIR": ("spa_dir", lambda v: Path(v).expanduser()),
         "OPAL_SAY_LOG_DIR": ("log_dir", lambda v: Path(v).expanduser()),
         "OPAL_SAY_PERSONA_OWNER_URL": ("persona_owner_url", str),
+        "OPAL_SAY_PERSONA_OWNER_TOKEN_ENV": ("persona_owner_token_env", str),
     }
     if apply_env:
         for env_key, (attr, conv) in env_map.items():

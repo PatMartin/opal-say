@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS personas (
     voice_id TEXT NOT NULL,
     enabled INTEGER NOT NULL,
     origin TEXT NOT NULL DEFAULT 'local',
+    owner_etag TEXT,
+    owner_checked_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -105,6 +107,10 @@ class Store:
         self._conn.executescript(SCHEMA)
         if "origin" not in {r[1] for r in self._conn.execute("PRAGMA table_info(personas)")}:
             self._conn.execute("ALTER TABLE personas ADD COLUMN origin TEXT NOT NULL DEFAULT 'local'")
+        existing = {r[1] for r in self._conn.execute("PRAGMA table_info(personas)")}
+        for col in ("owner_etag", "owner_checked_at"):
+            if col not in existing:
+                self._conn.execute(f"ALTER TABLE personas ADD COLUMN {col} TEXT")
 
     def close(self) -> None:
         self._conn.close()

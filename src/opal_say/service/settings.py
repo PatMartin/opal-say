@@ -50,6 +50,9 @@ KNOWN_SETTINGS: dict[str, tuple[Callable[[str], Any], Any]] = {
     # Incremental input: text chunks accepted ahead of synthesis. A full buffer
     # stops request-body reads, pushing backpressure onto the producer.
     "incremental_pending_chunks": (_number(int, 1, 64), 8),
+    # Owner-synced personas: how long a cached owner record may serve before it
+    # is revalidated against the persona owner. 0 revalidates on every use.
+    "persona_refresh_seconds": (_number(int, 0, 86_400), 60),
 }
 
 

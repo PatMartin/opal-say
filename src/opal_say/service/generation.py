@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -9,7 +11,7 @@ from typing import Any
 
 import httpx
 
-from opal_say.persistence.store import Store
+from opal_say.persistence.store import Store, now_iso
 from opal_say.schemas import (
     GenerateRequest,
     GenerateStreamRequest,
@@ -38,6 +40,8 @@ from opal_say.tts.base import (
 )
 from opal_say.tts.chunking import chunk_text
 from opal_say.tts.runtime import EngineRuntime
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -102,38 +106,136 @@ def translate_engine_error(exc: Exception) -> Exception:
 
 class GenerationService:
     def __init__(
-        self, store: Store, engine: EngineService, setting: SettingsService, owner_url: str | None = None
+        self, store: Store, engine: EngineService, setting: SettingsService, owner_url: str | None = None,
+        owner_token_env: str = "OPAL_SAY_PERSONA_OWNER_TOKEN",
     ):
         self.store = store
         self.engine = engine
         self.setting = setting
         self.owner_url = owner_url
+        self.owner_token_env = owner_token_env
         # Per-engine serialization is owned by EngineRuntimeManager (engine.runtime).
 
-    def _fetch_owner_persona(self, persona_id: str) -> dict[str, Any] | None:
-        """Fetch an unknown persona from the authoritative owner (OPAL Think) and
-        store it as a synced ``origin: owner`` record. Any fetch failure falls back
-        to the normal not-registered error."""
+    def _owner_get(self, persona_id: str, etag: str | None = None) -> httpx.Response | None:
+        """Authenticated GET against the persona owner (OPAL Think).
+
+        The bearer token comes from `owner_token_env` — resolved per call so the
+        token can rotate without a restart. `etag` carries the last seen owner
+        ETag for version-aware revalidation (`If-None-Match`)."""
+        headers: dict[str, str] = {}
+        token = os.environ.get(self.owner_token_env) if self.owner_token_env else None
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        if etag:
+            headers["If-None-Match"] = etag
         try:
-            resp = httpx.get(f"{self.owner_url}/api/v1/persona/{persona_id}", timeout=5.0)
+            return httpx.get(
+                f"{self.owner_url}/api/v1/persona/{persona_id}", headers=headers, timeout=5.0
+            )
         except httpx.HTTPError:
             return None
-        if resp.status_code != 200:
-            return None
-        data = resp.json()
-        now = datetime.now(UTC).isoformat()
-        row = {
+
+    @staticmethod
+    def _owner_row(data: dict[str, Any], etag: str | None, now: str) -> dict[str, Any]:
+        return {
             "persona_id": data["persona_id"],
             "name": data["name"],
             "description": data.get("description"),
             "voice_id": data.get("voice_id"),
             "enabled": int(data.get("enabled", True)),
             "origin": "owner",
+            "owner_etag": etag,
+            "owner_checked_at": now,
             "created_at": data.get("created_at") or now,
             "updated_at": data.get("updated_at") or now,
         }
-        self.store.insert_persona(row)
+
+    def _fetch_owner_persona(self, persona_id: str) -> dict[str, Any] | None:
+        """Fetch an unknown persona from the authoritative owner (OPAL Think) and
+        store it as a synced ``origin: owner`` record. Any fetch failure falls back
+        to the normal not-registered error."""
+        resp = self._owner_get(persona_id)
+        if resp is None or resp.status_code != 200:
+            return None
+        self.store.insert_persona(
+            self._owner_row(resp.json(), resp.headers.get("ETag"), now_iso())
+        )
         return self.store.get_persona(persona_id)
+
+    def _refresh_owner_persona(self, row: dict[str, Any]) -> dict[str, Any]:
+        """Revalidate a synced persona against its owner and apply the outcome.
+
+        Version-aware: the last seen owner ETag goes out as If-None-Match and
+        the stored row is only rewritten when the owner revision or record
+        actually changed. Owner-side changes propagate as follows:
+
+        * voice/description edits → applied to the cached row;
+        * disablement or deletion → the persona is disabled locally;
+        * unreachable owner, auth failure, 304 or unexpected status → keep the
+          cached row so generation keeps working through a transient outage.
+
+        `owner_checked_at` is bumped on every contact attempt so a slow or dead
+        owner costs at most one HTTP call per `persona_refresh_seconds`.
+        """
+        persona_id = row["persona_id"]
+        resp = self._owner_get(persona_id, etag=row.get("owner_etag"))
+        now = now_iso()
+        if resp is None:
+            self.store.update_persona(persona_id, {"owner_checked_at": now})
+            return self.store.get_persona(persona_id)
+        if resp.status_code == 404:
+            log.info("persona '%s' deleted at owner; disabling cached copy", persona_id)
+            self.store.update_persona(persona_id, {"enabled": 0, "owner_checked_at": now})
+            return self.store.get_persona(persona_id)
+        if resp.status_code in (401, 403):
+            log.warning("persona owner rejected %s credentials (status %s)", self.owner_token_env,
+                        resp.status_code)
+            self.store.update_persona(persona_id, {"owner_checked_at": now})
+            return self.store.get_persona(persona_id)
+        if resp.status_code == 304:
+            self.store.update_persona(persona_id, {"owner_checked_at": now})
+            return self.store.get_persona(persona_id)
+        if resp.status_code != 200:
+            self.store.update_persona(persona_id, {"owner_checked_at": now})
+            return self.store.get_persona(persona_id)
+        try:
+            data = resp.json()
+        except ValueError:
+            self.store.update_persona(persona_id, {"owner_checked_at": now})
+            return self.store.get_persona(persona_id)
+        etag = resp.headers.get("ETag")
+        if data.get("updated_at") == row.get("updated_at") and etag == row.get("owner_etag"):
+            self.store.update_persona(persona_id, {"owner_checked_at": now})
+        else:
+            fresh = self._owner_row(data, etag, now)
+            self.store.update_persona(persona_id, {
+                "name": fresh["name"], "description": fresh["description"],
+                "voice_id": fresh["voice_id"], "enabled": fresh["enabled"],
+                "owner_etag": fresh["owner_etag"], "owner_checked_at": now,
+                "updated_at": fresh["updated_at"],
+            })
+        return self.store.get_persona(persona_id)
+
+    def _resolve_owner_persona(self, persona: dict[str, Any]) -> dict[str, Any]:
+        """Refresh a synced persona when the cached copy is older than
+        `persona_refresh_seconds`; otherwise return it unchanged. Local
+        personas always take precedence and are never revalidated."""
+        if persona.get("origin") != "owner":
+            return persona
+        interval = int(self.setting.effective("persona_refresh_seconds"))
+        if interval <= 0:
+            return self._refresh_owner_persona(persona)
+        checked = persona.get("owner_checked_at")
+        try:
+            age = (
+                (datetime.now(UTC) - datetime.fromisoformat(checked.replace("Z", "+00:00"))).total_seconds()
+                if checked else float("inf")
+            )
+        except ValueError:
+            age = float("inf")
+        if age < interval:
+            return persona
+        return self._refresh_owner_persona(persona)
 
 
     # -- resolution -----------------------------------------------------------
@@ -276,6 +378,8 @@ class GenerationService:
             persona = self.store.get_persona(req.persona)
             if persona is None and self.owner_url:
                 persona = self._fetch_owner_persona(req.persona)
+            elif persona is not None and self.owner_url and persona.get("origin") == "owner":
+                persona = self._resolve_owner_persona(persona)
             if persona is None:
                 raise InvalidRequest.single(["body", "persona"], f"persona '{req.persona}' is not registered")
             if not persona["enabled"]:
