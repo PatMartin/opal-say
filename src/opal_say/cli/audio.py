@@ -17,7 +17,9 @@ import contextlib
 import io
 import subprocess
 import sys
+import time
 import wave
+from collections import deque
 from collections.abc import Iterable
 
 import httpx
@@ -53,6 +55,16 @@ def _run_worker(args: list[str], chunks: Iterable[bytes], sent: list[bytes]) -> 
             sent.append(chunk)
             proc.stdin.write(chunk)
         proc.stdin.close()
+    except KeyboardInterrupt:
+        # The worker shares the console and gets its own SIGINT; terminate it so an
+        # interrupted stream never leaves a half-fed player process behind.
+        if proc.stdin is not None:
+            with contextlib.suppress(OSError):
+                proc.stdin.close()
+        proc.terminate()
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=5)
+        raise
     except (BrokenPipeError, OSError):
         if proc.stdin is not None:
             with contextlib.suppress(OSError):
@@ -90,6 +102,8 @@ def _play_via_worker(chunks: Iterable[bytes], sample_rate: int, channels: int, b
                                 source, [] if sent else sent)
         if code == 0:
             return sum(len(c) for c in sent)
+        if code == 130:  # interrupted — don't cascade into fallback backends
+            raise KeyboardInterrupt
     detail = err or "no working playback backend (check your simpleaudio installation)"
     raise typer.BadParameter(f"playback failed: {detail}")
 
@@ -128,17 +142,91 @@ def play_response(resp: httpx.Response) -> int:
     return play_pcm(data, rate)
 
 
-def _play_simpleaudio(align: int, rate: int, channels: int, bps: int) -> None:
+_JITTER_BUFFER_BYTES = 256 << 10  # ~6s of 22050 Hz s16le mono
+
+
+class _AudioSink:
+    """Bounded continuous-playback queue over an async backend.
+
+    `submit(block)` must return a handle exposing `is_playing()` (simpleaudio's
+    PlayObject contract). Blocks queue ahead of the hardware — playback is
+    continuous while the producer works — up to `max_bytes`, at which point the
+    feeder parks until the oldest block finishes. A queue that drains empty
+    mid-stream counts an underrun; `stop()` discards queued audio immediately
+    and `drain()` plays out the remainder on EOF.
+    """
+
+    def __init__(self, submit, stop_all, max_bytes: int = _JITTER_BUFFER_BYTES):
+        self._submit = submit
+        self._stop_all = stop_all
+        self._max_bytes = max(1, max_bytes)
+        self._pending: deque = deque()  # (handle, nbytes)
+        self._pending_bytes = 0
+        self.started = False
+        self.underruns = 0
+
+    def _reap(self) -> None:
+        while self._pending and not self._pending[0][0].is_playing():
+            self._pending_bytes -= self._pending.popleft()[1]
+
+    def enqueue(self, block: bytes) -> None:
+        self._reap()
+        if self.started and not self._pending_bytes:
+            self.underruns += 1
+        while self._pending_bytes >= self._max_bytes:
+            time.sleep(0.005)
+            self._reap()
+        handle = self._submit(block)
+        self._pending.append((handle, len(block)))
+        self._pending_bytes += len(block)
+        self.started = True
+
+    def drain(self) -> None:
+        while self._pending_bytes:
+            time.sleep(0.005)
+            self._reap()
+
+    def stop(self) -> None:
+        self._pending.clear()
+        self._pending_bytes = 0
+        self._stop_all()
+
+
+def _play_simpleaudio(align: int, rate: int, channels: int, bps: int,
+                      max_buffer_bytes: int = _JITTER_BUFFER_BYTES,
+                      frame_bytes: int = 32 << 10) -> int:
     sa = _simpleaudio()
+    sink = _AudioSink(
+        lambda block: sa.play_buffer(block, num_channels=channels, bytes_per_sample=bps,
+                                     sample_rate=rate),
+        sa.stop_all,
+        max_buffer_bytes,
+    )
+    frame_bytes = max(align, min(frame_bytes, max_buffer_bytes))
     pending = b""
-    while block := sys.stdin.buffer.read1(1 << 16):
-        pending += block
+    try:
+        while block := sys.stdin.buffer.read1(1 << 16):
+            pending += block
+            usable = len(pending) - (len(pending) % align)
+            while usable:
+                n = min(usable, frame_bytes)
+                sink.enqueue(pending[:n])
+                pending, usable = pending[n:], usable - n
         usable = len(pending) - (len(pending) % align)
-        sa.play_buffer(pending[:usable], num_channels=channels,
-                       bytes_per_sample=bps, sample_rate=rate).wait_done()
-        pending = pending[usable:]
-    if pending:
-        raise RuntimeError(f"{len(pending)} trailing bytes are not a complete audio frame")
+        if usable:
+            sink.enqueue(pending[:usable])
+            pending = pending[usable:]
+        if pending:
+            raise RuntimeError(f"{len(pending)} trailing bytes are not a complete audio frame")
+        sink.drain()
+    except KeyboardInterrupt:
+        sink.stop()
+        print("playback interrupted", file=sys.stderr)
+        return 130
+    if sink.underruns:
+        print(f"playback underran {sink.underruns} time(s) (producer could not keep up)",
+              file=sys.stderr)
+    return 0
 
 
 def _play_winsound(rate: int, channels: int, bps: int) -> None:
@@ -173,13 +261,12 @@ def _worker() -> int:
     try:
         if ns.backend == "winsound":
             _play_winsound(ns.rate, ns.channels, ns.bytes_per_sample)
-        else:
-            _play_simpleaudio(ns.channels * ns.bytes_per_sample, ns.rate, ns.channels,
-                              ns.bytes_per_sample)
+            return 0
+        return _play_simpleaudio(ns.channels * ns.bytes_per_sample, ns.rate, ns.channels,
+                                 ns.bytes_per_sample)
     except Exception as exc:  # noqa: BLE001 - worker must report, never traceback a broken audio lib
         print(f"{exc}", file=sys.stderr)
         return 1
-    return 0
 
 
 if __name__ == "__main__":
