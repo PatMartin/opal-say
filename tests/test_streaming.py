@@ -267,3 +267,92 @@ def test_close_during_long_engine_call_releases_after_it_finishes(client, voices
         assert entered.wait(5)  # the second engine call is in flight, blocked
     assert _wait_until(lambda: rec.refs == 0)
     assert _wait_until(lambda: rec.waiters == 0)
+
+
+def test_disconnect_during_output_releases_promptly(live_server, client, voices, app):
+    """A client that goes away mid-stream frees the permit at the next chunk
+    boundary (bounded by the running engine call's duration)."""
+    rec = app.state.services.runtime._records["fake"]
+    body = {"text": SENTENCES, "voice_id": "v1", "engine_options": {"delay": 1.0}}
+    with httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=15) as resp:
+        assert resp.status_code == 200
+        assert next(resp.iter_bytes())
+    assert _wait_until(lambda: rec.refs == 0, timeout=10)
+    assert _wait_until(lambda: rec.waiters == 0, timeout=10)
+    assert client.post("/api/v1/generate", json={"text": "ok", "voice_id": "v1"}).status_code == 200
+
+
+def test_disconnect_during_admission_wait_cancels(live_server, client, voices, app):
+    """A request queued for an inference permit gives up promptly when its
+    client disconnects, instead of waiting out the full deadline."""
+    runtime = app.state.services.runtime
+    rec = runtime._records["fake"]
+    holder = runtime.using("fake")
+    holder.__enter__()  # the test thread holds the sole permit
+    try:
+        with pytest.raises(httpx.ReadTimeout), httpx.stream(
+            "POST",
+            f"{live_server}/api/v1/generate/stream",
+            json={"text": "hi.", "voice_id": "v1"},
+            timeout=httpx.Timeout(10.0, read=1.5),
+        ) as resp:
+            resp.read()
+        # The queued request's admission wait observed the disconnect and bailed.
+        assert _wait_until(lambda: rec.waiters == 0 and rec.refs == 1, timeout=10)
+    finally:
+        holder.__exit__(None, None, None)
+    assert client.post("/api/v1/generate", json={"text": "ok", "voice_id": "v1"}).status_code == 200
+
+
+def test_admission_deadline_returns_engine_unavailable(live_server, client, voices, app):
+    """engine_acquire_timeout_ms bounds the permit wait; expiry is a JSON 503."""
+    assert client.put(
+        "/api/v1/setting/engine_acquire_timeout_ms", json={"value": 500}
+    ).status_code == 200
+    runtime = app.state.services.runtime
+    holder = runtime.using("fake")
+    holder.__enter__()
+    try:
+        started = time.monotonic()
+        resp = httpx.post(
+            f"{live_server}/api/v1/generate",
+            json={"text": "hi.", "voice_id": "v1"},
+            timeout=15,
+        )
+        assert resp.status_code == 503
+        assert resp.json()["error"]["code"] == "engine_unavailable"
+        assert time.monotonic() - started < 10
+    finally:
+        holder.__exit__(None, None, None)
+    # The freed permit admits the next request normally.
+    assert httpx.post(
+        f"{live_server}/api/v1/generate", json={"text": "ok", "voice_id": "v1"}, timeout=15
+    ).status_code == 200
+
+
+def test_slow_consumer_abandons_stream_and_frees_engine(live_server, client, voices, app):
+    """A client that stops draining exhausts the bounded buffer; after
+    stream_lag_timeout_ms the producer abandons generation (freeing the engine)
+    instead of holding the permit hostage. Buffered bytes still reach the client,
+    so the stream ends truncated rather than hanging."""
+    assert client.put("/api/v1/setting/stream_buffer_blocks", json={"value": 1}).status_code == 200
+    assert client.put("/api/v1/setting/stream_lag_timeout_ms", json={"value": 800}).status_code == 200
+    rec = app.state.services.runtime._records["fake"]
+    text = " ".join(f"This is sentence number {i}." for i in range(300))
+    body = {"text": text, "voice_id": "v1"}
+
+    # Reference run: full consumption length for comparison.
+    with httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=30) as resp:
+        full_len = len(resp.read())
+    assert full_len > 0
+
+    with httpx.stream("POST", f"{live_server}/api/v1/generate/stream", json=body, timeout=30) as resp:
+        assert resp.status_code == 200
+        it = resp.iter_bytes()
+        assert next(it)
+        time.sleep(2.0)  # stall well past the lag deadline while audio buffers fill
+        stalled_len = sum(len(c) for c in it)
+    assert stalled_len < full_len
+    assert _wait_until(lambda: rec.refs == 0 and rec.waiters == 0, timeout=10)
+    # Subsequent traffic still gets the freed permit.
+    assert client.post("/api/v1/generate", json={"text": "ok", "voice_id": "v1"}).status_code == 200

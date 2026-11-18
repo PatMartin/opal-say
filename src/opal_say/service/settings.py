@@ -40,6 +40,13 @@ KNOWN_SETTINGS: dict[str, tuple[Callable[[str], Any], Any]] = {
     "default_speed": (_number(float, 0.25, 4.0), 1.0),
     "default_volume": (_number(float, 0.0, 2.0), 1.0),
     "default_output_format": (_choice("wav", "pcm"), "wav"),
+    # Max wait for a pending engine reconfiguration or an inference permit before
+    # generation admission fails (also bounds each permit wait inside a stream).
+    "engine_acquire_timeout_ms": (_number(int, 100, 600_000), 30_000),
+    # Streaming output: bounded producer buffer (blocks) and how long a full
+    # buffer may sit undrained before the stream is abandoned to free the engine.
+    "stream_buffer_blocks": (_number(int, 1, 64), 8),
+    "stream_lag_timeout_ms": (_number(int, 500, 300_000), 30_000),
 }
 
 

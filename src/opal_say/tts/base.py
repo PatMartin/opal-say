@@ -54,6 +54,10 @@ class EngineUnavailableError(Exception):
     """The engine runtime or its required resources are not usable."""
 
 
+class AdmissionCancelledError(Exception):
+    """A bounded engine-admission wait was cancelled (e.g. the client went away)."""
+
+
 class SynthesisError(Exception):
     """The engine failed while generating audio."""
 

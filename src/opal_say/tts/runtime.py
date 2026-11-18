@@ -13,13 +13,18 @@ serialization the service had before.
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
-from opal_say.tts.base import EngineUnavailableError, TtsEngine
+from opal_say.tts.base import AdmissionCancelledError, EngineUnavailableError, TtsEngine
 from opal_say.tts.registry import EngineRegistry
+
+# Poll slice for bounded waits: short enough for cancellation to feel prompt,
+# long enough to keep the loop negligible under normal load.
+_WAIT_SLICE = 0.1
 
 # Reserved engine option handled at runtime level (never passed to adapters):
 # how many synthesize() calls may run concurrently on one engine. Default 1
@@ -71,11 +76,20 @@ class EngineRuntime:
     engine: TtsEngine
     _record: _RuntimeRecord
     _mgr: EngineRuntimeManager
+    # Admission policy bound at reference creation: a timeout applied to each
+    # permit wait (ms, None = wait forever — each `with runtime:` is a new wait,
+    # so the deadline is recomputed per entry) and a cancellation predicate
+    # (None = not cancellable).
+    _timeout_ms: int | None = None
+    _cancelled: Any = None
     _held: bool = False
     _detached: bool = False
 
     def acquire(self) -> EngineRuntime:
-        self._mgr._enter(self._record)
+        deadline = (
+            time.monotonic() + self._timeout_ms / 1000 if self._timeout_ms is not None else None
+        )
+        self._mgr._enter(self._record, deadline, self._cancelled)
         self._held = True
         return self
 
@@ -125,8 +139,19 @@ class EngineRuntimeManager:
         declared = int(getattr(engine, "max_concurrent_inferences", 1))
         return max(1, min(configured or 1, declared))
 
-    def _enter(self, rec: _RuntimeRecord) -> None:
-        """Take an inference permit; reject when the wait queue is already full."""
+    def _enter(
+        self,
+        rec: _RuntimeRecord,
+        deadline: float | None = None,
+        cancelled=None,
+    ) -> None:
+        """Take an inference permit; reject when the wait queue is already full.
+
+        The wait is bounded by `deadline` (monotonic seconds; times out into
+        `EngineUnavailableError`) and aborts early when `cancelled` reports
+        the caller is gone (`AdmissionCancelledError`). Both are optional so
+        internal/lifecycle callers keep the historical unbounded wait.
+        """
         with self._guard:
             if rec.waiters >= rec.permits:
                 raise EngineUnavailableError(
@@ -135,7 +160,22 @@ class EngineRuntimeManager:
                 )
             rec.waiters += 1
         try:
-            rec.sem.acquire()
+            while True:
+                if cancelled is not None and cancelled():
+                    raise AdmissionCancelledError(
+                        f"admission for engine '{rec.engine.engine_id}' was cancelled"
+                    )
+                slice_ = _WAIT_SLICE
+                if deadline is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise EngineUnavailableError(
+                            f"timed out waiting for an inference permit on engine "
+                            f"'{rec.engine.engine_id}'"
+                        )
+                    slice_ = min(slice_, remaining)
+                if rec.sem.acquire(timeout=slice_):
+                    return
         finally:
             with self._guard:
                 rec.waiters -= 1
@@ -156,21 +196,53 @@ class EngineRuntimeManager:
     def all(self) -> list[TtsEngine]:
         return [self._records[k].engine for k in self.ids()]
 
-    def acquire(self, engine_id: str) -> EngineRuntime:
+    def acquire(
+        self,
+        engine_id: str,
+        timeout_ms: int | None = None,
+        cancelled=None,
+    ) -> EngineRuntime:
         """Bind a usage reference to the current runtime record (KeyError if unknown).
 
         Blocks while the record's configuration is still pending application, and
         raises `EngineUnavailableError` if that application failed. A binding that
         lands on a superseded generation is dropped and re-bound to the current
         record, so every waiter either proceeds or gets an explicit error.
+
+        `timeout_ms` bounds the whole admission (pending-configuration wait plus
+        the first permit wait); expiry raises `EngineUnavailableError`.
+        `cancelled` is an optional predicate polled during the wait — when it
+        reports the caller is gone, `AdmissionCancelledError` is raised and no
+        reference is left held.
         """
+        deadline = time.monotonic() + timeout_ms / 1000 if timeout_ms is not None else None
         while True:
             with self._guard:
                 rec = self._record(engine_id)
                 rec.refs += 1
-            rec.ready.wait()
+            try:
+                while not rec.ready.is_set():
+                    if cancelled is not None and cancelled():
+                        raise AdmissionCancelledError(
+                            f"admission for engine '{engine_id}' was cancelled"
+                        )
+                    slice_ = _WAIT_SLICE
+                    if deadline is not None:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise EngineUnavailableError(
+                                f"timed out waiting for engine '{engine_id}' to finish reconfiguring"
+                            )
+                        slice_ = min(slice_, remaining)
+                    rec.ready.wait(slice_)
+            except BaseException:
+                self.release(EngineRuntime(rec.engine, rec, self))
+                raise
             if rec.failed is None:
-                return EngineRuntime(rec.engine, rec, self)
+                return EngineRuntime(
+                    rec.engine, rec, self,
+                    _timeout_ms=timeout_ms, _cancelled=cancelled,
+                )
             superseded = rec.superseded
             self.release(EngineRuntime(rec.engine, rec, self))
             if not superseded:

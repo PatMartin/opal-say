@@ -14,6 +14,7 @@ from opal_say.schemas import GenerateRequest, GenerateStreamRequest, VoiceTestRe
 from opal_say.service.catalog import EngineService
 from opal_say.service.errors import (
     ApiError,
+    ClientDisconnected,
     Conflict,
     GenerationFailed,
     InvalidRequest,
@@ -24,6 +25,7 @@ from opal_say.service.errors import (
 from opal_say.service.settings import SettingsService
 from opal_say.tts.audio import WAV_HEADER_BYTES, resample, to_pcm16, wav_bytes
 from opal_say.tts.base import (
+    AdmissionCancelledError,
     EngineOptionsError,
     EngineUnavailableError,
     TtsEngine,
@@ -82,6 +84,8 @@ def translate_engine_error(exc: Exception) -> Exception:
     """Map adapter exceptions onto API errors."""
     if isinstance(exc, ApiError | InvalidRequest):
         return exc
+    if isinstance(exc, AdmissionCancelledError):
+        return ClientDisconnected(str(exc))
     if isinstance(exc, EngineOptionsError):
         return InvalidRequest.from_issues(["body", "engine_options"], exc.issues, {})
     if isinstance(exc, VoiceResolutionError):
@@ -141,7 +145,9 @@ class GenerationService:
             raise InvalidRequest.single(["body", "text"], "text contains nothing to speak", input_=text)
         return chunks
 
-    def _route(self, voice: dict[str, Any], engine_override: str | None) -> tuple[TtsEngine, EngineRuntime]:
+    def _route(
+        self, voice: dict[str, Any], engine_override: str | None, cancelled=None
+    ) -> tuple[TtsEngine, EngineRuntime]:
         """Resolve the target engine and bind its current runtime generation.
 
         The bound reference pins the configuration generation for the whole request:
@@ -157,8 +163,12 @@ class GenerationService:
         if engine is None:
             raise Conflict(f"engine '{engine_id}' is not installed", "engine_not_found", {"engine_id": engine_id})
         try:
-            runtime = self.engine.runtime.acquire(engine_id)
-        except EngineUnavailableError as exc:
+            runtime = self.engine.runtime.acquire(
+                engine_id,
+                timeout_ms=int(self.setting.effective("engine_acquire_timeout_ms")),
+                cancelled=cancelled,
+            )
+        except (EngineUnavailableError, AdmissionCancelledError) as exc:
             raise translate_engine_error(exc) from exc
         try:
             if engine_id != voice["engine_id"]:
@@ -228,7 +238,9 @@ class GenerationService:
             runtime=runtime,
         )
 
-    def plan(self, req: GenerateRequest | GenerateStreamRequest) -> GenerationPlan:
+    def plan(
+        self, req: GenerateRequest | GenerateStreamRequest, cancelled=None
+    ) -> GenerationPlan:
         chunks = self._check_text(req.text)
         if req.profile_id is not None:
             profile = self.store.get_profile(req.profile_id)
@@ -257,7 +269,7 @@ class GenerationService:
         voice = self.store.get_voice(voice_id)
         if voice is None:
             raise Conflict(f"voice '{voice_id}' is not registered", "voice_not_found", {"voice_id": voice_id})
-        engine, runtime = self._route(voice, req.engine_id)
+        engine, runtime = self._route(voice, req.engine_id, cancelled)
         try:
             request_issues = engine.validate_options(req.engine_options, "generation")
             if request_issues:
@@ -290,9 +302,11 @@ class GenerationService:
             self.engine.runtime.release(runtime)
             raise
 
-    def plan_voice_test(self, voice: dict[str, Any], req: VoiceTestRequest) -> GenerationPlan:
+    def plan_voice_test(
+        self, voice: dict[str, Any], req: VoiceTestRequest, cancelled=None
+    ) -> GenerationPlan:
         chunks = self._check_text(req.text)
-        engine, runtime = self._route(voice, None)
+        engine, runtime = self._route(voice, None, cancelled)
         try:
             issues = engine.validate_options(req.engine_options, "generation")
             if issues:
@@ -416,11 +430,13 @@ class GenerationService:
             return wav_bytes(pcm, plan.sample_rate), "audio/wav"
         return pcm, "application/octet-stream"
 
-    def test_voice(self, voice_id: str, req: VoiceTestRequest) -> tuple[GenerationPlan, bytes, str]:
+    def test_voice(
+        self, voice_id: str, req: VoiceTestRequest, cancelled=None
+    ) -> tuple[GenerationPlan, bytes, str]:
         """Lookup + plan + render for POST /voice/{id}/test, in one call."""
         voice = self.store.get_voice(voice_id)
         if voice is None:
             raise NotFound(f"voice '{voice_id}' not found", "voice_not_found", {"voice_id": voice_id})
-        plan = self.plan_voice_test(voice, req)
+        plan = self.plan_voice_test(voice, req, cancelled)
         data, media_type = self.render(plan)
         return plan, data, media_type

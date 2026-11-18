@@ -48,6 +48,16 @@ class Unavailable(ApiError):
     default_code = "engine_unavailable"
 
 
+class ClientDisconnected(ApiError):
+    """Client went away while a bounded admission wait was still pending.
+
+    499 is outside the documented contract surface, but by definition this error
+    can only be raised for a connection that no longer exists — no conforming
+    client will ever observe it."""
+    status = 499
+    default_code = "client_disconnected"
+
+
 class PreconditionRequired(ApiError):
     status = 428
     default_code = "precondition_required"

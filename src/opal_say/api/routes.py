@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import queue
 import threading
+import time
 from typing import Any
 
 import anyio
@@ -68,21 +71,50 @@ def _correlation_context(request: Request) -> str:
     return " ".join(parts)
 
 
+# Poll slice for buffer put/get waits inside the PCM stream machinery.
+_STREAM_POLL_S = 0.1
+
+
+async def _watch_disconnect(request: Request, cancel: threading.Event) -> None:
+    """Set `cancel` once the client's connection drops (http.disconnect)."""
+    try:
+        while True:
+            message = await request.receive()
+            if message["type"] == "http.disconnect":
+                cancel.set()
+                return
+    except Exception:  # noqa: BLE001 - a receiver failure only ends the watch
+        return
+
+
 class _PcmBodyIterator:
     """Async iterator feeding the synchronous PCM generator of one stream request.
 
-    `close()` — serialized with in-flight reads — is the single release path for the
-    generator's runtime reference and inference permit. `_PcmStreamResponse` calls
-    it from `__call__`'s finally, so every unwind path reaches it deterministically.
+    A producer thread runs the generator into a bounded buffer (`buffer_blocks`),
+    decoupling engine synthesis from client consumption speed. When the buffer
+    stays full beyond `lag_timeout_ms` — the client fell behind — the producer
+    abandons generation instead of holding the inference permit for a stalled
+    reader; buffered blocks still drain before the stream ends. `close()` signals
+    the producer to stop and releases the plan-bound runtime reference exactly
+    once; the producer thread owns generator teardown so close() never races a
+    suspended `next()`.
     """
 
-    def __init__(self, blocks, ctx: str, on_close=None):
+    def __init__(self, blocks, ctx: str, on_close=None, buffer_blocks: int = 8,
+                 lag_timeout_ms: int = 30_000, cancel: threading.Event | None = None):
         self._blocks = blocks
         self._ctx = ctx
         self._on_close = on_close
+        self._lag_timeout = lag_timeout_ms / 1000
+        self._cancel = cancel or threading.Event()
+        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=max(1, buffer_blocks))
+        self._producer_done = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._error: BaseException | None = None
         self._lock = threading.Lock()
         self._first: bytes | None = None
         self._first_pending = False
+        self._started = False
         self._completed = False
         self._failed = False
         self._closed = False
@@ -114,35 +146,81 @@ class _PcmBodyIterator:
         self._first = first
         self._first_pending = True
 
+    def _produce(self) -> None:
+        """Run the generator into the bounded queue; owns the generator's lifecycle."""
+        full_since: float | None = None
+        try:
+            for block in self._blocks:
+                while True:
+                    if self._closed or self._cancel.is_set():
+                        return
+                    try:
+                        self._queue.put(block, timeout=_STREAM_POLL_S)
+                        full_since = None
+                        break
+                    except queue.Full:
+                        if full_since is None:
+                            full_since = time.monotonic()
+                        elif time.monotonic() - full_since >= self._lag_timeout:
+                            log.warning(
+                                "audio stream abandoned: buffer undrained for %.1fs (%s)",
+                                self._lag_timeout, self._ctx,
+                            )
+                            return
+        except Exception as exc:  # noqa: BLE001 - surfaced to the consumer via next_block
+            self._error = exc
+        finally:
+            try:
+                self._blocks.close()
+            except Exception:  # noqa: BLE001 - teardown failure must not mask the outcome
+                log.exception("failed to release audio stream resources (%s)", self._ctx)
+            self._producer_done.set()
+
     def next_block(self) -> bytes | None:
         with self._lock:
             if self._closed:
                 return None
-            return next(self._blocks, None)
+            if not self._started:
+                self._started = True
+                self._thread = threading.Thread(
+                    target=self._produce, name="pcm-stream-producer", daemon=True
+                )
+                self._thread.start()
+        while True:
+            if self._closed:
+                return None
+            try:
+                return self._queue.get(timeout=_STREAM_POLL_S)
+            except queue.Empty:
+                if self._producer_done.is_set():
+                    if self._error is not None:
+                        raise self._error from None
+                    return None
 
     def close(self) -> None:
         """Release the stream exactly once.
 
-        The lock serializes against an in-flight `next()`: `blocks.close()` while a
-        worker is executing would raise `ValueError: generator already executing`,
-        so close() waits out the running engine call — bounded by that call's own
-        duration, never deadlocked by this cleanup itself.
+        Signals the producer to stop and joins it; the producer closes the
+        generator itself (it's the iterating thread, so no `generator already
+        executing` race), then `_on_close` releases the plan-bound runtime —
+        also covering the never-started case. The join may wait out a running
+        engine call, bounded by that call's own duration.
         """
         with self._lock:
             if self._closed:
                 return
             self._closed = True
-            try:
-                self._blocks.close()
-            except Exception:  # noqa: BLE001 - teardown failure must not mask the outcome
-                log.exception("failed to release audio stream resources (%s)", self._ctx)
-            try:
-                # The plan-bound runtime: released even when blocks.close() ran no
-                # generator body (never started) or raised.
-                if self._on_close is not None:
-                    self._on_close()
-            except Exception:  # noqa: BLE001
-                log.exception("failed to release the bound generation (%s)", self._ctx)
+            self._cancel.set()
+            thread = self._thread
+        if thread is not None:
+            thread.join()
+        try:
+            # The plan-bound runtime: released even when the producer never ran
+            # a generator body (never started) or raised.
+            if self._on_close is not None:
+                self._on_close()
+        except Exception:  # noqa: BLE001
+            log.exception("failed to release the bound generation (%s)", self._ctx)
         if not self._completed and not self._failed:
             log.info("audio stream closed before completion (%s)", self._ctx)
 
@@ -273,11 +351,17 @@ def validate_voice(voice_id: str, svc: Services = Depends(services)):
 # stream keeps a generator alive for the response body.
 @router.post("/api/v1/voice/{voice_id}/test", tags=["voice"],
              operation_id="opal_voice_test", response_class=Response)
-async def test_voice(voice_id: str, body: VoiceTestRequest | None = Body(None), svc: Services = Depends(services)):
-    plan, data, media_type = await run_in_threadpool(
-        svc.generation.test_voice, voice_id, body or VoiceTestRequest()
-    )
-    return Response(data, media_type=media_type, headers=plan.headers())
+async def test_voice(request: Request, voice_id: str, body: VoiceTestRequest | None = Body(None),
+                     svc: Services = Depends(services)):
+    cancel = threading.Event()
+    watch = asyncio.get_running_loop().create_task(_watch_disconnect(request, cancel))
+    try:
+        plan, data, media_type = await run_in_threadpool(
+            svc.generation.test_voice, voice_id, body or VoiceTestRequest(), cancel.is_set
+        )
+        return Response(data, media_type=media_type, headers=plan.headers())
+    finally:
+        watch.cancel()
 
 
 # -- persona --------------------------------------------------------------------
@@ -378,18 +462,36 @@ def activate_profile(profile_id: int = ProfileId, if_match: str | None = Header(
 
 @router.post("/api/v1/generate", tags=["generate"], operation_id="opal_generate",
              response_class=Response)
-async def generate_audio(body: GenerateRequest, svc: Services = Depends(services)):
-    plan = await run_in_threadpool(svc.generation.plan, body)
-    data, media_type = await run_in_threadpool(svc.generation.render, plan)
-    return Response(data, media_type=media_type, headers=plan.headers())
+async def generate_audio(request: Request, body: GenerateRequest, svc: Services = Depends(services)):
+    # Admission and per-chunk permit waits abort promptly if the client drops.
+    cancel = threading.Event()
+    watch = asyncio.get_running_loop().create_task(_watch_disconnect(request, cancel))
+    try:
+        plan = await run_in_threadpool(svc.generation.plan, body, cancel.is_set)
+        data, media_type = await run_in_threadpool(svc.generation.render, plan)
+        return Response(data, media_type=media_type, headers=plan.headers())
+    finally:
+        watch.cancel()
 
 
 @router.post("/api/v1/generate/stream", tags=["generate"], operation_id="opal_generate_stream",
              response_class=StreamingResponse)
 async def stream_audio(request: Request, body: GenerateStreamRequest, svc: Services = Depends(services)):
-    plan = await run_in_threadpool(svc.generation.plan, body)
+    cancel = threading.Event()
+    loop = asyncio.get_running_loop()
+    watch = loop.create_task(_watch_disconnect(request, cancel))
+    try:
+        plan = await run_in_threadpool(svc.generation.plan, body, cancel.is_set)
+    except BaseException:
+        watch.cancel()
+        raise
     stream = _PcmBodyIterator(
-        svc.generation.pcm_stream(plan), _correlation_context(request), on_close=plan.release
+        svc.generation.pcm_stream(plan),
+        _correlation_context(request),
+        on_close=lambda: (loop.call_soon_threadsafe(watch.cancel), plan.release()),
+        buffer_blocks=int(svc.setting.effective("stream_buffer_blocks")),
+        lag_timeout_ms=int(svc.setting.effective("stream_lag_timeout_ms")),
+        cancel=cancel,
     )
     try:
         # Produce the first block before committing to 200 so early failures become JSON errors.
