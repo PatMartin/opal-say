@@ -99,6 +99,10 @@
     "method": "POST",
     "path": "/api/v1/generate/stream"
   },
+  "opal_generate_stream_incremental": {
+    "method": "POST",
+    "path": "/api/v1/generate/stream/incremental"
+  },
   "opal_setting_list": {
     "method": "GET",
     "path": "/api/v1/setting/"

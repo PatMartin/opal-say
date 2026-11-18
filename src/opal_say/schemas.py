@@ -182,8 +182,9 @@ class ProfileRead(BaseModel):
 # -- generation ----------------------------------------------------------------
 
 
-class GenerateStreamRequest(_Request):
-    text: str = Field(min_length=1)
+class GenerationParams(_Request):
+    """Voice/engine/tuning fields shared by one-shot and incremental generation."""
+
     profile_id: Annotated[int, Field(ge=1)] | None = None
     persona: Annotated[str, Field(min_length=1, max_length=200, pattern=VOICE_ID_PATTERN)] | None = None
     voice_id: Annotated[str, Field(min_length=1)] | None = None
@@ -194,8 +195,16 @@ class GenerateStreamRequest(_Request):
     engine_options: EngineOptions = Field(default_factory=dict)
 
 
+class GenerateStreamRequest(GenerationParams):
+    text: str = Field(min_length=1)
+
+
 class GenerateRequest(GenerateStreamRequest):
     output_format: AudioFormat | None = None
+
+
+class IncrementalStreamParams(GenerationParams):
+    """First NDJSON line of the incremental stream input: generation params without `text`."""
 
 
 # -- service lifecycle ---------------------------------------------------------

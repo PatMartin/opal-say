@@ -47,6 +47,9 @@ KNOWN_SETTINGS: dict[str, tuple[Callable[[str], Any], Any]] = {
     # buffer may sit undrained before the stream is abandoned to free the engine.
     "stream_buffer_blocks": (_number(int, 1, 64), 8),
     "stream_lag_timeout_ms": (_number(int, 500, 300_000), 30_000),
+    # Incremental input: text chunks accepted ahead of synthesis. A full buffer
+    # stops request-body reads, pushing backpressure onto the producer.
+    "incremental_pending_chunks": (_number(int, 1, 64), 8),
 }
 
 

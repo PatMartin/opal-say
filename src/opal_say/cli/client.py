@@ -109,8 +109,9 @@ class ApiClient:
         return resp
 
     @contextmanager
-    def stream(self, op: str, json: Any = None) -> Iterator[httpx.Response]:
+    def stream(self, op: str, json: Any = None, content: Any = None,
+               headers: dict[str, str] | None = None) -> Iterator[httpx.Response]:
         method, url = self._request_args(op, None)
-        with self.http.stream(method, url, json=json) as resp:
+        with self.http.stream(method, url, json=json, content=content, headers=headers) as resp:
             self._raise_for(resp)
             yield resp

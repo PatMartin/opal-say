@@ -35,6 +35,7 @@ COMMANDS: dict[str, str] = {
     "opal_persona_delete": "persona remove",
     "opal_generate": "generate",
     "opal_generate_stream": "generate --stream",
+    "opal_generate_stream_incremental": "generate --incremental",
     "opal_setting_list": "config setting list",
     "opal_setting_get": "config setting show",
     "opal_setting_put": "config setting set",

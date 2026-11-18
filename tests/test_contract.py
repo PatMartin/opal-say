@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -239,6 +240,16 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
 
     assert c.post("/api/v1/generate", json={"text": "Hello there."}).status_code == 200
     assert c.post("/api/v1/generate/stream", json={"text": "Hello there."}).status_code == 200
+    ndjson = (
+        json.dumps({"voice_id": "v2"}) + "\n"
+        + json.dumps({"text": "Hello there."}) + "\n"
+        + json.dumps({"done": True}) + "\n"
+    )
+    assert c.post(
+        "/api/v1/generate/stream/incremental",
+        content=ndjson,
+        headers={"content-type": "application/x-ndjson"},
+    ).status_code == 200
 
     assert c.put("/api/v1/setting/greeting", json={"value": "hi"}).status_code == 200
     assert c.get("/api/v1/setting/").json() == {"greeting": "hi"}

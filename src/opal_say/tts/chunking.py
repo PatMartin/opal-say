@@ -57,3 +57,26 @@ def chunk_text(text: str, max_chars: int = 400) -> list[str]:
     if current:
         chunks.append(current)
     return chunks
+
+
+def split_stream_ready(text: str, max_chars: int = 400) -> tuple[list[str], str]:
+    """Split the leading complete-sentence portion of `text` into chunks.
+
+    Returns (chunks, remainder): chunks cover everything up to the last
+    sentence boundary; the trailing partial sentence is handed back as
+    remainder for the caller to keep buffering. Used by incremental input,
+    where text arrives in arbitrary fragments and only complete sentences
+    should be synthesized yet. A fragment larger than `max_chars` with no
+    boundary is force-chunked so the pipeline is never starved by one long
+    run-on fragment — its last chunk is retained as remainder.
+    """
+    boundary = 0
+    for m in _SENTENCE_END.finditer(text):
+        boundary = m.end()
+    if boundary == 0:
+        if len(text) > max_chars:
+            chunks = chunk_text(text, max_chars)
+            if len(chunks) > 1:
+                return chunks[:-1], chunks[-1]
+        return [], text
+    return chunk_text(text[:boundary], max_chars), text[boundary:]

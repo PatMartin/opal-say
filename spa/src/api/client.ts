@@ -58,6 +58,7 @@ export interface CallOptions {
   path?: Record<string, string | number>
   query?: Record<string, string | number | boolean | undefined | null>
   body?: unknown
+  contentType?: string // when set with a string body, sent verbatim instead of JSON
   signal?: AbortSignal
 }
 
@@ -95,8 +96,13 @@ async function send(op: OpId, opts: CallOptions, ifMatch: string | null): Promis
   if (ifMatch) headers['If-Match'] = ifMatch
   const init: RequestInit = { method: operations[op].method, signal: opts.signal, headers }
   if (opts.body !== undefined) {
-    headers['Content-Type'] = 'application/json'
-    init.body = JSON.stringify(opts.body)
+    if (opts.contentType) {
+      headers['Content-Type'] = opts.contentType
+      init.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body)
+    } else {
+      headers['Content-Type'] = 'application/json'
+      init.body = JSON.stringify(opts.body)
+    }
   }
   return fetch(buildUrl(op, opts), init)
 }

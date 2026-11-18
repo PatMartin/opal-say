@@ -97,3 +97,22 @@ same identifiers). Generation requests accept `persona` on both
   engine. Response is the kernel `OpalValidationReport`.
 - **`voice list ?language=`**: optional prefix filter on stored language codes
   (case-insensitive; `en` matches all English locales, `en_US` only US).
+
+## Pending upstream proposal: incremental generation (v1.7.2 candidate)
+
+Locally amended in `openapi/opal_say_v1.7.1.yaml` ahead of an upstream
+submission — flagged here until accepted into the shared contract:
+
+- `POST /api/v1/generate/stream/incremental` (`opal_generate_stream_incremental`)
+  accepts `application/x-ndjson`. Line 1 carries the `GenerateStreamRequest`
+  parameters minus `text`; later lines carry `{"text": "..."}` segments (with an
+  optional `"flush": true` to synthesize buffered text immediately), a
+  standalone `{"flush": true}` line, and `{"done": true}` or request-body EOF to
+  finish. The response is the same headerless s16le PCM stream as
+  `/api/v1/generate/stream`.
+- Compatibility: additive operation only — no existing operation, schema, or
+  error envelope changed. Clients that never call it are unaffected.
+- Client responsibilities agreed for the protocol: send a params line first,
+  keep records within the line and total-text limits, set `flush` on the last
+  segment of an utterance, treat a truncated PCM stream as failed generation,
+  and close the connection to cancel.

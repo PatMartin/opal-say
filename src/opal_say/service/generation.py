@@ -10,7 +10,12 @@ from typing import Any
 import httpx
 
 from opal_say.persistence.store import Store
-from opal_say.schemas import GenerateRequest, GenerateStreamRequest, VoiceTestRequest
+from opal_say.schemas import (
+    GenerateRequest,
+    GenerateStreamRequest,
+    IncrementalStreamParams,
+    VoiceTestRequest,
+)
 from opal_say.service.catalog import EngineService
 from opal_say.service.errors import (
     ApiError,
@@ -242,6 +247,22 @@ class GenerationService:
         self, req: GenerateRequest | GenerateStreamRequest, cancelled=None
     ) -> GenerationPlan:
         chunks = self._check_text(req.text)
+        return self._resolve_plan(req, chunks, cancelled=cancelled)
+
+    def plan_incremental(self, params: IncrementalStreamParams, cancelled=None) -> GenerationPlan:
+        """Plan a stream whose text arrives incrementally after planning.
+
+        Resolution is identical to plan(); the chunk list starts empty and the
+        caller feeds chunks live via `pcm_stream(plan, text_source=...)`.
+        """
+        return self._resolve_plan(params, [], cancelled=cancelled)
+
+    def _resolve_plan(
+        self,
+        req: GenerateRequest | GenerateStreamRequest | IncrementalStreamParams,
+        chunks: list[str],
+        cancelled=None,
+    ) -> GenerationPlan:
         if req.profile_id is not None:
             profile = self.store.get_profile(req.profile_id)
             if profile is None:
@@ -370,18 +391,20 @@ class GenerationService:
 
     # -- synthesis ------------------------------------------------------------
 
-    def pcm_stream(self, plan: GenerationPlan) -> Iterator[bytes]:
+    def pcm_stream(self, plan: GenerationPlan, text_source=None) -> Iterator[bytes]:
         """Yield S16LE mono PCM at `plan.sample_rate`, one block per engine audio chunk.
 
-        Engine exceptions are translated to API errors so callers can report failures that
-        occur before the first block as normal JSON errors.
+        `text_source` overrides `plan.chunks`: pass a live iterator for
+        incremental input. Engine exceptions are translated to API errors so
+        callers can report failures that occur before the first block as
+        normal JSON errors.
         """
         ref = plan.voice["engine_voice_ref"]
         # The request is already bound to one runtime generation by plan(): synthesis
         # runs against the same configuration snapshot that validation resolved.
         runtime = plan.runtime
         try:
-            for text in plan.chunks:
+            for text in (text_source if text_source is not None else plan.chunks):
                 try:
                     # Hold the inference permit for the whole iterator, but *consume*
                     # chunks incrementally instead of materializing the list.

@@ -103,6 +103,13 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert streamed.stat().st_size > 0
     stdout_audio = run("generate Hi --voice v1 -o -").stdout_bytes
     assert stdout_audio[:4] == b"RIFF"
+    inc = tmp_path / "inc.pcm"
+    run(f'generate "Sentence one. Sentence two." --incremental -o {inc.as_posix()} --voice v1')
+    assert inc.stat().st_size > 0
+    inc2 = tmp_path / "inc2.pcm"
+    run(f"generate - --incremental -o {inc2.as_posix()}",
+        stdin='{"voice_id": "v1"}\n{"text": "From stdin.", "flush": true}\n{"done": true}\n')
+    assert inc2.stat().st_size > 0
 
     run("config setting set chunk_max_chars 200")
     assert json.loads(run("config setting list").stdout) == {"chunk_max_chars": 200}

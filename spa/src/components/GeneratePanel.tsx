@@ -22,6 +22,7 @@ export function GeneratePanel() {
   const [sampleRate, setSampleRate] = useState('')
   const [options, setOptions] = useState('')
   const [stream, setStream] = useState(false)
+  const [incremental, setIncremental] = useState(false)
   const [received, setReceived] = useState<number | null>(null)
   const [clip, setClip] = useState<AudioClip | null>(null)
   const action = useAction()
@@ -52,7 +53,16 @@ export function GeneratePanel() {
         return
       }
 
-      const resp = await callRaw('opal_generate_stream', { body })
+      const resp = incremental
+        ? await callRaw('opal_generate_stream_incremental', {
+            body: [
+              JSON.stringify(Object.fromEntries(Object.entries(body).filter(([k]) => k !== 'text'))),
+              JSON.stringify({ text, flush: true }),
+              JSON.stringify({ done: true }),
+            ].join('\n') + '\n',
+            contentType: 'application/x-ndjson',
+          })
+        : await callRaw('opal_generate_stream', { body })
       const meta = audioMeta(resp)
       const chunks: Uint8Array[] = []
       let total = 0
@@ -149,6 +159,15 @@ export function GeneratePanel() {
         </label>
         <label className="check">
           <input type="checkbox" checked={stream} onChange={(e) => setStream(e.target.checked)} /> Stream (raw PCM)
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={incremental}
+            disabled={!stream}
+            onChange={(e) => setIncremental(e.target.checked)}
+          />{' '}
+          Incremental text (NDJSON)
         </label>
         <OptionsField value={options} onChange={setOptions} />
         <div className="wide">

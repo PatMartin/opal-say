@@ -984,6 +984,62 @@ paths:
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalTransactionIdParameter'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalRequestIdParameter'
     - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
+  /api/v1/generate/stream/incremental:
+    post:
+      tags:
+      - generate
+      summary: Stream Generated Audio From Incremental Text
+      description: "Generate speech while the caller supplies text incrementally, streaming raw PCM\n\
+        bytes back as they are synthesized.\n\nThe request body is `application/x-ndjson` — one JSON\n\
+        object per line:\n\n* Line 1 (required): the generation parameters — the same `profile_id`,\n\
+        \  `persona`, `voice_id`, `engine_id`, `speed`, `volume`, `sample_rate` and `engine_options`\n\
+        \  fields as `GenerateStreamRequest`, with the same validation and resolution rules. There is\n\
+        \  no `text` field.\n* Lines 2+: `{\"text\": \"...\"}` segments. Segments are concatenated in\n\
+        \  order; the service buffers them and synthesizes complete sentences as they form. A client\n\
+        \  generating text progressively (e.g. a conversation engine) receives the first audio bytes\n\
+        \  before it finishes supplying text.\n* Flush: `\"flush\": true` on a text segment — or a\n\
+        \  standalone `{\"flush\": true}` line — synthesizes all buffered text immediately, including\n\
+        \  text without a closing sentence boundary. Producers that emit complete utterances\n\
+        \  SHOULD set it on their final segment of an utterance.\n* Finish: `{\"done\": true}` or end\n\
+        \  of the request body.\n\
+        \  Trailing text without a sentence boundary is synthesized after finish.\n* Cancellation: closing\n\
+        \  the request connection aborts generation.\n* Backpressure: when too much unsynthesized text is\n\
+        \  pending, the service stops reading the body; producers should throttle their send loop.\n\n\
+        The response is identical to `/api/v1/generate/stream`: headerless s16le mono PCM at\n\
+        `X-Opal-Sample-Rate`. A failure before the first audio block returns a normal JSON error; a\n\
+        failure after 200 truncates the stream, which clients MUST treat as a failed generation."
+      operationId: opal_generate_stream_incremental
+      requestBody:
+        required: true
+        content:
+          application/x-ndjson:
+            schema:
+              type: string
+              description: "NDJSON line protocol: line 1 is the generation-parameter object\n\
+                (`GenerateStreamRequest` minus `text`); subsequent lines are `{\"text\": \"...\"}`\n\
+                segments, ending with `{\"done\": true}` or request-body EOF."
+      responses:
+        '401':
+          $ref: './shared/opal_kernel.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared/opal_kernel.yaml#/components/responses/Forbidden'
+        '200':
+          $ref: '#/components/responses/PcmStreamResponse'
+        '409':
+          $ref: './shared/opal_kernel.yaml#/components/responses/Conflict'
+        '413':
+          $ref: './shared/opal_kernel.yaml#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: './shared/opal_kernel.yaml#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/GenerationFailed'
+        '503':
+          $ref: './shared/opal_kernel.yaml#/components/responses/ServiceUnavailable'
+    parameters:
+    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalSessionIdParameter'
+    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalTransactionIdParameter'
+    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalRequestIdParameter'
+    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
   /api/v1/setting/:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/settings_collection'
     x-opal-cli:

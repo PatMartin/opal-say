@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import queue
 import threading
@@ -12,7 +13,9 @@ from typing import Any
 import anyio
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, Header, Path, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import ClientDisconnect
 
 from opal_say import API_VERSION, SERVICE_NAME, __version__
 from opal_say.api.correlation import correlation_ids
@@ -26,6 +29,7 @@ from opal_say.schemas import (
     GenerateRequest,
     GenerateStreamRequest,
     HealthRead,
+    IncrementalStreamParams,
     LivenessRead,
     OperationResult,
     PersonaCreate,
@@ -49,9 +53,10 @@ from opal_say.schemas import (
 from opal_say.service.concurrency import config_etag, mutate_with_revision
 from opal_say.service.config_candidate import Candidate
 from opal_say.service.container import Services
-from opal_say.service.errors import NotFound
+from opal_say.service.errors import GenerationFailed, InvalidRequest, NotFound, PayloadTooLarge
 from opal_say.service.settings import settings_to_str
 from opal_say.tts.base import Report
+from opal_say.tts.chunking import chunk_text, split_stream_ready
 
 router = APIRouter()
 
@@ -239,6 +244,34 @@ class _PcmStreamResponse(StreamingResponse):
             # Every exit — completed, failed, disconnected or externally cancelled —
             # unwinds through here, so the runtime reference and inference permit are
             # released deterministically instead of relying on garbage collection.
+            with anyio.CancelScope(shield=True):
+                await run_in_threadpool(self._stream.close)
+
+
+class _DuplexPcmStreamResponse(_PcmStreamResponse):
+    """Stream response for the incremental endpoint, whose request body stays open.
+
+    `StreamingResponse.__call__` runs `listen_for_disconnect(receive)` alongside
+    the body send — a second consumer that competes for and discards request-body
+    messages, so it cannot be used while NDJSON input is still arriving. Instead
+    send chunks directly; a dropped client surfaces as ClientDisconnect in the
+    NDJSON reader or as a send failure, both of which unwind through the
+    `finally` below.
+    """
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await send({
+                "type": "http.response.start",
+                "status": self.status_code,
+                "headers": self.raw_headers,
+            })
+            async for chunk in self.body_iterator:
+                if not isinstance(chunk, bytes | memoryview):
+                    chunk = chunk.encode(self.charset)
+                await send({"type": "http.response.body", "body": chunk, "more_body": True})
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
+        finally:
             with anyio.CancelScope(shield=True):
                 await run_in_threadpool(self._stream.close)
 
@@ -502,6 +535,196 @@ async def stream_audio(request: Request, body: GenerateStreamRequest, svc: Servi
         raise
     stream.prime(first)
     return _PcmStreamResponse(stream, media_type="application/octet-stream", headers=plan.headers("pcm"))
+
+
+# -- incremental generation ---------------------------------------------------------
+
+_INCREMENT_MAX_LINE = 64 << 10
+
+
+class _NdjsonReader:
+    """Line splitter over `request.stream()`; the handler reads the params line
+    first, then hands the same reader to the feed task for text segments."""
+
+    def __init__(self, request: Request):
+        self._it = request.stream().__aiter__()
+        self._buf = ""
+
+    async def readline(self) -> str | None:
+        while "\n" not in self._buf:
+            if len(self._buf) > _INCREMENT_MAX_LINE:
+                raise PayloadTooLarge(
+                    f"incremental input line exceeds the {_INCREMENT_MAX_LINE}-byte limit"
+                )
+            try:
+                chunk = await self._it.__anext__()
+            except StopAsyncIteration:
+                line, self._buf = self._buf, ""
+                return line if line.strip() else None
+            self._buf += chunk.decode("utf-8", "replace")
+        line, self._buf = self._buf.split("\n", 1)
+        return line
+
+
+class _FeedError:
+    """Terminal record carrying a reader-side failure into the chunk stream."""
+
+    def __init__(self, exc: Exception):
+        self.exc = exc
+
+
+def _qput(q: queue.Queue, item, cancel: threading.Event) -> bool:
+    """Bounded put; returns False when the stream is being torn down."""
+    while True:
+        if cancel.is_set():
+            return False
+        try:
+            q.put(item, timeout=_STREAM_POLL_S)
+            return True
+        except queue.Full:
+            continue
+
+
+async def _feed_increments(reader: _NdjsonReader, q: queue.Queue, cancel: threading.Event,
+                           setting, ctx: str) -> None:
+    """Read NDJSON text segments and feed sentence-sized chunks to synthesis.
+
+    Boundaries: `{"done": true}` or request-body EOF finishes input (trailing
+    partial text is flushed); `cancel` — set by disconnect or stream teardown —
+    aborts; a full queue blocks the read, so backpressure reaches the client's
+    TCP send buffer instead of growing memory. Malformed records and the
+    max_text_chars cap terminate the output stream with a stored error.
+    """
+    pending = ""
+    total = 0
+    max_chars = int(setting.effective("max_text_chars"))
+    chunk_max = int(setting.effective("chunk_max_chars"))
+    error: Exception | None = None
+    try:
+        while True:
+            if cancel.is_set():
+                return
+            line = await reader.readline()
+            if line is None:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                raise InvalidRequest.single(["body"], "malformed NDJSON record") from None
+            if isinstance(rec, dict) and rec.get("done") is True:
+                break
+            seg = rec.get("text") if isinstance(rec, dict) else None
+            if seg is not None and (not isinstance(seg, str) or not seg):
+                raise InvalidRequest.single(["body"], "record must carry a non-empty 'text' string")
+            if seg is None:
+                if isinstance(rec, dict) and rec.get("flush") is True:
+                    for c in chunk_text(pending, chunk_max):
+                        await run_in_threadpool(_qput, q, c, cancel)
+                    pending = ""
+                    continue
+                raise InvalidRequest.single(["body"], "record must carry a non-empty 'text' string")
+            total += len(seg)
+            if total > max_chars:
+                raise PayloadTooLarge(
+                    f"incremental text exceeds the configured maximum of {max_chars} characters",
+                    details={"max_text_chars": max_chars},
+                )
+            pending += seg
+            if rec.get("flush") is True:
+                ready, pending = chunk_text(pending, chunk_max), ""
+            else:
+                ready, pending = split_stream_ready(pending, chunk_max)
+            for c in ready:
+                await run_in_threadpool(_qput, q, c, cancel)
+    except ClientDisconnect:
+        # Interrupted input: abort the stream rather than flushing partial text.
+        cancel.set()
+        return
+    except (InvalidRequest, PayloadTooLarge) as exc:
+        error = exc
+    except Exception:  # noqa: BLE001 - reader/transport failure truncates the stream
+        log.exception("incremental input reader failed (%s)", ctx)
+        error = GenerationFailed("incremental text input failed")
+    for c in (chunk_text(pending, chunk_max) if error is None and not cancel.is_set() else []):
+        await run_in_threadpool(_qput, q, c, cancel)
+    # Terminal record: the stored error wins when present, else the EOF sentinel.
+    _qput(q, _FeedError(error) if error is not None else None, cancel)
+
+
+def _increment_chunks(q: queue.Queue, cancel: threading.Event):
+    """Generator feeding pcm_stream from the incremental chunk queue."""
+    while True:
+        if cancel.is_set():
+            return
+        try:
+            item = q.get(timeout=_STREAM_POLL_S)
+        except queue.Empty:
+            continue
+        if item is None:
+            return
+        if isinstance(item, _FeedError):
+            raise item.exc
+        yield item
+
+
+@router.post("/api/v1/generate/stream/incremental", tags=["generate"],
+             operation_id="opal_generate_stream_incremental", response_class=StreamingResponse)
+async def stream_audio_incremental(request: Request, svc: Services = Depends(services)):
+    """Streaming PCM for text supplied incrementally as NDJSON lines.
+
+    Line 1 carries the generation parameters (`IncrementalStreamParams`); later
+    lines carry `{"text": "..."}` segments or `{"done": true}`. First audio
+    becomes available before the producer finishes supplying text.
+    """
+    # Unlike the one-shot stream endpoints there is no _watch_disconnect task:
+    # it would compete with the NDJSON reader for the request body. A dropped
+    # connection surfaces as ClientDisconnect in the feed reader or as a send
+    # failure while the response streams — both unwind through _cleanup.
+    cancel = threading.Event()
+    loop = asyncio.get_running_loop()
+    reader = _NdjsonReader(request)
+    params_line = await reader.readline()
+    if params_line is None:
+        raise InvalidRequest.single(["body"], "first NDJSON line must carry the generation parameters")
+    try:
+        raw = json.loads(params_line)
+    except ValueError:
+        raise InvalidRequest.single(["body"], "first NDJSON line must be a JSON object") from None
+    try:
+        params = IncrementalStreamParams.model_validate(raw)
+    except ValidationError as exc:
+        raise InvalidRequest(exc.errors()) from None
+    plan = await run_in_threadpool(svc.generation.plan_incremental, params, cancel.is_set)
+    chunks_q: queue.Queue = queue.Queue(
+        maxsize=int(svc.setting.effective("incremental_pending_chunks"))
+    )
+    feed = loop.create_task(_feed_increments(reader, chunks_q, cancel, svc.setting,
+                                             _correlation_context(request)))
+
+    def _cleanup():
+        cancel.set()
+        loop.call_soon_threadsafe(feed.cancel)
+        plan.release()
+
+    stream = _PcmBodyIterator(
+        svc.generation.pcm_stream(plan, text_source=_increment_chunks(chunks_q, cancel)),
+        _correlation_context(request),
+        on_close=_cleanup,
+        buffer_blocks=int(svc.setting.effective("stream_buffer_blocks")),
+        lag_timeout_ms=int(svc.setting.effective("stream_lag_timeout_ms")),
+        cancel=cancel,
+    )
+    try:
+        first = await run_in_threadpool(stream.next_block)
+    except BaseException:
+        with anyio.CancelScope(shield=True):
+            await run_in_threadpool(stream.close)
+        raise
+    stream.prime(first)
+    return _DuplexPcmStreamResponse(stream, media_type="application/octet-stream", headers=plan.headers("pcm"))
 
 
 # -- setting --------------------------------------------------------------------

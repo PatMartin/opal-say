@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from typing import Any
 
@@ -63,12 +64,32 @@ def _stream_response(resp: httpx.Response, output: str | None, play: bool) -> in
             out.close()
 
 
-def _synthesize(ctx: typer.Context, body: dict[str, Any], output: str | None, stream: bool, play: bool) -> None:
+def _incremental_payload(body: dict[str, Any]) -> bytes:
+    """Wrap a generation body as NDJSON: params line, one flushed text segment, done."""
+    params = {k: v for k, v in body.items() if k != "text"}
+    records = (json.dumps(params), json.dumps({"text": body["text"], "flush": True}),
+               json.dumps({"done": True}))
+    return ("\n".join(records) + "\n").encode()
+
+
+def _synthesize(ctx: typer.Context, body: dict[str, Any], output: str | None, stream: bool, play: bool,
+                incremental: bool = False, payload: bytes | None = None) -> None:
     if play and output == "-":
         raise typer.BadParameter("cannot both write audio to stdout and play it locally")
     if not play and output is None:
         raise typer.BadParameter("supply -o/--output, or play the audio locally")
-    if stream:
+    if incremental:
+        try:
+            with _state(ctx).client.stream("opal_generate_stream_incremental", content=payload,
+                                           headers={"Content-Type": "application/x-ndjson"}) as resp:
+                size = _stream_response(resp, output, play)
+        except ApiCallError as exc:
+            typer.echo(f"Error: {exc.describe()}", err=True)
+            raise typer.Exit(1) from None
+        except httpx.HTTPError as exc:
+            typer.echo(f"Error: stream terminated prematurely; generation failed ({exc})", err=True)
+            raise typer.Exit(1) from None
+    elif stream:
         try:
             with _state(ctx).client.stream("opal_generate_stream", json=body) as resp:
                 size = _stream_response(resp, output, play)
@@ -96,6 +117,9 @@ def register(say_app: typer.Typer) -> None:
         text: str = typer.Argument(..., help="Plain text to speak ('-' reads stdin)"),
         output: str | None = OptionalOutput,
         stream: bool = typer.Option(False, "--stream", help="Use /generate/stream (progressive raw PCM)"),
+        incremental: bool = typer.Option(
+            False, "--incremental",
+            help="Use /generate/stream/incremental (text '-' reads NDJSON lines from stdin)"),
         play: bool = typer.Option(False, "--play", help="Also play the audio locally (requires 'opal-say[audio]')"),
         profile: int = typer.Option(None, "--profile", min=1, help="Profile id (default: active profile)"),
         persona: str = typer.Option(None, "--persona", help="Named persona supplying the voice"),
@@ -112,7 +136,20 @@ def register(say_app: typer.Typer) -> None:
 
         Example: opal say generate "Hello" --stream -o - | aplay -r 22050 -f S16_LE -c 1
         """
-        if stream and output_format is not None:
+        if incremental:
+            if stream:
+                raise typer.BadParameter("choose either --stream or --incremental")
+            if output_format is not None:
+                raise typer.BadParameter("--format is not supported with --incremental (always pcm)")
+            if text == "-":
+                # Stdin carries the whole NDJSON conversation: params line, then
+                # {"text": ...} records ending with {"done": true} (or EOF).
+                _synthesize(ctx, {}, output, stream, play, incremental=True,
+                            payload=sys.stdin.buffer.read())
+                return
+        elif stream and output_format is not None:
             raise typer.BadParameter("--format is not supported with --stream (always pcm)")
-        _synthesize(ctx, _generation_body(text, profile, voice, engine, speed, volume, output_format, sample_rate,
-                                        option, options_json, persona=persona), output, stream, play)
+        body = _generation_body(text, profile, voice, engine, speed, volume, output_format, sample_rate,
+                                option, options_json, persona=persona)
+        _synthesize(ctx, body, output, stream, play, incremental=incremental,
+                    payload=_incremental_payload(body) if incremental else None)
