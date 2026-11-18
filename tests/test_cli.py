@@ -194,6 +194,18 @@ def test_tree_command_prints_command_surface():
     assert "│   ├──" in out and "└──" in out
 
 
+def test_tree_ascii_flag_prints_plain_ascii():
+    result = CliRunner().invoke(cli.app, ["say", "tree", "--ascii"])
+    assert result.exit_code == 0
+    out = result.stdout
+    for cmd in ("generate", "engine", "voice", "profile", "setting", "backup", "health"):
+        assert cmd in out
+    assert "generate TEXT [-o/--output" in out
+    assert "+-- " in out or "`-- " in out
+    for ch in ("│", "├", "└", "─", "\x1b"):
+        assert ch not in out
+
+
 def test_generate_plays_when_asked(run, monkeypatch):
     played: list[int] = []
     monkeypatch.setattr(audio, "play_response", lambda resp: played.append(len(resp.content)) or len(resp.content))

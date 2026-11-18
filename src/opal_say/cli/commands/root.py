@@ -7,6 +7,9 @@ import sys
 
 import click
 import typer
+from rich.console import Console
+from rich.text import Text
+from rich.tree import Tree
 from typer.main import get_command
 
 from opal_say.cli.common import _call, _emit, _state
@@ -36,14 +39,29 @@ def _param_label(p: click.Parameter) -> str:
     return label if p.required else f"[{label}]"
 
 
-def _walk(group: click.Group, prefix: str) -> None:
-    commands = [(n, c) for n, c in group.commands.items() if not c.hidden]
-    for i, (name, cmd) in enumerate(commands):
-        last = i == len(commands) - 1
-        params = " ".join(_param_label(p) for p in cmd.params if not getattr(p, "hidden", False))
-        typer.echo(f"{prefix}{'└── ' if last else '├── '}{name}" + (f" {params}" if params else ""))
+def _node_label(name: str, cmd: click.Command) -> Text:
+    label = Text(name, style="bold cyan" if getattr(cmd, "commands", None) else "cyan")
+    for p in cmd.params:
+        if getattr(p, "hidden", False):
+            continue
+        label.append(f" {_param_label(p)}", style="yellow" if p.required else "dim")
+    return label
+
+
+def _grow(node: Tree, group: click.Group) -> None:
+    for name, cmd in group.commands.items():
+        if cmd.hidden:
+            continue
+        child = node.add(_node_label(name, cmd))
         if getattr(cmd, "commands", None):  # TyperGroup doesn't subclass click.Group
-            _walk(cmd, prefix + ("    " if last else "│   "))
+            _grow(child, cmd)
+
+
+def _dump_ascii(node: Tree, prefix: str) -> None:
+    for i, child in enumerate(node.children):
+        last = i == len(node.children) - 1
+        typer.echo(f"{prefix}{'`-- ' if last else '|-- '}{child.label}")
+        _dump_ascii(child, prefix + ("    " if last else "|   "))
 
 
 def _health(ctx: typer.Context) -> None:
@@ -104,11 +122,21 @@ def register(say_app: typer.Typer) -> None:
     say_app.add_typer(info_app, name="info")
 
     @say_app.command("tree")
-    def tree() -> None:
-        """Print an ASCII tree of every CLI command and its arguments.
-        Optional arguments appear in [square brackets]."""
+    def tree(
+        ascii_output: bool = typer.Option(False, "--ascii", help="Plain ASCII tree: no box-drawing, no color."),
+    ) -> None:
+        """Print a color-coded tree of every CLI command and its arguments.
+        Optional arguments appear in square brackets."""
         with contextlib.suppress(AttributeError, ValueError):
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         root = get_command(say_app)
-        typer.echo("opal-say " + " ".join(_param_label(p) for p in root.params))
-        _walk(root, "")
+        label = Text("opal-say", style="bold green")
+        if params := " ".join(_param_label(p) for p in root.params):
+            label.append(f" {params}", style="dim")
+        t = Tree(label, guide_style="blue")
+        _grow(t, root)
+        if ascii_output:
+            typer.echo(t.label.plain)
+            _dump_ascii(t, "")
+        else:
+            Console().print(t)
