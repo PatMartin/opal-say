@@ -59,6 +59,28 @@ class Services:
             },
         }
 
+    def readiness(self) -> dict[str, Any]:
+        """Readiness probe: ready iff the default speech path can synthesize.
+
+        Engine states stay visible alongside the verdict (`engines`), but they no
+        longer decide it: an enabled-and-available engine is necessary, not
+        sufficient — readiness additionally requires the default voice resolution
+        used by generation (active profile -> voice -> engine) to succeed, and the
+        resolved voice's options and host assets to check out. Failures report the
+        resolution stage (`details.speech.code`) so the missing/disabled/invalid
+        default is actionable instead of a bare 503.
+        """
+        health = self.health()
+        speech = self.generation.default_path()
+        body = {
+            "status": health["status"] if speech["ok"] else "unavailable",
+            "ready": bool(speech["ok"]),
+            "version": health["version"],
+            "engines": health["engines"],
+            "details": {**health["details"], "speech": speech},
+        }
+        return body
+
     def close(self) -> None:
         self.store.close()
 

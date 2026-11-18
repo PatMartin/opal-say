@@ -454,10 +454,8 @@ def health_live() -> dict[str, Any]:
 
 @router.get("/api/v1/health/ready", tags=["health"], operation_id="opal_health_ready_get")
 def health_ready(svc: Services = Depends(services)):
-    health = svc.health()
-    usable = health["status"] != "error"
-    body = {"status": health["status"] if usable else "unavailable", "ready": usable, "details": health["details"]}
-    return JSONResponse(body, status_code=200 if usable else 503)
+    probe = svc.readiness()
+    return JSONResponse(probe, status_code=200 if probe["ready"] else 503)
 
 
 # -- backup ----------------------------------------------------------------------

@@ -113,6 +113,7 @@ def register(say_app: typer.Typer) -> None:
             if e.status != 503:
                 raise
             _emit(ctx, e.body)
+            raise typer.Exit(1) from None
 
     @info_app.command("ping")
     def info_ping(ctx: typer.Context) -> None:

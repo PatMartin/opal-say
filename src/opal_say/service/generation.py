@@ -313,6 +313,47 @@ class GenerationService:
             self.engine.runtime.release(runtime)
             raise
 
+    # -- readiness --------------------------------------------------------------
+
+    def default_path(self) -> dict[str, Any]:
+        """Probe the default speech path: what a generation request carrying no
+        explicit voice, persona or profile would resolve to.
+
+        Mirrors plan()'s resolution order (active profile -> voice -> engine) and
+        checks the resolved voice's options and host assets, but never binds a
+        runtime reference, so probing is cheap and can never queue behind
+        inference permits or a deferred reconfiguration. Returns
+        ``{"ok": True, ...resolved ids...}`` or ``{"ok": False, "code", "message", ...}``.
+        """
+        profile = self.store.active_profile()
+        voice_id = profile["voice_id"] if profile else None
+        base: dict[str, Any] = {"profile_id": profile["id"] if profile else None, "voice_id": voice_id}
+        if voice_id is None:
+            return {**base, "ok": False, "code": "no_voice",
+                    "message": "no default voice: no active profile supplies a voice_id"}
+        voice = self.store.get_voice(voice_id)
+        if voice is None:
+            return {**base, "ok": False, "code": "voice_not_found",
+                    "message": f"default voice '{voice_id}' is not registered"}
+        if not voice["enabled"]:
+            return {**base, "ok": False, "code": "voice_disabled",
+                    "message": f"default voice '{voice_id}' is disabled"}
+        base["engine_id"] = voice["engine_id"]
+        problem = self.engine.usability_problem(voice["engine_id"])
+        if problem is not None:
+            return {**base, "ok": False, "code": problem[0], "message": problem[1]}
+        engine = self.engine.runtime.get(voice["engine_id"])
+        issues = engine.validate_options(voice["engine_options"], "voice")
+        if issues:
+            return {**base, "ok": False, "code": "invalid_options",
+                    "message": "; ".join(i.message for i in issues)}
+        try:
+            desc = engine.describe_voice(voice["engine_voice_ref"], voice["engine_options"])
+        except (VoiceResolutionError, EngineUnavailableError) as exc:
+            return {**base, "ok": False, "code": getattr(exc, "code", "engine_unavailable"),
+                    "message": str(exc)}
+        return {**base, "ok": True, "native_sample_rate": desc.native_sample_rate}
+
     # -- synthesis ------------------------------------------------------------
 
     def pcm_stream(self, plan: GenerationPlan) -> Iterator[bytes]:

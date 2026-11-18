@@ -89,7 +89,11 @@ def check_response(resp: httpx.Response, method: str | None = None, path: str | 
     media = resp.headers.get("content-type", "").split(";")[0].strip()
     assert media in content, f"{op['operationId']} {status} returned media type {media}, expected {list(content)}"
     if media == "application/json":
-        if resp.status_code >= 400:
+        # Error statuses use the strict OpalError envelope — except where the contract
+        # documents a different body for that status (e.g. health probes report
+        # OpalHealthProbe on 503 rather than an error envelope).
+        schema = _deref(content[media]["schema"])
+        if resp.status_code >= 400 and "error" in schema.get("properties", {}):
             Draft202012Validator(OPAL_ERROR_SCHEMA).validate(resp.json())
         else:
             schema_validator(content[media]["schema"]).validate(resp.json())
