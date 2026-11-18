@@ -26,10 +26,10 @@ from opal_say.tts.base import (
     VoiceResolutionError,
 )
 
-PIPER_MODEL = Path(os.environ.get("OPAL_SAY_TEST_PIPER_MODEL", "~/piper/voice/en_US-amy-low.onnx")).expanduser()
+PIPER_MODEL = Path(os.environ.get("OPAL_SAY_TEST_PIPER_MODEL", "~/piper/voices/en_US-amy-low.onnx")).expanduser()
 KOKORO_DIR = Path(os.environ.get("OPAL_SAY_TEST_KOKORO_DIR", "~/kokoro")).expanduser()
 KOKORO_MODEL = next(iter(sorted(KOKORO_DIR.glob("kokoro-v1.0*.onnx"))), KOKORO_DIR / "kokoro-v1.0.onnx")
-KOKORO_VOICES = KOKORO_DIR / "voice-v1.0.bin"
+KOKORO_VOICES = next(iter(sorted(KOKORO_DIR.glob("voices-v1.0*.bin"))), KOKORO_DIR / "voices-v1.0.bin")
 
 
 def piper_ready() -> bool:

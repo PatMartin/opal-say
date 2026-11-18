@@ -277,7 +277,8 @@ def test_kokoro_stream_smoke(tmp_path):
     try:
         with TestClient(app) as c:
             resp = c.post("/api/v1/voice/", json={"voice_id": "k", "name": "K", "engine_id": "kokoro",
-                                                    "engine_voice_ref": "af_heart"})
+                                                    "engine_voice_ref": "af_heart"},
+                          headers={"If-Match": c.get("/api/v1/setting/").headers["etag"]})
             assert resp.status_code == 201, resp.text
             status, headers, arrivals, pcm = _smoke_stream(c, "k")
             assert status == 200 and len(pcm) > 0

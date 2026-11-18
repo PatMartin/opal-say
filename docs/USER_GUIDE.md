@@ -190,6 +190,8 @@ individual fields:
 | | `log_level` | `info` | Python/uvicorn log level |
 | | `cors_origins` | `http://localhost:5173`, `http://127.0.0.1:5173` | Browser origins allowed to call the API |
 | | `engine` | none | Initial engine state, applied only when an engine is first seen |
+| `OPAL_SAY_PERSONA_OWNER_URL` | `persona_owner_url` | none | OPAL Think base URL for persona adoption/refresh (see [5.7](#57-personas---apiv1persona)) |
+| `OPAL_SAY_PERSONA_OWNER_TOKEN_ENV` | `persona_owner_token_env` | `OPAL_SAY_PERSONA_OWNER_TOKEN` | Name of the env var holding the owner's bearer token |
 | `OPAL_SAY_API_URL` | | `http://127.0.0.1:8001` | API URL used by the **CLI** |
 | `VITE_OPAL_SAY_API_URL` | | same origin (dev: `http://127.0.0.1:8001`) | API URL compiled into the **web GUI** at build time |
 
@@ -539,6 +541,12 @@ service:
     - http://localhost:5173
     - http://127.0.0.1:5173
 
+  # Persona owner (OPAL Think): unknown personas are adopted from this service and
+  # origin=owner records are revalidated per the persona_refresh_seconds setting.
+  # The bearer token is read from the environment variable named here.
+  # persona_owner_url: http://127.0.0.1:8080
+  # persona_owner_token_env: OPAL_SAY_PERSONA_OWNER_TOKEN
+
   # Initial engine state, applied only when an engine is first seen. Later changes are made
   # through PATCH /api/v1/engine/{engine_id} and persisted.
   engines:
@@ -656,6 +664,11 @@ profiles are numbered `1..N` in file order.
 | `default_speed` | float | `1.0` | 0.25 to 4.0 | Fallback speed (after request and profile) |
 | `default_volume` | float | `1.0` | 0.0 to 2.0 | Fallback volume |
 | `default_output_format` | str | `wav` | `wav`, `pcm` | Fallback completed-audio format |
+| `engine_acquire_timeout_ms` | int | `30000` | 100 to 600000 | Max wait for engine reconfiguration or an inference permit before admission fails |
+| `stream_buffer_blocks` | int | `8` | 1 to 64 | PCM blocks buffered ahead of the client on a stream |
+| `stream_lag_timeout_ms` | int | `30000` | 500 to 300000 | A full buffer undrained this long abandons the stream, freeing the engine |
+| `incremental_pending_chunks` | int | `8` | 1 to 64 | Text chunks accepted ahead of synthesis on incremental input |
+| `persona_refresh_seconds` | int | `60` | 0 to 86400 | How long an owner-synced persona may serve before revalidation (0 = always) |
 
 Values are always strings in the API (`"value": "400"`). Known keys are validated on `PUT` (`422` if
 invalid). Unknown keys are stored as they are, so you can keep your own metadata there. `GET` only returns
@@ -1154,6 +1167,25 @@ error.
 curl -s -X POST $API/api/v1/persona/amy/validate | jq '{valid, errors, warnings}'
 ```
 
+#### Personas synced from an owner (OPAL Think)
+
+Setting `persona_owner_url` in `service.yaml` (e.g. a running `opal-think`) turns on adoption and
+refresh:
+
+- **Adoption** — a `persona` value that isn't registered locally is fetched once from the owner and
+  stored with `origin: owner`. A `404` there keeps the local miss (`422`/`409` as usual).
+- **Authentication** — when `persona_owner_token_env` names an environment variable (default
+  `OPAL_SAY_PERSONA_OWNER_TOKEN`), its value is sent as a `Bearer` token; the token itself never goes
+  into config or the database.
+- **Refresh** — an `origin: owner` persona that hasn't been checked for `persona_refresh_seconds`
+  is revalidated on use: `GET {persona_owner_url}/api/v1/persona/{id}` with `If-None-Match` on the
+  stored owner `ETag`. A `200` applies the owner's new fields — including a changed `voice_id` or the
+  owner having disabled it; a `404` disables the local copy.
+- **Offline tolerance** — an unreachable owner keeps serving the cached persona (local fallback, no
+  request penalty; the check timestamp still advances so every request doesn't retry).
+- **Local precedence** — personas created through this API (`origin: local`) are never adopted,
+  revalidated or overwritten by the owner; a local persona with the same id always wins.
+
 ---
 
 ### 5.8 Generation — `/api/v1/generate`
@@ -1241,6 +1273,35 @@ curl -sN -X POST $API/api/v1/generate/stream -H 'Content-Type: application/json'
   | aplay -r 22050 -f S16_LE -c 1 -t raw
 ```
 
+#### `POST /api/v1/generate/stream/incremental` — text supplied while audio plays
+
+For conversation producers that generate text progressively: the request body is
+`application/x-ndjson` — one JSON object per line — and the response is the same raw PCM stream as
+`/generate/stream`, starting **before the caller finishes supplying text**.
+
+```bash
+printf '%s\n' \
+  '{"voice_id": "en-us-amy-low"}' \
+  '{"text": "First sentence is spoken right away. ", "flush": true}' \
+  '{"text": "A second sentence follows when it is ready.", "flush": true}' \
+  '{"done": true}' \
+| curl -sN -X POST $API/api/v1/generate/stream/incremental \
+  -H 'Content-Type: application/x-ndjson' --data-binary @- \
+  | aplay -r 16000 -f S16_LE -c 1 -t raw
+```
+
+| Line | Meaning |
+|---|---|
+| Line 1 (required) | Generation parameters — the same fields as `/generate/stream` (`profile_id`, `persona`, `voice_id`, `engine_id`, `speed`, `volume`, `sample_rate`, `engine_options`), minus `text` |
+| `{"text": "..."}` | Text segment. Segments are concatenated in order; complete sentences are synthesized as they form |
+| `"flush": true` | On a text segment (or as a standalone `{"flush": true}` line): synthesize all buffered text immediately, even without a closing sentence boundary. Set it on the last segment of an utterance |
+| `{"done": true}` or body EOF | Input finished; trailing partial text is flushed |
+
+Rules: the `max_text_chars` cap applies to the concatenated text (`413`); each line is limited to 64 KB
+and the number of unsynthesized buffered chunks to `incremental_pending_chunks` — a producer that
+outruns synthesis is slowed by backpressure. Closing the connection cancels generation. A failure
+before the first audio block is a normal JSON error; a failure after `200` truncates the stream.
+
 ---
 
 ### 5.9 Settings — `/api/v1/setting`
@@ -1310,11 +1371,39 @@ curl -s $API/api/v1/health/
 
 | `status` | Meaning |
 |---|---|
-| `ok` | Every enabled engine is available |
+| `ok` | Every enabled engine is available **and the default speech path resolves** |
 | `degraded` | Some enabled engine is unavailable, but at least one is available |
-| `error` | No enabled engine is available |
+| `error` | No enabled engine is available, or the default speech path can't produce audio |
 
-The response is always `200`. Use `status` for readiness decisions, and `/api/v1/info/ping` for liveness.
+The response is always `200`. `status` also reflects a probe of the **default speech path** — what a
+request with no `voice_id`/`persona`/`profile_id` would resolve to (active profile → voice → engine →
+voice assets). The probe never acquires an engine slot, so it stays cheap. `details.speech` reports the
+verdict and, on failure, an actionable `code`/`message`:
+
+```json
+"details": {"voices": 4, "enabled_voices": 4, "profiles": 3,
+            "speech": {"profile_id": 1, "voice_id": "en-us-amy-low", "engine_id": "piper",
+                       "ok": true, "native_sample_rate": 16000}}
+```
+
+| `speech.code` | Cause |
+|---|---|
+| `no_voice` | No active profile supplies a voice and no default exists |
+| `voice_not_found` | The default voice isn't registered |
+| `voice_disabled` | The default voice is disabled |
+| `engine_*` | The voice's engine is disabled/unavailable/not installed |
+| `invalid_options` | The voice's stored options fail validation |
+| `model_not_found` | The voice's model file isn't on disk |
+
+#### `GET /api/v1/health/live` — liveness → `200`
+
+Cheap "process is up" probe (`{"status": "ok", "ready": true}`).
+
+#### `GET /api/v1/health/ready` — readiness → `200` or `503`
+
+Same readiness verdict as `/health/` with a Kubernetes-style status code: `503` when the default
+speech path can't produce audio (the body is still the health probe document, so the failure detail is
+visible). `opal say info ready` prints it either way and exits non-zero when unready.
 
 ---
 
@@ -1477,6 +1566,8 @@ chunk and sends each block as soon as it's encoded, so playback can start after 
 | Errors before audio | Normal JSON errors (`409`, `413`, `422`, `503`, ...). The first block is produced before `200` is committed. |
 | Errors after audio started | The service aborts the chunked response without the terminating chunk. Clients see an incomplete read, never an in-band error. Treat the audio received so far as incomplete. |
 | Format | Always PCM. `output_format` isn't accepted. |
+| Admission | Waiting for an inference permit or a pending engine reconfiguration is bounded by `engine_acquire_timeout_ms` (`503 engine_unavailable`); a cancelled request stops waiting |
+| Slow client | Audio is produced into a bounded buffer of `stream_buffer_blocks`; a client that stops reading for `stream_lag_timeout_ms` loses the rest of the stream and frees the engine |
 
 **curl**
 

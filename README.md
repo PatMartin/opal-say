@@ -41,7 +41,7 @@ It provides one consistent interface over local synthesis engines, including **P
 
 - **One API, multiple voices.** Piper and Kokoro adapters expose a common generation contract, including speed, volume, audio format, and output sample rate.
 - **Local-first.** Synthesis runs with engines and models installed on your own host. Basic operation doesn't require a cloud speech service.
-- **Actually streaming.** `generate --stream` emits raw 16-bit mono PCM progressively, rather than waiting for the whole finished WAV.
+- **Actually streaming.** `generate --stream` emits raw 16-bit mono PCM progressively, rather than waiting for the whole finished WAV. `--incremental` goes further: a producer supplies NDJSON text lines while the audio is already streaming — built for conversation.
 - **Voices are resources.** Register installed voices once, validate them, and refer to stable IDs from scripts and profiles.
 - **Profiles make speech contextual.** Give a home assistant a friendly voice, an announcement system a distinct one, or a phone line 8 kHz PCM.
 - **Tune without changing applications.** Adjust engine-specific options, defaults, sentence chunking, and per-request overrides through REST or Typer.
@@ -299,6 +299,7 @@ opal
     │
     ├── TEXT                                    speaks aloud (generate + play)
     ├── generate TEXT                           [-o OUTPUT] [--play] [--stream]
+    │                                           [--incremental]
     │                                           [--profile PROFILE_ID]
     │                                           [--voice VOICE_ID] [--persona PERSONA_ID]
     │                                           [--engine ENGINE_ID]
@@ -385,7 +386,7 @@ opal say voice list --engine piper
 opal say voice list --engine kokoro
 ~~~
 
-An engine has both `enabled` (your administrative setting) and `available` (the runtime and its required files can be used). A Piper adapter with no voice models or a Kokoro adapter with a missing ONNX file isn't ready simply because the package installed.
+An engine has both `enabled` (your administrative setting) and `available` (the runtime and its required files can be used). A Piper adapter with no voice models or a Kokoro adapter with a missing ONNX file isn't ready simply because the package installed. The service goes further: `health/ready` only returns `200` when the **default speech path actually works** — an active profile (or explicit voice) resolving to an enabled voice whose model file is on disk and whose engine is usable. See `docs/USER_GUIDE.md` §5.10 for the failure codes it reports.
 
 Check each registered voice independently:
 

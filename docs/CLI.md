@@ -227,7 +227,12 @@ skips playback. `--play` without `-o` also works on `generate` and `voice test`;
 only when nothing plays. `--play -o -` is rejected — pick one destination.
 
 Local playback runs on the client machine, not on the service host, and needs the `audio` extra
-installed there.
+installed there. Playback is fed through a small bounded jitter buffer in a dedicated worker process,
+so `--stream`/`--incremental` chunks sound continuous instead of stuttering per block; `Ctrl+C` stops
+playback and kills the worker cleanly. If a burst of input arrives faster than realtime, audio plays
+at natural speed — it never fast-forwards to catch up. Underruns (the service delivering slower than
+realtime) are tolerated: the buffer drains and resumes when more audio arrives. On Windows without
+`simpleaudio`, `winsound` plays saved audio; progressive streaming still requires `simpleaudio`.
 
 The summary line always goes to stderr, so it never corrupts piped audio:
 
@@ -749,8 +754,9 @@ opal say generate TEXT [-o OUT] [--play] [--stream] [--profile ID] [--voice V] [
 |---|---|---|
 | `TEXT` | required | Plain text to speak. `-` reads the text from stdin. |
 | `-o`, `--output OUT` | required unless `--play` | Output file, or `-` for stdout |
-| `--play` | off | Also play the audio locally. With `--stream`, PCM chunks play progressively |
+| `--play` | off | Also play the audio locally. With `--stream`/`--incremental`, PCM chunks play progressively |
 | `--stream` | off | Use `/generate/stream`: progressive raw PCM, written as it arrives |
+| `--incremental` | off | Use `/generate/stream/incremental`: NDJSON input, audio starts while text is still arriving. With a literal `TEXT` the CLI wraps it for you; with `-` stdin carries the NDJSON conversation. Mutually exclusive with `--stream` |
 | `--profile ID` | active profile | Use this profile instead of the active one |
 | `--voice V` | from profile | Voice override |
 | `--engine E` | voice's engine | Advanced engine override. The engine must be able to use the voice. |
@@ -861,6 +867,36 @@ ffmpeg -f s16le -ar 16000 -ac 1 -i s.pcm s.wav
 | Sample rate | Same resolution as above. The CLI prints it in the summary line once the stream ends. |
 | Early errors | Problems that occur before the first audio block (unknown voice, bad options, text too long, ...) are normal JSON errors, exactly like `generate` without `--stream`. |
 | Late errors | If the engine fails after audio has started, the service aborts the response. The CLI prints `Error: stream terminated prematurely; generation failed (...)` and exits `1`. Audio that was already received has been written to the output. |
+
+### Incremental input (`--incremental`)
+
+`--incremental` calls `/api/v1/generate/stream/incremental`: the request body is `application/x-ndjson`
+and PCM audio starts streaming **while the producer is still writing text** — built for conversation
+producers such as an LLM emitting sentences as it thinks.
+
+```bash
+# One-shot convenience: the CLI wraps TEXT as one flushed segment
+opal say generate "Hello there." --incremental --play
+
+# A real conversation: stdin carries NDJSON lines
+printf '%s\n' \
+  '{"voice_id": "en-us-amy-low"}' \
+  '{"text": "First answer sentence. ", "flush": true}' \
+  '{"text": "Second sentence follows.", "flush": true}' \
+  '{"done": true}' \
+| opal say generate - --incremental -o - | aplay -r 16000 -f S16_LE -c 1 -t raw
+```
+
+| Line | Meaning |
+|---|---|
+| Line 1 (required) | Generation params — the `/generate` fields minus `text` |
+| `{"text": "..."}` | Text segment, concatenated in order; complete sentences are synthesized as they form |
+| `"flush": true` | Synthesize all buffered text now, even without a closing sentence boundary — set it on the last segment of an utterance |
+| `{"done": true}` or EOF | Input finished; a trailing partial sentence is flushed |
+
+When `TEXT` isn't `-`, the CLI emits params line + `{"text": TEXT, "flush": true}` + `{"done": true}`,
+so `--incremental` is a drop-in for `--stream` in scripts. `--stream` and `--incremental` are mutually
+exclusive, and `--format` isn't accepted (always PCM).
 
 ### Generation errors
 

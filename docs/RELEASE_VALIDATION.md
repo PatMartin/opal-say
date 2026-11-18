@@ -67,3 +67,34 @@ pytest -m "not piper and not kokoro"
 The `release-validation` workflow job is `workflow_dispatch`-only: it downloads
 the small public `en_US-amy-low` Piper voice and runs `-m piper` on demand.
 It never runs on push or pull requests.
+
+## OPAL Event handoff
+
+`opal-event`'s `say_request` plugin dispatches `say.request` events to a Say
+endpoint and verifies the WAV it gets back. Its smoke test runs two ways
+(from the `opal-event` checkout):
+
+```sh
+# Fake engine — no live service needed; runs in normal CI
+pytest tests/integration/test_event_say_smoke.py
+
+# Live — a real opal-say with a real engine; verifies event id, execution
+# receipt, terminal success, and a nonempty playable WAV
+OPAL_SAY_URL=http://127.0.0.1:8002 \
+OPAL_SAY_VOICE=en-us-amy-low OPAL_SAY_ENGINE=piper \
+pytest tests/integration/test_event_say_smoke.py
+```
+
+To stand up the live target (Windows `.venv` interpreter shown; use
+`.venv/bin/python` elsewhere):
+
+```powershell
+$env:OPAL_SAY_PORT = "8002"
+$env:OPAL_SAY_DATA_DIR = ".\var-live"
+.venv\Scripts\python -m opal_say          # serving on 127.0.0.1:8002
+```
+
+`GET /api/v1/health/ready` must return `200` (a working default speech path,
+not merely an installed engine) before the live smoke is meaningful — e.g.
+register the bundled `resources/piper/en_US-amy-low.onnx` voice, set the
+profile active, then run the test.

@@ -211,7 +211,8 @@ def test_rest_to_kokoro_end_to_end(tmp_path):
                                                        "voices_path": str(KOKORO_VOICES)}}})
     with TestClient(app) as c:
         resp = c.post("/api/v1/voice/", json={"voice_id": "k", "name": "K", "engine_id": "kokoro",
-                                                "engine_voice_ref": "am_adam"})
+                                                "engine_voice_ref": "am_adam"},
+                      headers={"If-Match": c.get("/api/v1/setting/").headers["etag"]})
         assert resp.status_code == 201 and resp.json()["native_sample_rate"] == 24000
         resp = c.post("/api/v1/generate", json={"text": "Hi.", "voice_id": "k", "output_format": "pcm",
                                                  "sample_rate": 16000, "engine_options": {"lang": "en-us"}})
