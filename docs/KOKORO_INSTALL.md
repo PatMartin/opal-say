@@ -103,8 +103,9 @@ opal say engine update kokoro --enable
 ```
 
 Both paths are **required** — the engine reports unavailable until they point at real files.
-If you edit the YAML files after the service has already started, apply them with
-`opal say backup import`; otherwise the persisted engine configuration continues to win.
+After first startup, use `engine update` to change the persisted options. For portable full replacement,
+save with `opal say config save --out snapshot.json`, edit and validate the snapshot, then apply it with
+`opal say config load --in snapshot.json`. Bootstrap YAML is not a live import interface.
 
 ## 4. Verify
 

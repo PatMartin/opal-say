@@ -23,22 +23,20 @@ OPERATIONS: dict[str, tuple[str, str]] = contract_operations()
 # retries once on 412.
 PRECONDITION_OPS = {
     "opal_engine_patch",
-    "opal_voice_create",
-    "opal_voice_patch",
-    "opal_voice_delete",
+    "create_voice",
+    "update_voice",
+    "remove_voice",
     "opal_profile_patch",
     "opal_profile_delete",
     "opal_setting_put",
     "opal_setting_delete",
-    "opal_setting_patch",
     # kernel 1.5.0: creates/activations/imports/restores are also preconditioned
     "opal_persona_create",
     "opal_persona_patch",
     "opal_persona_delete",
     "opal_profile_create",
     "opal_profile_activate",
-    "opal_backup_restore",
-    "opal_backup_import",
+    "opal_config_load",
 }
 
 
@@ -69,7 +67,9 @@ class ApiCallError(Exception):
 
 class ApiClient:
     def __init__(self, base_url: str, timeout: float = 120.0, http: httpx.Client | None = None):
-        self.http = http or httpx.Client(base_url=base_url.rstrip("/"), timeout=timeout)
+        token = os.environ.get("OPAL_SAY_TOKEN")
+        headers = {"Authorization": f"Bearer {token}"} if token else None
+        self.http = http or httpx.Client(base_url=base_url.rstrip("/"), timeout=timeout, headers=headers)
 
     @staticmethod
     def _request_args(op: str, path_params: dict[str, Any] | None) -> tuple[str, str]:
@@ -88,7 +88,9 @@ class ApiClient:
             raise ApiCallError(resp.status_code, body)
 
     def _config_etag(self) -> str:
-        return self.http.get("/api/v1/setting/").headers.get("ETag", "")
+        response = self.http.get("/api/v1/setting/")
+        self._raise_for(response)
+        return response.headers.get("ETag", "")
 
     def call(
         self,
@@ -96,12 +98,13 @@ class ApiClient:
         path_params: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
         json: Any = None,
+        if_match: str | None = None,
     ) -> httpx.Response:
         method, url = self._request_args(op, path_params)
         clean = {k: v for k, v in (params or {}).items() if v is not None}
-        headers = {"If-Match": self._config_etag()} if op in PRECONDITION_OPS else None
+        headers = {"If-Match": if_match if if_match is not None else self._config_etag()} if op in PRECONDITION_OPS else None
         resp = self.http.request(method, url, params=clean or None, json=json, headers=headers)
-        if resp.status_code == 412:  # stale revision: refresh the ETag and retry once
+        if resp.status_code == 412 and if_match is None:  # stale revision: refresh the ETag and retry once
             resp = self.http.request(
                 method, url, params=clean or None, json=json, headers={"If-Match": self._config_etag()}
             )

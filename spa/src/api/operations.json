@@ -11,35 +11,35 @@
     "method": "PATCH",
     "path": "/api/v1/engine/{engine_id}"
   },
-  "opal_engine_validate": {
+  "validate_engine": {
     "method": "POST",
     "path": "/api/v1/engine/{engine_id}/validate"
   },
-  "opal_voice_list": {
+  "list_voices": {
     "method": "GET",
     "path": "/api/v1/voice/"
   },
-  "opal_voice_create": {
+  "create_voice": {
     "method": "POST",
     "path": "/api/v1/voice/"
   },
-  "opal_voice_get": {
+  "show_voice": {
     "method": "GET",
     "path": "/api/v1/voice/{voice_id}"
   },
-  "opal_voice_patch": {
+  "update_voice": {
     "method": "PATCH",
     "path": "/api/v1/voice/{voice_id}"
   },
-  "opal_voice_delete": {
+  "remove_voice": {
     "method": "DELETE",
     "path": "/api/v1/voice/{voice_id}"
   },
-  "opal_voice_validate": {
+  "validate_voice": {
     "method": "POST",
     "path": "/api/v1/voice/{voice_id}/validate"
   },
-  "opal_voice_test": {
+  "test_voice": {
     "method": "POST",
     "path": "/api/v1/voice/{voice_id}/test"
   },
@@ -91,24 +91,20 @@
     "method": "DELETE",
     "path": "/api/v1/persona/{persona_id}"
   },
-  "opal_generate": {
+  "generate_speech": {
     "method": "POST",
     "path": "/api/v1/generate"
   },
-  "opal_generate_stream": {
+  "stream_speech": {
     "method": "POST",
     "path": "/api/v1/generate/stream"
   },
-  "opal_generate_stream_incremental": {
+  "stream_speech_incremental": {
     "method": "POST",
     "path": "/api/v1/generate/stream/incremental"
   },
   "opal_setting_list": {
     "method": "GET",
-    "path": "/api/v1/setting/"
-  },
-  "opal_setting_patch": {
-    "method": "PATCH",
     "path": "/api/v1/setting/"
   },
   "opal_setting_get": {
@@ -123,53 +119,21 @@
     "method": "DELETE",
     "path": "/api/v1/setting/{key}"
   },
+  "opal_config_save": {
+    "method": "POST",
+    "path": "/api/v1/config/save"
+  },
+  "opal_config_load": {
+    "method": "POST",
+    "path": "/api/v1/config/load"
+  },
+  "opal_config_validate": {
+    "method": "POST",
+    "path": "/api/v1/config/validate"
+  },
   "opal_health_get": {
     "method": "GET",
     "path": "/api/v1/health/"
-  },
-  "opal_backup_list": {
-    "method": "GET",
-    "path": "/api/v1/backup/list"
-  },
-  "opal_backup_create": {
-    "method": "POST",
-    "path": "/api/v1/backup/create"
-  },
-  "opal_backup_download": {
-    "method": "GET",
-    "path": "/api/v1/backup/download/{filename}"
-  },
-  "opal_backup_restore": {
-    "method": "POST",
-    "path": "/api/v1/backup/restore/{filename}"
-  },
-  "opal_backup_delete": {
-    "method": "DELETE",
-    "path": "/api/v1/backup/{filename}"
-  },
-  "opal_backup_export": {
-    "method": "GET",
-    "path": "/api/v1/backup/export"
-  },
-  "opal_backup_import": {
-    "method": "POST",
-    "path": "/api/v1/backup/import"
-  },
-  "opal_backup_validate": {
-    "method": "POST",
-    "path": "/api/v1/backup/validate"
-  },
-  "opal_backup_validate_stored": {
-    "method": "GET",
-    "path": "/api/v1/backup/validate"
-  },
-  "opal_info_get": {
-    "method": "GET",
-    "path": "/api/v1/info/"
-  },
-  "opal_info_ping": {
-    "method": "GET",
-    "path": "/api/v1/info/ping"
   },
   "opal_health_live_get": {
     "method": "GET",

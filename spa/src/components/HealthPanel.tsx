@@ -38,7 +38,7 @@ export function HealthPanel() {
               </tr>
             </thead>
             <tbody>
-              {h.engines.map((e) => (
+              {h.details.engines.map((e) => (
                 <tr key={e.engine_id}>
                   <td>{e.engine_id}</td>
                   <td>{e.enabled ? 'yes' : 'no'}</td>

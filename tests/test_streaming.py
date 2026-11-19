@@ -14,6 +14,7 @@ import pytest
 from contract_check import check_response
 
 from conftest import make_profile, make_voice
+from opal_say.schemas import GenerateStreamRequest
 
 SENTENCES = " ".join(f"This is sentence number {i}." for i in range(6))
 
@@ -191,9 +192,12 @@ def test_close_tolerates_engine_teardown_failure(client, voices, engines, app, m
 
     engine.synthesize = flaky
     rec = app.state.services.runtime._records["fake"]
-    with client.stream("POST", "/api/v1/generate/stream", json={"text": SENTENCES, "voice_id": "v1"}) as resp:
-        assert next(resp.iter_raw())
-    assert _wait_until(lambda: rec.refs == 0)
+    generation = app.state.services.generation
+    plan = generation.plan(GenerateStreamRequest(text=SENTENCES, voice_id="v1"))
+    stream = generation.pcm_stream(plan)
+    assert next(stream)
+    stream.close()
+    assert rec.refs == 0
     assert any(isinstance(e, RuntimeError) and "teardown" in str(e) for e in unraisable)
 
 

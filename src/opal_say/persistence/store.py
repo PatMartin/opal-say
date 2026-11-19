@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -32,16 +33,12 @@ CREATE TABLE IF NOT EXISTS voices (
     updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS profiles (
-    id INTEGER PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     description TEXT,
     is_active INTEGER NOT NULL,
-    voice_id TEXT NOT NULL,
-    speed REAL NOT NULL,
-    volume REAL NOT NULL,
-    output_format TEXT NOT NULL,
-    sample_rate INTEGER,
-    engine_options TEXT NOT NULL,
+    shared TEXT NOT NULL,
+    modules TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -49,13 +46,17 @@ CREATE TABLE IF NOT EXISTS personas (
     persona_id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    voice_id TEXT NOT NULL,
+    voice_id TEXT,
     enabled INTEGER NOT NULL,
     origin TEXT NOT NULL DEFAULT 'local',
     owner_etag TEXT,
     owner_checked_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS persona_cache (
+    persona_id TEXT PRIMARY KEY,
+    document TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY,
@@ -69,7 +70,7 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 """
 
-JSON_COLUMNS = {"options", "engine_options", "metadata"}
+JSON_COLUMNS = {"options", "engine_options", "metadata", "shared", "modules"}
 BOOL_COLUMNS = {"enabled", "is_active"}
 
 
@@ -105,12 +106,72 @@ class Store:
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._lock = threading.RLock()
         self._conn.executescript(SCHEMA)
+        try:
+            self._migrate_profiles()
+        except BaseException:
+            self._conn.close()
+            raise
         if "origin" not in {r[1] for r in self._conn.execute("PRAGMA table_info(personas)")}:
             self._conn.execute("ALTER TABLE personas ADD COLUMN origin TEXT NOT NULL DEFAULT 'local'")
         existing = {r[1] for r in self._conn.execute("PRAGMA table_info(personas)")}
         for col in ("owner_etag", "owner_checked_at"):
             if col not in existing:
                 self._conn.execute(f"ALTER TABLE personas ADD COLUMN {col} TEXT")
+        self._migrate_personas()
+
+    def _migrate_personas(self) -> None:
+        if not any(r[1] == "voice_id" and r[3] for r in self._conn.execute("PRAGMA table_info(personas)")):
+            return
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            self._conn.execute("CREATE TABLE personas_next (persona_id TEXT PRIMARY KEY, name TEXT NOT NULL, "
+                               "description TEXT, voice_id TEXT, enabled INTEGER NOT NULL, origin TEXT NOT NULL DEFAULT 'local', "
+                               "owner_etag TEXT, owner_checked_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
+            self._conn.execute("INSERT INTO personas_next SELECT persona_id, name, description, voice_id, enabled, origin, "
+                               "owner_etag, owner_checked_at, created_at, updated_at FROM personas")
+            self._conn.execute("DROP TABLE personas")
+            self._conn.execute("ALTER TABLE personas_next RENAME TO personas")
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._conn.execute("ROLLBACK")
+            self._conn.close()
+            raise
+
+    def list_owner_personas(self) -> list[dict[str, Any]]:
+        return [json.loads(row["document"]) for row in self._all("SELECT document FROM persona_cache ORDER BY persona_id")]
+
+    def get_owner_persona(self, persona_id: str) -> dict[str, Any] | None:
+        row = self._one("SELECT document FROM persona_cache WHERE persona_id = ?", (persona_id,))
+        return json.loads(row["document"]) if row else None
+
+    def cache_owner_persona(self, persona_id: str, document: dict[str, Any]) -> None:
+        with self._lock:
+            self._conn.execute("INSERT INTO persona_cache VALUES (?, ?) ON CONFLICT(persona_id) "
+                               "DO UPDATE SET document=excluded.document", (persona_id, json.dumps(document)))
+
+    def _migrate_profiles(self) -> None:
+        if "modules" in {r[1] for r in self._conn.execute("PRAGMA table_info(profiles)")}:
+            return
+        from opal_say.schemas import validate_profile_document
+
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            self._conn.execute("CREATE TABLE profiles_next (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, "
+                               "description TEXT, is_active INTEGER NOT NULL, shared TEXT NOT NULL, "
+                               "modules TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
+            for raw in self._conn.execute("SELECT * FROM profiles").fetchall():
+                old = _decode(raw)
+                own = {k: old[k] for k in ("voice_id", "speed", "volume", "output_format", "sample_rate", "engine_options")}
+                row = {k: old[k] for k in ("name", "description", "is_active", "created_at", "updated_at")}
+                row.update(id=str(old["id"]), shared={}, modules={"opal-say": own})
+                validate_profile_document(row, "OpalProfile")
+                self._insert(self._conn, "profiles_next", row)
+            self._conn.execute("DROP TABLE profiles")
+            self._conn.execute("ALTER TABLE profiles_next RENAME TO profiles")
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._conn.execute("ROLLBACK")
+            raise
 
     def close(self) -> None:
         self._conn.close()
@@ -223,7 +284,7 @@ class Store:
     def list_profiles(self) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM profiles ORDER BY id")
 
-    def get_profile(self, profile_id: int) -> dict[str, Any] | None:
+    def get_profile(self, profile_id: str) -> dict[str, Any] | None:
         return self._one("SELECT * FROM profiles WHERE id = ?", (profile_id,))
 
     def get_profile_by_name(self, name: str) -> dict[str, Any] | None:
@@ -233,21 +294,23 @@ class Store:
         return self._one("SELECT * FROM profiles WHERE is_active = 1 ORDER BY id LIMIT 1")
 
     def profiles_using_voice(self, voice_id: str) -> list[dict[str, Any]]:
-        return self._all("SELECT * FROM profiles WHERE voice_id = ? ORDER BY id", (voice_id,))
+        return [p for p in self.list_profiles() if p["modules"].get("opal-say", {}).get("voice_id") == voice_id]
 
-    def insert_profile(self, values: dict[str, Any]) -> int:
+    def insert_profile(self, values: dict[str, Any]) -> str:
+        values = {**values, "id": values.get("id") or uuid.uuid4().hex}
         with self.transaction() as conn:
             if values.get("is_active"):
                 conn.execute("UPDATE profiles SET is_active = 0")
-            return self._insert(conn, "profiles", values)
+            self._insert(conn, "profiles", values)
+        return values["id"]
 
-    def update_profile(self, profile_id: int, values: dict[str, Any]) -> None:
+    def update_profile(self, profile_id: str, values: dict[str, Any]) -> None:
         with self.transaction() as conn:
             if values.get("is_active"):
                 conn.execute("UPDATE profiles SET is_active = 0 WHERE id != ?", (profile_id,))
             self._update(conn, "profiles", "id", profile_id, values)
 
-    def delete_profile(self, profile_id: int) -> None:
+    def delete_profile(self, profile_id: str) -> None:
         with self.transaction() as conn:
             conn.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
 

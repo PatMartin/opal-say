@@ -116,14 +116,14 @@ class PersonaCreate(_Request):
     persona_id: str = Field(min_length=1, max_length=200, pattern=VOICE_ID_PATTERN)
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=1000)
-    voice_id: str = Field(min_length=1)
+    voice_id: str | None = Field(default=None, min_length=1)
     enabled: bool = True
 
 
 class PersonaUpdate(_Patch):
     name: NonNull[str] = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=1000)
-    voice_id: NonNull[str] = Field(default=None, min_length=1)
+    voice_id: str | None = Field(default=None, min_length=1)
     enabled: NonNull[bool] = None
 
 
@@ -131,8 +131,9 @@ class PersonaRead(BaseModel):
     persona_id: str
     name: str
     description: str | None = None
-    voice_id: str
+    voice_id: str | None = None
     enabled: bool
+    origin: Literal["local", "owner"] = "local"
     created_at: str
     updated_at: str
 
@@ -140,41 +141,53 @@ class PersonaRead(BaseModel):
 # -- profiles ------------------------------------------------------------------
 
 
+def validate_profile_document(value: Any, schema: str) -> Any:
+    from jsonschema import Draft202012Validator
+
+    from opal_say.contract import load_contract
+
+    validator = Draft202012Validator({"$ref": f"#/components/schemas/{schema}",
+                                      "components": load_contract()["components"]})
+    error = next(validator.iter_errors(value), None)
+    if error is not None:
+        raise ValueError(f"{'.'.join(map(str, error.absolute_path))}: {error.message}")
+    return value
+
+
 class ProfileCreate(_Request):
+    id: str | None = None
     name: str = Field(min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=1000)
     is_active: bool = False
-    voice_id: str = Field(min_length=1)
-    speed: Speed = 1.0
-    volume: Volume = 1.0
-    output_format: AudioFormat = "wav"
-    sample_rate: SampleRate | None = None
-    engine_options: EngineOptions = Field(default_factory=dict)
+    shared: dict[str, Any] = Field(default_factory=dict)
+    modules: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _namespace(cls, value):
+        return validate_profile_document(value, "OpalProfileCreate")
 
 
 class ProfileUpdate(_Patch):
     name: NonNull[str] = Field(default=None, min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=1000)
     is_active: NonNull[bool] = None
-    voice_id: NonNull[str] = Field(default=None, min_length=1)
-    speed: NonNull[Speed] = None
-    volume: NonNull[Volume] = None
-    output_format: NonNull[AudioFormat] = None
-    sample_rate: SampleRate | None = None
-    engine_options: NonNull[EngineOptions] = None
+    shared: NonNull[dict[str, Any]] = None
+    modules: NonNull[dict[str, Any]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _namespace(cls, value):
+        return validate_profile_document(value, "OpalProfilePatch")
 
 
-class ProfileRead(BaseModel):
-    id: int
+class ProfileRead(_Request):
+    id: str
     name: str
     description: str | None = None
     is_active: bool
-    voice_id: str
-    speed: float
-    volume: float
-    output_format: AudioFormat
-    sample_rate: int | None = None
-    engine_options: EngineOptions
+    shared: dict[str, Any]
+    modules: dict[str, Any]
     created_at: str
     updated_at: str
 
@@ -185,8 +198,16 @@ class ProfileRead(BaseModel):
 class GenerationParams(_Request):
     """Voice/engine/tuning fields shared by one-shot and incremental generation."""
 
-    profile_id: Annotated[int, Field(ge=1)] | None = None
+    profile_id: Annotated[str, Field(min_length=1)] | None = None
+    persona_id: Annotated[str, Field(min_length=1, max_length=200, pattern=VOICE_ID_PATTERN)] | None = None
     persona: Annotated[str, Field(min_length=1, max_length=200, pattern=VOICE_ID_PATTERN)] | None = None
+
+    @model_validator(mode="after")
+    def _persona_alias(self):
+        if self.persona_id is not None and self.persona is not None and self.persona_id != self.persona:
+            raise ValueError("persona_id and persona must agree when both are supplied")
+        self.persona = self.persona_id if self.persona_id is not None else self.persona
+        return self
     voice_id: Annotated[str, Field(min_length=1)] | None = None
     engine_id: Annotated[str, Field(min_length=1)] | None = None
     speed: Speed | None = None
@@ -237,10 +258,18 @@ class ServiceLogTail(BaseModel):
 
 
 class SettingRead(BaseModel):
-    id: int
+    id: int | None = None
     key: str
     value: Any
-    updated_at: str
+    configured_value: Any
+    default: Any
+    has_override: bool
+    is_default: bool
+    source: Literal["default", "persisted", "dotenv", "environment"]
+    restart_required: bool
+    pending_restart: bool
+    warnings: list[dict[str, Any]] = Field(default_factory=list)
+    updated_at: str | None = None
 
 
 class SettingUpdate(_Request):
@@ -269,10 +298,13 @@ class EngineHealthRead(BaseModel):
 
 
 class HealthRead(BaseModel):
+    name: str
+    api_version: str
     status: Literal["ok", "degraded", "error"]
     version: str
-    active_profile_id: int | None = None
-    engines: list[EngineHealthRead]
+    live: bool
+    ready: bool
+    active_profile_id: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -285,6 +317,14 @@ class BackupRead(BaseModel):
 class BackupCreateResponse(BaseModel):
     filename: str
     message: str
+
+
+class ConfigSaveRequest(_Request):
+    destination: Literal["managed", "response"] = "managed"
+
+
+class ConfigSnapshotRequest(_Request):
+    snapshot: NonNull[dict[str, Any]] = None
 
 
 class ConfigExport(BaseModel):

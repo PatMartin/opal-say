@@ -16,7 +16,7 @@ from opal_say.service.errors import InvalidRequest, PreconditionFailed, Precondi
 
 T = TypeVar("T")
 
-_ETAG = re.compile(r'"?r(\d+)"?')
+_ETAG = re.compile(r'"[^"\s]+"')
 
 
 def config_etag(store: Store) -> str:
@@ -40,7 +40,7 @@ def mutate_with_revision(store: Store, if_match: str | None, fn: Callable[[], T]
             input_=if_match,
         )
     with store.write_lock():
-        current = store.config_revision()
+        current = config_etag(store)
         if expected != current:
             raise PreconditionFailed(
                 f"If-Match {if_match!r} does not match current configuration revision {config_etag(store)}"
@@ -48,6 +48,5 @@ def mutate_with_revision(store: Store, if_match: str | None, fn: Callable[[], T]
         return fn()
 
 
-def _revision(tag: str) -> int | None:
-    m = _ETAG.fullmatch(tag.strip())
-    return int(m.group(1)) if m else None
+def _revision(tag: str) -> str | None:
+    return tag if _ETAG.fullmatch(tag) else None

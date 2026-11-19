@@ -21,9 +21,9 @@ const EMPTY: ProfileForm = {
 
 export function ProfilePanel() {
   const profile = useLoad(() => call<Profile[]>('opal_profile_list'), [])
-  const voices = useLoad(() => call<Voice[]>('opal_voice_list'), [])
+  const voices = useLoad(() => call<Voice[]>('list_voices'), [])
   const [form, setForm] = useState<ProfileForm>(EMPTY)
-  const [editing, setEditing] = useState<number | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
   const [selected, setSelected] = useState<Profile | null>(null)
   const action = useAction()
   const set = (patch: Partial<ProfileForm>) => setForm((f) => ({ ...f, ...patch }))
@@ -31,16 +31,17 @@ export function ProfilePanel() {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     void action.run(async () => {
-      const body = {
-        name: form.name,
-        description: form.description || null,
-        voice_id: form.voice_id,
+      const own = {
+        ...(form.voice_id ? { voice_id: form.voice_id } : editing ? { voice_id: null } : {}),
         speed: Number(form.speed),
         volume: Number(form.volume),
         output_format: form.output_format,
         sample_rate: form.sample_rate ? Number(form.sample_rate) : null,
-        is_active: form.is_active,
         engine_options: parseOptions(form.options) ?? {},
+      }
+      const body = {
+        name: form.name, description: form.description || null,
+        is_active: form.is_active, modules: { 'opal-say': own },
       }
       if (editing !== null) {
         await call('opal_profile_patch', { path: { profile_id: editing }, body })
@@ -55,29 +56,30 @@ export function ProfilePanel() {
 
   const edit = (p: Profile) => {
     setEditing(p.id)
+    const own = p.modules['opal-say'] ?? {}
     setForm({
       name: p.name,
       description: p.description ?? '',
-      voice_id: p.voice_id,
-      speed: String(p.speed),
-      volume: String(p.volume),
-      output_format: p.output_format,
-      sample_rate: p.sample_rate ? String(p.sample_rate) : '',
+      voice_id: own.voice_id ?? '',
+      speed: String(own.speed ?? 1),
+      volume: String(own.volume ?? 1),
+      output_format: own.output_format ?? 'wav',
+      sample_rate: own.sample_rate ? String(own.sample_rate) : '',
       is_active: p.is_active,
-      options: Object.keys(p.engine_options).length ? JSON.stringify(p.engine_options) : '',
+      options: Object.keys(own.engine_options ?? {}).length ? JSON.stringify(own.engine_options) : '',
     })
   }
 
-  const show = (id: number) =>
+  const show = (id: string) =>
     action.run(async () => setSelected(await call<Profile>('opal_profile_get', { path: { profile_id: id } })))
 
-  const activate = (id: number) =>
+  const activate = (id: string) =>
     action.run(async () => {
       await call('opal_profile_activate', { path: { profile_id: id } })
       await profile.reload()
     })
 
-  const remove = (id: number) =>
+  const remove = (id: string) =>
     action.run(async () => {
       await call('opal_profile_delete', { path: { profile_id: id } })
       await profile.reload()
@@ -107,11 +109,11 @@ export function ProfilePanel() {
               <td>{p.id}</td>
               <td>{p.name}</td>
               <td>{p.is_active ? '●' : ''}</td>
-              <td>{p.voice_id}</td>
-              <td>{p.speed}</td>
-              <td>{p.volume}</td>
-              <td>{p.output_format}</td>
-              <td>{p.sample_rate ?? 'native'}</td>
+              <td>{p.modules['opal-say']?.voice_id ?? 'inherit'}</td>
+              <td>{p.modules['opal-say']?.speed ?? 'inherit'}</td>
+              <td>{p.modules['opal-say']?.volume ?? 'inherit'}</td>
+              <td>{p.modules['opal-say']?.output_format ?? 'inherit'}</td>
+              <td>{p.modules['opal-say']?.sample_rate ?? 'native'}</td>
               <td className="actions">
                 <button onClick={() => void show(p.id)}>Details</button>
                 <button onClick={() => edit(p)}>Edit</button>
@@ -133,7 +135,7 @@ export function ProfilePanel() {
         </label>
         <label>
           Voice
-          <select required value={form.voice_id} onChange={(e) => set({ voice_id: e.target.value })}>
+          <select value={form.voice_id} onChange={(e) => set({ voice_id: e.target.value })}>
             <option value="">choose…</option>
             {voices.data.map((v) => (
               <option key={v.voice_id} value={v.voice_id}>

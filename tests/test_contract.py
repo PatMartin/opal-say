@@ -199,8 +199,8 @@ def recording(app):
 
 def test_walkthrough_exercises_every_operation_with_conformant_responses(recording, config):
     c = recording
-    assert c.get("/api/v1/info/").json()["name"] == "opal-say-svc"
-    assert c.get("/api/v1/info/ping").json() == {"status": "ok"}
+    assert c.get("/api/v1/health/").json()["name"] == "opal-say-svc"
+    assert c.get("/api/v1/health/live").json()["status"] == "ok"
     assert c.get("/api/v1/health/").status_code == 200
 
     assert c.get("/api/v1/engine/").status_code == 200
@@ -225,7 +225,7 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     p2 = make_profile(c, "p2", "v2")
     assert c.get("/api/v1/profile/").status_code == 200
     assert c.get(f"/api/v1/profile/{p1['id']}").status_code == 200
-    assert c.patch(f"/api/v1/profile/{p2['id']}", json={"speed": 1.5}).status_code == 200
+    assert c.patch(f"/api/v1/profile/{p2['id']}", json={"modules": {"opal-say": {"speed": 1.5}}}).status_code == 200
     assert c.post(f"/api/v1/profile/{p2['id']}/activate").status_code == 200
     assert c.delete(f"/api/v1/profile/{p1['id']}").status_code == 204
 
@@ -251,12 +251,10 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
         headers={"content-type": "application/x-ndjson"},
     ).status_code == 200
 
-    assert c.put("/api/v1/setting/greeting", json={"value": "hi"}).status_code == 200
-    assert c.get("/api/v1/setting/").json() == {"greeting": "hi"}
-    assert c.get("/api/v1/setting/greeting").status_code == 200
-    assert c.patch("/api/v1/setting/", json={"greeting": None, "other": "x"}).status_code == 200
-    assert c.get("/api/v1/setting/").json() == {"other": "x"}
-    assert c.delete("/api/v1/setting/other").status_code == 204
+    assert c.put("/api/v1/setting/default_speed", json={"value": 1.25}).status_code == 200
+    assert c.get("/api/v1/setting/").json()["default_speed"] == 1.25
+    assert c.get("/api/v1/setting/default_speed").status_code == 200
+    assert c.delete("/api/v1/setting/default_speed").status_code == 204
 
     assert c.get("/api/v1/health/live").json() == {"status": "ok", "ready": True}
     assert c.get("/api/v1/health/ready").json()["ready"] is True
@@ -265,21 +263,12 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.get("/api/v1/service/log", params={"lines": 1}).json()["lines"] == ["ready"]
     assert c.post("/api/v1/service/stop").json()["state"] == "stopped"
 
-    created = c.post("/api/v1/backup/create")
-    assert created.status_code == 201
-    filename = created.json()["filename"]
-    assert created.headers["location"] == f"/api/v1/backup/download/{filename}"
-    assert c.get("/api/v1/backup/list").status_code == 200
-    assert c.get(f"/api/v1/backup/download/{filename}").status_code == 200
-    assert c.post(f"/api/v1/backup/restore/{filename}").status_code == 200
-    assert c.get("/api/v1/backup/export").status_code == 200
-    assert c.get("/api/v1/backup/validate").status_code == 200
-    payload = c.get("/api/v1/backup/export").json()
-    assert c.post("/api/v1/backup/validate", json=payload).status_code == 200
-    config.config_dir.mkdir(parents=True, exist_ok=True)
-    (config.config_dir / "settings.yaml").write_text("version: 1\nsettings:\n  chunk_max_chars: 300\n")
-    assert c.post("/api/v1/backup/import").json()["success"] is True
-    assert c.delete(f"/api/v1/backup/{filename}").status_code == 204
+    saved = c.post("/api/v1/config/save")
+    assert saved.status_code == 200 and saved.json()["managed"] is True
+    payload = saved.json()["snapshot"]
+    assert c.post("/api/v1/config/validate", json={"snapshot": payload}).json()["valid"] is True
+    assert c.post("/api/v1/config/load", json={"snapshot": payload}).json()["applied"] is True
+    assert c.post("/api/v1/config/load").status_code == 200
 
     assert c.delete("/api/v1/voice/v1").status_code == 204
 

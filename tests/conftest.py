@@ -115,8 +115,7 @@ def _needs_if_match(method: str, url: str) -> bool:
             url == "/api/v1/voice/"
             or url == "/api/v1/persona/"
             or url == "/api/v1/profile/"
-            or url == "/api/v1/backup/import"
-            or url.startswith("/api/v1/backup/restore/")
+            or url == "/api/v1/config/load"
             or (url.startswith("/api/v1/profile/") and url.endswith("/activate"))
         )
     return False
@@ -236,6 +235,10 @@ def make_voice(client: TestClient, voice_id: str = "v1", engine_id: str = "fake"
 
 
 def make_profile(client: TestClient, name: str = "p1", voice_id: str = "v1", **extra) -> dict:
-    resp = client.post("/api/v1/profile/", json={"name": name, "voice_id": voice_id, **extra})
+    own = {"voice_id": voice_id}
+    for key in ("speed", "volume", "output_format", "sample_rate", "engine_options"):
+        if key in extra:
+            own[key] = extra.pop(key)
+    resp = client.post("/api/v1/profile/", json={"name": name, "modules": {"opal-say": own}, **extra})
     assert resp.status_code == 201, resp.text
     return resp.json()

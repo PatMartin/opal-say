@@ -14,7 +14,7 @@ SPA = Path(__file__).resolve().parents[1] / "spa"
 
 
 def test_every_operation_has_a_cli_command_that_exists():
-    assert set(COMMANDS) == set(contract_operations())
+    assert set(COMMANDS) == set(contract_operations()) - {"opal_health_live_get", "opal_health_ready_get"}
     root = typer.main.get_command(app)
     say = root.commands["say"]  # type: ignore[attr-defined]
     for op_id, command in COMMANDS.items():

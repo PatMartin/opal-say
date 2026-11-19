@@ -7,6 +7,7 @@ and only then applied in one transaction.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -161,10 +162,13 @@ class CandidateService:
             if profile["name"] in names:
                 report.errors.append(Issue("duplicate_profile", f"profile name '{profile['name']}' is duplicated", field))
             names.add(profile["name"])
-            voice = voice_by_id.get(profile["voice_id"])
+            own = profile.get("modules", {}).get("opal-say", {})
+            if not own.get("voice_id"):
+                continue
+            voice = voice_by_id.get(own["voice_id"])
             if voice is None:
                 report.errors.append(
-                    Issue("voice_not_found", f"profile '{profile['name']}' references unknown voice '{profile['voice_id']}'",
+                    Issue("voice_not_found", f"profile '{profile['name']}' references unknown voice '{own['voice_id']}'",
                           f"{field}.voice_id")
                 )
                 continue
@@ -173,7 +177,7 @@ class CandidateService:
                                              f"{field}.voice_id"))
             engine = self.engines.runtime.get(voice["engine_id"])
             if engine is not None:
-                for issue in engine.validate_options(profile.get("engine_options") or {}, "generation"):
+                for issue in engine.validate_options(own.get("engine_options") or {}, "generation"):
                     report.errors.append(Issue(issue.code, issue.message, f"{field}.engine_options.{issue.field}"))
 
         settings = cand.settings if cand.settings is not None else {
@@ -225,11 +229,10 @@ class CandidateService:
         profiles = None
         if cand.profiles is not None:
             profiles = []
-            fields = ("name", "description", "is_active", "voice_id", "speed", "volume", "output_format",
-                      "sample_rate", "engine_options")
-            for index, p in enumerate(cand.profiles, start=1):
+            fields = ("name", "description", "is_active", "shared", "modules")
+            for p in cand.profiles:
                 row = {k: p.get(k) for k in fields}
-                row["id"] = p.get("id") or index
+                row["id"] = p.get("id") or uuid.uuid4().hex
                 for stamp in ("created_at", "updated_at"):
                     if p.get(stamp):
                         row[stamp] = p[stamp]

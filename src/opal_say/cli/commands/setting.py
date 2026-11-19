@@ -28,12 +28,13 @@ def _list(ctx: typer.Context) -> None:
     _emit(ctx, _call(ctx, "opal_setting_list").json())
 
 
-def _show(ctx: typer.Context, key: str) -> None:
+def _show(ctx: typer.Context, key: str = typer.Option(..., "--name")) -> None:
     """Show one setting."""
     _emit(ctx, _call(ctx, "opal_setting_get", path_params={"key": key}).json())
 
 
-def _set(ctx: typer.Context, key: str, value: str) -> None:
+def _set(ctx: typer.Context, key: str = typer.Option(..., "--name"),
+         value: str = typer.Option(..., "--value")) -> None:
     """Create or replace a setting. The value is sent as native JSON when it
     parses as such (`5`, `true`, `{"a": 1}`); otherwise it is sent as a string."""
     try:
@@ -51,7 +52,7 @@ def _update(ctx: typer.Context, payload: str = typer.Option(
     _emit(ctx, _call(ctx, "opal_setting_patch", json=json.loads(payload)).json())
 
 
-def _remove(ctx: typer.Context, key: str) -> None:
+def _remove(ctx: typer.Context, key: str = typer.Option(..., "--name")) -> None:
     """Delete a setting so the default applies."""
     _call(ctx, "opal_setting_delete", path_params={"key": key})
     typer.echo(f"setting '{key}' deleted")
@@ -61,8 +62,7 @@ def _remove(ctx: typer.Context, key: str) -> None:
 config_setting_app.command("list")(_list)
 config_setting_app.command("show")(_show)
 config_setting_app.command("set")(_set)
-config_setting_app.command("update")(_update)
-config_setting_app.command("patch", hidden=True)(_update)  # declared alias of `update`
+# declared alias of `update`
 config_setting_app.command("remove")(_remove)
 config_app.add_typer(config_setting_app, name="setting")
 
@@ -73,4 +73,3 @@ setting_app.command("delete")(_remove)
 
 def register(say_app: typer.Typer) -> None:
     say_app.add_typer(config_app, name="config")
-    say_app.add_typer(setting_app, name="setting")

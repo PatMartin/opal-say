@@ -114,6 +114,7 @@ def test_launch_env_and_log_mode(mgr, monkeypatch):
 
 
 def test_launch_propagates_config_source(tmp_path, monkeypatch):
+    monkeypatch.delenv("OPAL_SAY_PORT", raising=False)
     cfg_file = tmp_path / "svc.yaml"
     cfg_file.write_text("service:\n  port: 8123\n")
     config = load_config(cfg_file)

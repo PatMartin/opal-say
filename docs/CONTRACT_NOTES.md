@@ -1,118 +1,47 @@
 # OPAL Say contract notes
 
-Authoritative contract: `openapi/opal_say_v1.7.1.yaml` together with the shared
-OPAL kernel `openapi/shared/opal_kernel.yaml`.
+The pinned source is `openapi/opal_say_v0.1.0.yaml` and its external reference tree, including `openapi/shared/opal_kernel.yaml`. These sources are read-only migration inputs. Contract version **0.1.0** does not change the declared **`/api/v1`** prefix.
 
-## v1.7.1 surface conventions
-
-- **`service` lifecycle.** `/api/v1/service/start|stop|log` mount the kernel
-  `service_start`/`service_stop`/`service_log` pathItems. "The service's server
-  process" is the pidfile-tracked detached child (`logs/opal_say.pid`,
-  `logs/opal_say.log`) managed by `ServiceProcessManager`. `start` spawns
-  `python -m opal_say` detached (log truncated unless `append`), replacing a
-  running managed instance; when the managed pid is the serving process itself,
-  termination is deferred to a BackgroundTask so the `200` lands first and the
-  replacement child waits on `OPAL_SAY_WAIT_FOR_PID` before binding. A short
-  post-spawn poll turns immediate child death (e.g. port held by an unmanaged
-  foreground server) into `500 operation_failed` rather than a phantom `running`.
-- **`x-opal-cli` bindings.** Setting ops get canonical spellings under a
-  `config` parent: `config setting list|show|set|update|remove`, with
-  `config setting patch`, `setting get` and `setting delete` as declared
-  aliases. Service ops bind `service start|stop|log`; the CLI calls REST first
-  and falls back to local bookkeeping when the API is unreachable (cold start).
-- **`PersonaRead.origin` dropped.** Persona stays flat; `origin` survives only
-  as an internal store column driving owner-vs-local conflict resolution.
-- Cosmetic only for us: `persona` now refs kernel `OpalPersonaRef` (same string
-  shape), `GenerateRequest`/`GenerateStreamRequest` compose `GenerateRequestBase`
-  (`unevaluatedProperties: false` ≡ our `extra="forbid"`), and the suite
-  pagination note switched to bounded arrays (Say has no history endpoints).
-
-## Kernel split
-
-The root contract defines the Say-specific operations inline (voice CRUD,
-voice validate/test, engine validate, persona CRUD/validate, generate/stream)
-and pulls the suite-standard routes — engine, profile, setting, health, backup,
-and the `info` namespace (`info`, `info_ping` pathItems plus shared
-`ServiceInfo`/`LivenessRead` schemas) — in from the kernel via external `$ref`
-pathItems. The kernel is a superset shared across OPAL services; pathItems a
-service does not implement are simply not referenced.
-
-`src/opal_say/contract/opal_say.yaml` is the packaged, self-contained bundle
-produced by:
+## Publication and parity
 
 ```bash
 python tools/bundle_contract.py
+python tools/bundle_contract.py --check
+npm --prefix spa run gen-ops
 ```
 
-`tests/test_contract.py` asserts the packaged file equals a fresh bundle of the
-`openapi/` sources, so regenerate it whenever the root contract or kernel
-changes.
+`src/opal_say/contract/opal_say.yaml` is the generated self-contained bundle, including transitively referenced kernel components. The application serves that document at `/openapi.json`; it does not substitute FastAPI-generated schemas. `tests/test_contract.py` checks source/bundle/served equality, exact route/operation parity, and a response-schema-checked walkthrough of all **39 operations**. The SPA derives its operation map from the same bundle. CLI operation IDs bind to contract-derived paths.
 
-## Optimistic concurrency (If-Match)
+The CLI covers 37 operations. Kernel liveness/readiness probes explicitly have no CLI binding; humans use `info health` instead. The target defines no old flat settings command aliases. The deprecated generation field `persona` remains supported as an alias of canonical `persona_id`.
 
-Mutable configuration writes require a strong `If-Match` header carrying the
-current ETag of the complete logical configuration (`"r<N>"`, where `N` is the
-SQLite `config_revision`). Any configuration mutation bumps the revision, so a
-tag goes stale after any write anywhere in the config.
+## Shared transport
 
-- Missing `If-Match` → `428 precondition_required`
-- Stale value → `412 precondition_failed`
-- Malformed (weak tag, `*`, list, unquoted) → `422`
+All errors use the kernel `OpalError` envelope. Transaction and request IDs are generated when absent; session and causation are propagated only when supplied. The four OPAL context headers accept printable ASCII tokens of 1–128 characters. Downstream owner requests propagate transaction/session context, create a new request ID and use the parent request ID as causation.
 
-Reads of configuration resources return the current `ETag` header; the CLI
-client fetches it automatically for the preconditioned operations listed in
-`opal_say.cli.client.PRECONDITION_OPS` and retries once on `412`.
+Configuration revisions are strong whole-configuration ETags of the form `"r<N>"`. Configuration writes compare `If-Match` and apply the mutation under the same store write lock. Missing headers return 428, well-formed stale tags 412, and malformed/weak/list/wildcard tags 422. Successful configuration responses expose the current/resulting ETag; CORS exposes it and the OPAL headers.
 
-## Personas
+Authorization is explicitly configurable. `service.token_env` and `service.admin_token_env` name environment variables, never embedded secrets. Either credential may read; only the administrator may mutate configuration or control the service. Authentication may be disabled only on loopback. The CLI obtains a bearer credential from `OPAL_SAY_TOKEN`; the SPA keeps entered credentials in memory only.
 
-`/api/v1/persona/` is a Say-local catalog of named persona — a `persona_id`,
-display name, and a bound registered `voice_id` (kept deliberately flat; the
-shape is designed so a future cross-service persona authority can serve the
-same identifiers). Generation requests accept `persona` on both
-`/api/v1/generate` and `/api/v1/generate/stream`:
+## Profiles, personas and stored data
 
-- the persona supplies a voice default: explicit `voice_id` > persona voice >
-  profile voice > service defaults;
-- unknown or disabled persona → `422`;
-- persona create/update/delete carry the same If-Match preconditions as other
-  configuration mutations; a persona's bound `voice_id` must resolve at write
-  time (`404` otherwise), and a voice cannot be deleted while persona
-  reference it (`409 voice_in_use`).
+Profiles have opaque string IDs and closed top-level `shared`/`modules` documents. Say defaults live in `modules.opal-say`; foreign compartments round-trip without interpretation. Updates are restricted to Say-owned fields, with field-level null removal except `sample_rate: null`, which remains a valid stored value. Setting `is_active: false` does not deselect the active profile.
 
-## v1.7.1 surface conventions
+SQLite upgrades preserve old numeric IDs as strings, move flat synthesis defaults into the Say compartment, and permit nullable persona voice bindings. The upgrade is transactional and retryable; fixture tests reopen the migrated database and inject a failed upgrade.
 
-- **Singular resources.** Collection paths are singular — `/api/v1/voice/`,
-  `/api/v1/engine/`, `/api/v1/profile/`, `/api/v1/setting/`, `/api/v1/persona/`
-  — mounted onto the same kernel pathItems the other OPAL services share.
-- **`info` namespace.** Service identity lives under `/api/v1/info/`
-  (`opal_info_get`) with a liveness probe at `/api/v1/info/ping`
-  (`opal_info_ping`); kernel `/api/v1/health/*` remains the readiness surface.
-- **operationId convention.** `opal_{resource}_{verb}` throughout: collection
-  ops use `{resource}_list`, item ops `{resource}_{get|patch|delete|verb}`
-  (`opal_voice_list`, `opal_voice_get`, `opal_profile_activate`,
-  `opal_setting_list`). Say-local ops that previously carried generated
-  FastAPI-style ids (`list_voice_api_v1_voice__get`) were renamed to match.
-- **`persona validate`** (`opal_persona_validate`): reports whether a persona
-  resolves — registered + enabled, bound voice present and valid against its
-  engine. Response is the kernel `OpalValidationReport`.
-- **`voice list ?language=`**: optional prefix filter on stored language codes
-  (case-insensitive; `en` matches all English locales, `en_US` only US).
+Personas may be unbound. `origin` is an optional public provenance field. With an owner configured, a same-ID owner definition takes precedence while the local record is retained; cache records are separate from local desired configuration. Conditional owner refresh uses its ETag. Generation supports both persona selector spellings on all three audio operations, rejects conflicting selectors, and preserves standalone/offline behavior.
 
-## Pending upstream proposal: incremental generation (v1.7.2 candidate)
+## Desired configuration snapshots
 
-Locally amended in `openapi/opal_say_v1.7.1.yaml` ahead of an upstream
-submission — flagged here until accepted into the shared contract:
+`POST /config/save`, `/config/load`, and `/config/validate` replace the backup/archive/import/export/restore surface. Snapshots use format version `1.0.0`, module `opal-say`, native JSON setting overrides and the declared `profiles`, `personas`, `voices`, and `engines` collections. They exclude credentials, model/media binaries, generated history and runtime caches.
 
-- `POST /api/v1/generate/stream/incremental` (`opal_generate_stream_incremental`)
-  accepts `application/x-ndjson`. Line 1 carries the `GenerateStreamRequest`
-  parameters minus `text`; later lines carry `{"text": "..."}` segments (with an
-  optional `"flush": true` to synthesize buffered text immediately), a
-  standalone `{"flush": true}` line, and `{"done": true}` or request-body EOF to
-  finish. The response is the same headerless s16le PCM stream as
-  `/api/v1/generate/stream`.
-- Compatibility: additive operation only — no existing operation, schema, or
-  error envelope changed. Clients that never call it are unaffected.
-- Client responsibilities agreed for the protocol: send a params line first,
-  keep records within the line and total-text limits, set `flush` on the last
-  segment of an utterance, treat a truncated PCM stream as failed generation,
-  and close the connection to cancel.
+Save defaults to the managed location; `destination: response` leaves it untouched. Save never mutates live configuration or its revision. Managed replacement uses an atomic rename. Validate without a candidate checks live configuration, not the managed snapshot, and is side-effect-free. Load is a complete atomic replacement, not a merge, requires `If-Match`, advances the revision once and does not overwrite the managed snapshot. Database/runtime preparation failures roll back. CLI `--out`/`--in` files are client-side JSON/YAML; the SPA accepts JSON candidates.
+
+## Clean cutover
+
+The retired `/info/*` and `/backup/*` routes are absent, as is collection settings PATCH. Settings now expose registered typed effective/default/configured values and provenance; DELETE is an idempotent override reset. Identity and diagnostics come from aggregate health, with engine details nested under `details`.
+
+Voice operation IDs are `list_voices`, `create_voice`, `show_voice`, `update_voice`, `remove_voice`, `validate_voice`, and `test_voice`; engine validation is `validate_engine`. Speech operation IDs are `generate_speech`, `stream_speech`, and `stream_speech_incremental`. Incremental NDJSON is part of the pinned target, not a local pending proposal.
+
+Two source-prose inconsistencies remain upstream and were not edited: the service suite-version label differs from the kernel label, and persona CLI prose says record revision while the shared `IfMatch` definition requires the complete logical configuration revision. The concrete schemas/operation semantics and shared whole-configuration precondition govern this implementation.
+
+For current commands and examples, see [CLI reference](CLI.md), [user guide](USER_GUIDE.md), and the served contract.

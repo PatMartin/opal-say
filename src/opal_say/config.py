@@ -21,6 +21,9 @@ class ServiceConfig:
     log_level: str = "info"
     persona_owner_url: str | None = None
     persona_owner_token_env: str = "OPAL_SAY_PERSONA_OWNER_TOKEN"
+    auth_enabled: bool = False
+    token_env: str = "OPAL_SAY_TOKEN"
+    admin_token_env: str = "OPAL_SAY_ADMIN_TOKEN"
     cors_origins: list[str] = field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
@@ -59,6 +62,13 @@ def load_config(path: Path | str | None = None, *, apply_env: bool = True) -> Se
             setattr(cfg, key, str(raw[key]))
     if "port" in raw:
         cfg.port = int(raw["port"])
+    if "auth_enabled" in raw:
+        if not isinstance(raw["auth_enabled"], bool):
+            raise ValueError("auth_enabled must be a boolean")
+        cfg.auth_enabled = raw["auth_enabled"]
+    for key in ("token_env", "admin_token_env"):
+        if key in raw:
+            setattr(cfg, key, str(raw[key]))
     for key in ("data_dir", "config_dir", "spa_dir"):
         if raw.get(key):
             setattr(cfg, key, Path(str(raw[key])).expanduser())

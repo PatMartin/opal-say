@@ -4,22 +4,25 @@
 service:
   host: 127.0.0.1
   port: 8001
+  auth_enabled: false
+  token_env: OPAL_SAY_READ_CREDENTIAL
+  admin_token_env: OPAL_SAY_ADMIN_CREDENTIAL
   log_level: info
-  data_dir: ./var            # SQLite state (opal_say.db) and backups/
-  config_dir: ./config       # YAML read by POST /api/v1/backup/import and on first start
+  data_dir: ./var            # SQLite state and managed config-snapshot.json
+  config_dir: ./config       # YAML seed inputs read only for a fresh database
   spa_dir: ./spa/dist        # optional: serve the built SPA at /ui
   cors_origins:
     - http://localhost:5173
     - http://127.0.0.1:5173
 
-  # Persona owner (OPAL Think): unknown personas are adopted from this service
+  # Persona owner (OPAL Think): authoritative personas are cached separately
   # and origin=owner records are revalidated per the persona_refresh_seconds
   # setting. The bearer token is read from the environment variable named here.
   # persona_owner_url: http://127.0.0.1:8080
   # persona_owner_token_env: OPAL_SAY_PERSONA_OWNER_TOKEN
 
   # Initial engine state, applied only when an engine is first seen (later changes are made
-  # through PATCH /api/v1/engines/{engine_id} and persisted).
+  # through PATCH /api/v1/engine/{engine_id} and persisted).
   engines:
     piper:
       enabled: true

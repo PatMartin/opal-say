@@ -18,6 +18,16 @@ class ApiError(Exception):
         self.details = details or {}
 
 
+class Unauthorized(ApiError):
+    status = 401
+    default_code = "unauthorized"
+
+
+class Forbidden(ApiError):
+    status = 403
+    default_code = "forbidden"
+
+
 class NotFound(ApiError):
     status = 404
     default_code = "not_found"

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -59,7 +61,7 @@ class GenerationPlan:
     chunks: list[str]
     voice: dict[str, Any]
     engine: TtsEngine
-    profile_id: int | None
+    profile_id: str | None
     speed: float
     volume: float
     output_format: str
@@ -116,13 +118,48 @@ class GenerationService:
         self.owner_token_env = owner_token_env
         # Per-engine serialization is owned by EngineRuntimeManager (engine.runtime).
 
+    def resolve_persona(self, persona_id: str) -> dict[str, Any] | None:
+        local = self.store.get_persona(persona_id)
+        if not self.owner_url:
+            return local
+        cached = self.store.get_owner_persona(persona_id)
+        response = self._owner_get(persona_id, cached.get("owner_etag") if cached else None)
+        if response is None or response.status_code in {304, 401, 403} or response.status_code >= 500:
+            return cached or local
+        if response.status_code == 404:
+            if cached:
+                cached = {**cached, "enabled": False}
+                self.store.cache_owner_persona(persona_id, cached)
+                return cached
+            return local
+        if response.status_code != 200:
+            return cached or local
+        from opal_say.schemas import PersonaRead
+
+        try:
+            raw = response.json()
+            document = PersonaRead.model_validate({"created_at": now_iso(), "updated_at": now_iso(), **raw}).model_dump()
+            if document["persona_id"] != persona_id:
+                return cached or local
+        except ValueError:
+            return cached or local
+        document.update(origin="owner", owner_etag=response.headers.get("ETag"))
+        self.store.cache_owner_persona(persona_id, document)
+        return document
+
     def _owner_get(self, persona_id: str, etag: str | None = None) -> httpx.Response | None:
         """Authenticated GET against the persona owner (OPAL Think).
 
         The bearer token comes from `owner_token_env` — resolved per call so the
         token can rotate without a restart. `etag` carries the last seen owner
         ETag for version-aware revalidation (`If-None-Match`)."""
-        headers: dict[str, str] = {}
+        from opal_say.api.correlation import CURRENT_IDS
+
+        ids = CURRENT_IDS.get()
+        headers: dict[str, str] = ids.response_headers() if ids else {}
+        if ids:
+            headers["X-Opal-Causation-Id"] = ids.request_id
+            headers["X-Opal-Request-Id"] = uuid.uuid4().hex
         token = os.environ.get(self.owner_token_env) if self.owner_token_env else None
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -130,7 +167,7 @@ class GenerationService:
             headers["If-None-Match"] = etag
         try:
             return httpx.get(
-                f"{self.owner_url}/api/v1/persona/{persona_id}", headers=headers, timeout=5.0
+                f"{self.owner_url}/api/v1/persona/{quote(persona_id, safe='')}", headers=headers, timeout=5.0
             )
         except httpx.HTTPError:
             return None
@@ -371,15 +408,11 @@ class GenerationService:
                 raise Conflict(f"profile {req.profile_id} not found", "profile_not_found", {"profile_id": req.profile_id})
         else:
             profile = self.store.active_profile()
-        p = profile or {}
+        p = profile.get("modules", {}).get("opal-say", {}) if profile else {}
 
         persona_voice: str | None = None
         if req.persona is not None:
-            persona = self.store.get_persona(req.persona)
-            if persona is None and self.owner_url:
-                persona = self._fetch_owner_persona(req.persona)
-            elif persona is not None and self.owner_url and persona.get("origin") == "owner":
-                persona = self._resolve_owner_persona(persona)
+            persona = self.resolve_persona(req.persona)
             if persona is None:
                 raise InvalidRequest.single(["body", "persona"], f"persona '{req.persona}' is not registered")
             if not persona["enabled"]:
@@ -393,7 +426,11 @@ class GenerationService:
             )
         voice = self.store.get_voice(voice_id)
         if voice is None:
+            if persona_voice == voice_id:
+                raise InvalidRequest.single(["body", "persona_id"], "persona voice binding cannot be resolved")
             raise Conflict(f"voice '{voice_id}' is not registered", "voice_not_found", {"voice_id": voice_id})
+        if persona_voice == voice_id and not voice["enabled"]:
+            raise InvalidRequest.single(["body", "persona_id"], "persona voice binding is disabled")
         engine, runtime = self._route(voice, req.engine_id, cancelled)
         try:
             request_issues = engine.validate_options(req.engine_options, "generation")
@@ -408,9 +445,9 @@ class GenerationService:
             # Profile engine_options are engine-specific; they only apply when routing stays on the profile voice's engine.
             profile_options: dict[str, Any] = {}
             if profile:
-                profile_voice = voice if voice_id == p["voice_id"] else self.store.get_voice(p["voice_id"])
+                profile_voice = self.store.get_voice(p["voice_id"]) if p.get("voice_id") else voice
                 if profile_voice and profile_voice["engine_id"] == engine.engine_id:
-                    profile_options = p["engine_options"]
+                    profile_options = p.get("engine_options", {})
             return self._plan(
                 chunks=chunks,
                 voice=voice,
@@ -465,7 +502,7 @@ class GenerationService:
         ``{"ok": True, ...resolved ids...}`` or ``{"ok": False, "code", "message", ...}``.
         """
         profile = self.store.active_profile()
-        voice_id = profile["voice_id"] if profile else None
+        voice_id = profile["modules"].get("opal-say", {}).get("voice_id") if profile else None
         base: dict[str, Any] = {"profile_id": profile["id"] if profile else None, "voice_id": voice_id}
         if voice_id is None:
             return {**base, "ok": False, "code": "no_voice",

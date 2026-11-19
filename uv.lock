@@ -557,11 +557,12 @@ wheels = [
 
 [[package]]
 name = "opal-say"
-version = "1.7.1"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "jsonschema" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pydantic" },
@@ -599,6 +600,7 @@ piper = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.110" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "jsonschema", specifier = "==4.26.0" },
     { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.21" },
     { name = "kokoro-onnx", marker = "extra == 'engines'", specifier = ">=0.4" },
     { name = "kokoro-onnx", marker = "extra == 'kokoro'", specifier = ">=0.4" },

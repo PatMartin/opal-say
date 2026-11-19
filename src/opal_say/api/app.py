@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +28,7 @@ from opal_say.api.routes import router
 from opal_say.config import ServiceConfig, load_config
 from opal_say.contract import load_contract
 from opal_say.service.container import Services, build_services
-from opal_say.service.errors import ApiError, InvalidRequest
+from opal_say.service.errors import ApiError, Forbidden, InvalidRequest, Unauthorized
 from opal_say.tts.base import TtsEngine
 
 log = logging.getLogger(__name__)
@@ -40,6 +43,8 @@ OPAL_HEADERS = [
     "X-Opal-Profile-Id",
     *CORRELATION_HEADERS,
     "Content-Disposition",
+    "ETag",
+    "Location",
 ]
 
 
@@ -71,6 +76,14 @@ def create_app(
     services: Services | None = None,
 ) -> FastAPI:
     config = config or (services.config if services else load_config())
+    try:
+        loopback = ipaddress.ip_address(config.host).is_loopback
+    except ValueError:
+        loopback = config.host.lower() == "localhost"
+    if not config.auth_enabled and not loopback:
+        raise ValueError("non-loopback deployments require authentication")
+    if config.auth_enabled and not os.environ.get(config.admin_token_env):
+        raise ValueError("authentication requires an admin credential environment variable")
     owns_services = services is None
     svc = services or build_services(config, engines)
 
@@ -122,7 +135,30 @@ def create_app(
         log.exception("unhandled error")
         return render_error(request, 500, "internal_error", "internal server error")
 
-    app.include_router(router)
+    async def authorize(request: Request) -> None:
+        if not config.auth_enabled:
+            return
+        supplied = request.headers.get("authorization", "")
+        scheme, _, token = supplied.partition(" ")
+        admin = os.environ.get(config.admin_token_env, "")
+        reader = os.environ.get(config.token_env, "")
+        is_admin = bool(admin and hmac.compare_digest(token.encode(), admin.encode()))
+        if scheme.lower() != "bearer" or not token or not (
+            is_admin or (reader and hmac.compare_digest(token.encode(), reader.encode()))
+        ):
+            raise Unauthorized("missing or invalid authentication")
+        path = request.url.path
+        privileged = request.method in {"PUT", "PATCH", "DELETE"} or (
+            request.method == "POST" and (
+                path in {"/api/v1/voice/", "/api/v1/profile/", "/api/v1/persona/"}
+                or path.endswith("/activate")
+                or path.startswith(("/api/v1/config/", "/api/v1/service/"))
+            )
+        )
+        if privileged and not is_admin:
+            raise Forbidden("configuration authorization required")
+
+    app.include_router(router, dependencies=[Depends(authorize)])
 
     if config.spa_dir and config.spa_dir.is_dir():
         app.mount("/ui", StaticFiles(directory=config.spa_dir, html=True), name="ui")

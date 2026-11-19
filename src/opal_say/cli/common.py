@@ -19,6 +19,24 @@ class CliState:
     json_output: bool
 
 
+def read_document(filename: str) -> dict[str, Any]:
+    from pathlib import Path
+
+    import yaml
+
+    path = Path(filename)
+    if path.suffix.lower() not in {".json", ".yaml", ".yml"}:
+        raise typer.BadParameter("use a .json, .yaml or .yml file")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8")) if path.suffix.lower() == ".json" else yaml.safe_load(
+            path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        raise typer.BadParameter(f"cannot read document: {exc}") from None
+    if not isinstance(value, dict):
+        raise typer.BadParameter("document must be an object")
+    return value
+
+
 def client_factory(api_url: str, timeout: float) -> ApiClient:
     return ApiClient(api_url, timeout)
 

@@ -15,7 +15,7 @@ const EMPTY: PersonaForm = { persona_id: '', name: '', description: '', voice_id
 
 export function PersonaPanel() {
   const persona = useLoad(() => call<Persona[]>('opal_persona_list'), [])
-  const voice = useLoad(() => call<Voice[]>('opal_voice_list'), [])
+  const voice = useLoad(() => call<Voice[]>('list_voices'), [])
   const [form, setForm] = useState<PersonaForm>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [selected, setSelected] = useState<Persona | null>(null)
@@ -29,7 +29,7 @@ export function PersonaPanel() {
       const body = {
         name: form.name,
         description: form.description || null,
-        voice_id: form.voice_id,
+        voice_id: form.voice_id || null,
         enabled: form.enabled,
       }
       if (editing !== null) {
@@ -49,7 +49,7 @@ export function PersonaPanel() {
       persona_id: p.persona_id,
       name: p.name,
       description: p.description ?? '',
-      voice_id: p.voice_id,
+      voice_id: p.voice_id ?? '',
       enabled: p.enabled,
     })
   }
@@ -111,7 +111,7 @@ export function PersonaPanel() {
         </label>
         <label>
           Voice
-          <select required value={form.voice_id} onChange={(e) => set({ voice_id: e.target.value })}>
+          <select value={form.voice_id} onChange={(e) => set({ voice_id: e.target.value })}>
             <option value="">choose…</option>
             {voice.data.map((v) => (
               <option key={v.voice_id} value={v.voice_id}>

@@ -1,112 +1,66 @@
 import { useState } from 'react'
-import { buildUrl, call } from '../api/client'
-import type { Backup, ValidationResult } from '../api/types'
-import { ErrorBanner, ValidationView, useAction, useLoad } from './common'
+import { call } from '../api/client'
+import { ErrorBanner, useAction } from './common'
 
-export function BackupPanel() {
-  const backups = useLoad(() => call<Backup[]>('opal_backup_list'), [])
+type Snapshot = Record<string, unknown>
+type Validation = { valid: boolean; errors: { code: string; path: string; message: string }[]; warnings: { code: string; path: string; message: string }[] }
+
+export function ConfigPanel() {
+  const [candidate, setCandidate] = useState('')
   const [message, setMessage] = useState('')
-  const [validation, setValidation] = useState<ValidationResult | null>(null)
+  const [validation, setValidation] = useState<Validation | null>(null)
   const action = useAction()
 
-  const run = (fn: () => Promise<void>) =>
-    action.run(async () => {
-      setMessage('')
-      setValidation(null)
-      await fn()
+  const save = (download: boolean) => action.run(async () => {
+    const result = await call<{ snapshot: Snapshot; managed: boolean }>('opal_config_save', {
+      body: { destination: download ? 'response' : 'managed' },
     })
+    if (download) {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(result.snapshot, null, 2)], { type: 'application/json' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'opal-say-config.json'
+      link.click()
+      URL.revokeObjectURL(url)
+    }
+    setMessage(download ? 'Snapshot downloaded; managed snapshot unchanged.' : 'Managed snapshot saved.')
+  })
 
-  const create = () =>
-    run(async () => {
-      const result = await call<{ filename: string; message?: string }>('opal_backup_create')
-      setMessage(`${result.message ?? 'Backup created'}: ${result.filename}`)
-      await backups.reload()
-    })
+  const load = (fromCandidate: boolean) => action.run(async () => {
+    if (!window.confirm('Replace the complete live configuration with this snapshot?')) return
+    await call('opal_config_load', { body: fromCandidate ? { snapshot: JSON.parse(candidate) } : {} })
+    setMessage('Configuration loaded. The managed snapshot was not changed.')
+  })
 
-  const restore = (filename: string) =>
-    run(async () => {
-      if (!window.confirm(`Restore configuration from ${filename}? Current configuration will be replaced.`)) return
-      const result = await call<{ message: string }>('opal_backup_restore', { path: { filename } })
-      setMessage(result.message)
-    })
-
-  const remove = (filename: string) =>
-    run(async () => {
-      await call('opal_backup_delete', { path: { filename } })
-      await backups.reload()
-    })
-
-  const exportConfig = () =>
-    run(async () => {
-      const data = await call('opal_backup_export')
-      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'opal-say-config.json'
-      a.click()
-      setMessage('Configuration exported.')
-    })
-
-  const importConfig = () =>
-    run(async () => {
-      const result = await call<{ success: boolean; validation: ValidationResult; message?: string | null }>(
-        'opal_backup_import',
-      )
-      setMessage(result.message ?? (result.success ? 'Imported.' : 'Import failed.'))
-      setValidation(result.validation)
-    })
-
-  const validate = () => run(async () => setValidation(await call<ValidationResult>('opal_backup_validate_stored')))
-
-  const validatePayload = () =>
-    run(async () => {
-      const payload = await call<Record<string, unknown>>('opal_backup_export')
-      setValidation(await call<ValidationResult>('opal_backup_validate', { body: payload }))
-    })
+  const validate = (fromCandidate: boolean) => action.run(async () => {
+    setValidation(await call<Validation>('opal_config_validate', { body: fromCandidate ? { snapshot: JSON.parse(candidate) } : {} }))
+  })
 
   return (
     <section>
-      <h2>Backup &amp; configuration</h2>
+      <h2>Configuration snapshots</h2>
+      <p>Snapshots replace settings overrides and declarative resources, not media, history, credentials or models.</p>
       <div className="row">
-        <button onClick={() => void create()}>Create backup</button>
-        <button onClick={() => void exportConfig()}>Export JSON</button>
-        <button onClick={() => void importConfig()}>Import ./config</button>
-        <button onClick={() => void validate()}>Validate config</button>
-        <button onClick={() => void validatePayload()}>Validate export payload</button>
+        <button onClick={() => void save(false)}>Save managed snapshot</button>
+        <button onClick={() => void save(true)}>Download snapshot</button>
+        <button onClick={() => void load(false)}>Load managed snapshot</button>
+        <button onClick={() => void validate(false)}>Validate live configuration</button>
       </div>
-      {message && (
-        <p className="ok" role="status">
-          {message}
-        </p>
-      )}
-      <ErrorBanner error={action.error || backups.error} />
-      <ValidationView result={validation} />
-      <table>
-        <thead>
-          <tr>
-            <th>Backup</th>
-            <th>Created</th>
-            <th>Size</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {backups.data.map((b) => (
-            <tr key={b.filename}>
-              <td className="mono">{b.filename}</td>
-              <td>{b.created_at}</td>
-              <td>{b.size_bytes ?? '-'}</td>
-              <td className="actions">
-                <a href={buildUrl('opal_backup_download', { path: { filename: b.filename } })} download>
-                  Download
-                </a>
-                <button onClick={() => void restore(b.filename)}>Restore</button>
-                <button onClick={() => void remove(b.filename)}>Delete</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <label>
+        Candidate snapshot (JSON)
+        <textarea value={candidate} rows={10} onChange={(event) => setCandidate(event.target.value)} />
+      </label>
+      <input aria-label="Open snapshot JSON" type="file" accept=".json,application/json" onChange={(event) => {
+        const file = event.target.files?.[0]
+        if (file) void action.run(async () => setCandidate(await file.text()))
+      }} />
+      <div className="row">
+        <button disabled={!candidate} onClick={() => void validate(true)}>Validate candidate</button>
+        <button disabled={!candidate} onClick={() => void load(true)}>Load candidate</button>
+      </div>
+      {message && <p role="status">{message}</p>}
+      <ErrorBanner error={action.error} />
+      {validation && <pre data-testid="snapshot-validation">{JSON.stringify(validation, null, 2)}</pre>}
     </section>
   )
 }

@@ -23,14 +23,17 @@ from opal_say.cli.common import (
 )
 
 
-def _generation_body(text: str, profile: int | None, voice: str | None, engine: str | None, speed: float | None,
+def _generation_body(text: str, profile: str | None, voice: str | None, engine: str | None, speed: float | None,
                      volume: float | None, output_format: str | None, sample_rate: int | None,
                      option: list[str] | None, options_json: str | None,
-                     persona: str | None = None) -> dict[str, Any]:
+                     persona: str | None = None, persona_id: str | None = None) -> dict[str, Any]:
     if text == "-":
         text = sys.stdin.read()
+    if persona_id is not None and persona is not None and persona_id != persona:
+        raise typer.BadParameter("--persona-id and --persona must identify the same persona")
     body: dict[str, Any] = {"text": text}
-    for key, value in (("profile_id", profile), ("voice_id", voice), ("persona", persona), ("engine_id", engine),
+    selected_persona = persona_id if persona_id is not None else persona
+    for key, value in (("profile_id", profile), ("voice_id", voice), ("persona_id", selected_persona), ("engine_id", engine),
                        ("speed", speed),
                        ("volume", volume), ("output_format", output_format), ("sample_rate", sample_rate)):
         if value is not None:
@@ -80,7 +83,7 @@ def _synthesize(ctx: typer.Context, body: dict[str, Any], output: str | None, st
         raise typer.BadParameter("supply -o/--output, or play the audio locally")
     if incremental:
         try:
-            with _state(ctx).client.stream("opal_generate_stream_incremental", content=payload,
+            with _state(ctx).client.stream("stream_speech_incremental", content=payload,
                                            headers={"Content-Type": "application/x-ndjson"}) as resp:
                 size = _stream_response(resp, output, play)
         except ApiCallError as exc:
@@ -91,7 +94,7 @@ def _synthesize(ctx: typer.Context, body: dict[str, Any], output: str | None, st
             raise typer.Exit(1) from None
     elif stream:
         try:
-            with _state(ctx).client.stream("opal_generate_stream", json=body) as resp:
+            with _state(ctx).client.stream("stream_speech", json=body) as resp:
                 size = _stream_response(resp, output, play)
         except ApiCallError as exc:
             typer.echo(f"Error: {exc.describe()}", err=True)
@@ -100,7 +103,7 @@ def _synthesize(ctx: typer.Context, body: dict[str, Any], output: str | None, st
             typer.echo(f"Error: stream terminated prematurely; generation failed ({exc})", err=True)
             raise typer.Exit(1) from None
     else:
-        resp = _call(ctx, "opal_generate", json=body)
+        resp = _call(ctx, "generate_speech", json=body)
         size = _write_audio(resp, output) if output is not None else 0
         if play:
             size = audio.play_response(resp)
@@ -121,8 +124,9 @@ def register(say_app: typer.Typer) -> None:
             False, "--incremental",
             help="Use /generate/stream/incremental (text '-' reads NDJSON lines from stdin)"),
         play: bool = typer.Option(False, "--play", help="Also play the audio locally (requires 'opal-say[audio]')"),
-        profile: int = typer.Option(None, "--profile", min=1, help="Profile id (default: active profile)"),
-        persona: str = typer.Option(None, "--persona", help="Named persona supplying the voice"),
+        profile: str = typer.Option(None, "--profile", help="Opaque profile id (default: active profile)"),
+        persona_id: str = typer.Option(None, "--persona-id", help="Named persona supplying the voice"),
+        persona: str = typer.Option(None, "--persona", help="Deprecated alias of --persona-id"),
         voice: str = typer.Option(None, "--voice"),
         engine: str = typer.Option(None, "--engine", help="Advanced engine override"),
         speed: float = typer.Option(None, "--speed", min=0.25, max=4.0),
@@ -150,6 +154,6 @@ def register(say_app: typer.Typer) -> None:
         elif stream and output_format is not None:
             raise typer.BadParameter("--format is not supported with --stream (always pcm)")
         body = _generation_body(text, profile, voice, engine, speed, volume, output_format, sample_rate,
-                                option, options_json, persona=persona)
+                                option, options_json, persona=persona, persona_id=persona_id)
         _synthesize(ctx, body, output, stream, play, incremental=incremental,
                     payload=_incremental_payload(body) if incremental else None)

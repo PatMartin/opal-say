@@ -12,33 +12,27 @@ from typing import Any
 
 import anyio
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, Header, Path, Query, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-from opal_say import API_VERSION, SERVICE_NAME, __version__
 from opal_say.api.correlation import correlation_ids
 from opal_say.schemas import (
-    BackupCreateResponse,
-    BackupRead,
-    ConfigExport,
-    ConfigImportResult,
+    ConfigSaveRequest,
+    ConfigSnapshotRequest,
     EngineRead,
     EngineUpdate,
     GenerateRequest,
     GenerateStreamRequest,
     HealthRead,
     IncrementalStreamParams,
-    LivenessRead,
-    OperationResult,
     PersonaCreate,
     PersonaRead,
     PersonaUpdate,
     ProfileCreate,
     ProfileRead,
     ProfileUpdate,
-    ServiceInfo,
     ServiceLogTail,
     ServiceStartOptions,
     ServiceStatus,
@@ -51,10 +45,8 @@ from opal_say.schemas import (
     VoiceUpdate,
 )
 from opal_say.service.concurrency import config_etag, mutate_with_revision
-from opal_say.service.config_candidate import Candidate
 from opal_say.service.container import Services
 from opal_say.service.errors import GenerationFailed, InvalidRequest, NotFound, PayloadTooLarge
-from opal_say.service.settings import settings_to_str
 from opal_say.tts.base import Report
 from opal_say.tts.chunking import chunk_text, split_stream_ready
 
@@ -275,7 +267,7 @@ class _DuplexPcmStreamResponse(_PcmStreamResponse):
             with anyio.CancelScope(shield=True):
                 await run_in_threadpool(self._stream.close)
 
-ProfileId = Path(ge=1, description="Numeric profile identifier.")
+ProfileId = Path(min_length=1, description="Opaque profile identifier.")
 BackupFilename = Path(min_length=1, max_length=255, pattern=r"^[^/\\]+$")
 SettingKey = Path(min_length=1)
 
@@ -321,7 +313,7 @@ def update_engine(engine_id: str, body: EngineUpdate, if_match: str | None = Hea
 
 
 @router.post("/api/v1/engine/{engine_id}/validate", tags=["engine"],
-             operation_id="opal_engine_validate", response_model=ValidationResult)
+             operation_id="validate_engine", response_model=ValidationResult)
 def validate_engine(engine_id: str, svc: Services = Depends(services)):
     return report_dict(svc.engine.validate(engine_id))
 
@@ -329,7 +321,7 @@ def validate_engine(engine_id: str, svc: Services = Depends(services)):
 # -- voice ----------------------------------------------------------------------
 
 
-@router.get("/api/v1/voice/", tags=["voice"], operation_id="opal_voice_list",
+@router.get("/api/v1/voice/", tags=["voice"], operation_id="list_voices",
             response_model=list[VoiceRead])
 def list_voice(
     response: Response,
@@ -342,7 +334,7 @@ def list_voice(
     return svc.voice.list(engine_id, enabled, language)
 
 
-@router.post("/api/v1/voice/", tags=["voice"], operation_id="opal_voice_create",
+@router.post("/api/v1/voice/", tags=["voice"], operation_id="create_voice",
              response_model=VoiceRead, status_code=201)
 def create_voice(body: VoiceCreate, response: Response, if_match: str | None = Header(None),
                  svc: Services = Depends(services)):
@@ -351,14 +343,14 @@ def create_voice(body: VoiceCreate, response: Response, if_match: str | None = H
     return voice
 
 
-@router.get("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="opal_voice_get",
+@router.get("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="show_voice",
             response_model=VoiceRead)
 def get_voice(voice_id: str, response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.voice.get(voice_id)
 
 
-@router.patch("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="opal_voice_patch",
+@router.patch("/api/v1/voice/{voice_id}", tags=["voice"], operation_id="update_voice",
               response_model=VoiceRead)
 def update_voice(voice_id: str, body: VoiceUpdate, if_match: str | None = Header(None),
                 svc: Services = Depends(services)):
@@ -366,14 +358,14 @@ def update_voice(voice_id: str, body: VoiceUpdate, if_match: str | None = Header
 
 
 @router.delete("/api/v1/voice/{voice_id}", tags=["voice"],
-               operation_id="opal_voice_delete", status_code=204)
+               operation_id="remove_voice", status_code=204)
 def delete_voice(voice_id: str, if_match: str | None = Header(None), svc: Services = Depends(services)):
     mutate_with_revision(svc.store, if_match, lambda: svc.voice.delete(voice_id))
     return Response(status_code=204)
 
 
 @router.post("/api/v1/voice/{voice_id}/validate", tags=["voice"],
-             operation_id="opal_voice_validate", response_model=ValidationResult)
+             operation_id="validate_voice", response_model=ValidationResult)
 def validate_voice(voice_id: str, svc: Services = Depends(services)):
     return report_dict(svc.voice.validate(voice_id))
 
@@ -383,7 +375,7 @@ def validate_voice(voice_id: str, svc: Services = Depends(services)):
 # is dispatched — generate/voice-test produce the first block before 200 is committed, and
 # stream keeps a generator alive for the response body.
 @router.post("/api/v1/voice/{voice_id}/test", tags=["voice"],
-             operation_id="opal_voice_test", response_class=Response)
+             operation_id="test_voice", response_class=Response)
 async def test_voice(request: Request, voice_id: str, body: VoiceTestRequest | None = Body(None),
                      svc: Services = Depends(services)):
     cancel = threading.Event()
@@ -404,7 +396,10 @@ async def test_voice(request: Request, voice_id: str, body: VoiceTestRequest | N
             response_model=list[PersonaRead])
 def list_persona(response: Response, enabled: bool | None = Query(None), svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.persona.list(enabled)
+    records = {p["persona_id"]: p for p in svc.persona.list(None)}
+    if svc.generation.owner_url:
+        records.update({p["persona_id"]: p for p in svc.store.list_owner_personas()})
+    return [records[key] for key in sorted(records) if enabled is None or records[key]["enabled"] == enabled]
 
 
 @router.post("/api/v1/persona/", tags=["persona"], operation_id="opal_persona_create",
@@ -420,7 +415,7 @@ def create_persona(body: PersonaCreate, response: Response, if_match: str | None
             operation_id="opal_persona_get", response_model=PersonaRead)
 def get_persona(persona_id: str, response: Response, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
-    return svc.persona.get(persona_id)
+    return svc.generation.resolve_persona(persona_id) or svc.persona.get(persona_id)
 
 
 @router.post("/api/v1/persona/{persona_id}/validate", tags=["persona"],
@@ -464,28 +459,28 @@ def create_profile(body: ProfileCreate, response: Response, if_match: str | None
 
 @router.get("/api/v1/profile/{profile_id}", tags=["profile"],
             operation_id="opal_profile_get", response_model=ProfileRead)
-def get_profile(response: Response, profile_id: int = ProfileId, svc: Services = Depends(services)):
+def get_profile(response: Response, profile_id: str = ProfileId, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.profile.get(profile_id)
 
 
 @router.patch("/api/v1/profile/{profile_id}", tags=["profile"],
               operation_id="opal_profile_patch", response_model=ProfileRead)
-def update_profile(body: ProfileUpdate, profile_id: int = ProfileId, if_match: str | None = Header(None),
+def update_profile(body: ProfileUpdate, profile_id: str = ProfileId, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
     return mutate_with_revision(svc.store, if_match, lambda: svc.profile.update(profile_id, body))
 
 
 @router.delete("/api/v1/profile/{profile_id}", tags=["profile"],
                operation_id="opal_profile_delete", status_code=204)
-def delete_profile(profile_id: int = ProfileId, if_match: str | None = Header(None), svc: Services = Depends(services)):
+def delete_profile(profile_id: str = ProfileId, if_match: str | None = Header(None), svc: Services = Depends(services)):
     mutate_with_revision(svc.store, if_match, lambda: svc.profile.delete(profile_id))
     return Response(status_code=204)
 
 
 @router.post("/api/v1/profile/{profile_id}/activate", tags=["profile"],
              operation_id="opal_profile_activate", response_model=ProfileRead)
-def activate_profile(profile_id: int = ProfileId, if_match: str | None = Header(None),
+def activate_profile(profile_id: str = ProfileId, if_match: str | None = Header(None),
                      svc: Services = Depends(services)):
     return mutate_with_revision(svc.store, if_match, lambda: svc.profile.activate(profile_id))
 
@@ -493,7 +488,7 @@ def activate_profile(profile_id: int = ProfileId, if_match: str | None = Header(
 # -- generate --------------------------------------------------------------------
 
 
-@router.post("/api/v1/generate", tags=["generate"], operation_id="opal_generate",
+@router.post("/api/v1/generate", tags=["generate"], operation_id="generate_speech",
              response_class=Response)
 async def generate_audio(request: Request, body: GenerateRequest, svc: Services = Depends(services)):
     # Admission and per-chunk permit waits abort promptly if the client drops.
@@ -507,7 +502,7 @@ async def generate_audio(request: Request, body: GenerateRequest, svc: Services 
         watch.cancel()
 
 
-@router.post("/api/v1/generate/stream", tags=["generate"], operation_id="opal_generate_stream",
+@router.post("/api/v1/generate/stream", tags=["generate"], operation_id="stream_speech",
              response_class=StreamingResponse)
 async def stream_audio(request: Request, body: GenerateStreamRequest, svc: Services = Depends(services)):
     cancel = threading.Event()
@@ -671,7 +666,7 @@ def _increment_chunks(q: queue.Queue, cancel: threading.Event):
 
 
 @router.post("/api/v1/generate/stream/incremental", tags=["generate"],
-             operation_id="opal_generate_stream_incremental", response_class=StreamingResponse)
+             operation_id="stream_speech_incremental", response_class=StreamingResponse)
 async def stream_audio_incremental(request: Request, svc: Services = Depends(services)):
     """Streaming PCM for text supplied incrementally as NDJSON lines.
 
@@ -736,21 +731,15 @@ def get_all_setting(response: Response, svc: Services = Depends(services)) -> di
     return svc.setting.all()
 
 
-@router.patch("/api/v1/setting/", tags=["setting"], operation_id="opal_setting_patch")
-def patch_setting(body: dict[str, Any] = Body(min_length=1), if_match: str | None = Header(None),
-                   svc: Services = Depends(services)) -> dict[str, Any]:
-    return mutate_with_revision(svc.store, if_match, lambda: svc.setting.patch(body))
-
-
 @router.get("/api/v1/setting/{key}", tags=["setting"], operation_id="opal_setting_get",
-            response_model=SettingRead)
+            response_model=SettingRead, response_model_exclude_none=True)
 def get_setting(response: Response, key: str = SettingKey, svc: Services = Depends(services)):
     response.headers["ETag"] = config_etag(svc.store)
     return svc.setting.get(key)
 
 
 @router.put("/api/v1/setting/{key}", tags=["setting"], operation_id="opal_setting_put",
-            response_model=SettingRead)
+            response_model=SettingRead, response_model_exclude_none=True)
 def upsert_setting(body: SettingUpdate, key: str = SettingKey, if_match: str | None = Header(None),
                    svc: Services = Depends(services)):
     return mutate_with_revision(svc.store, if_match, lambda: svc.setting.upsert(key, body.value))
@@ -786,79 +775,38 @@ def health_ready(svc: Services = Depends(services)):
 # -- backup ----------------------------------------------------------------------
 
 
-@router.get("/api/v1/backup/list", tags=["backup"], operation_id="opal_backup_list",
-            response_model=list[BackupRead])
-def list_backups(svc: Services = Depends(services)):
-    return svc.config_ops.list_backups()
+async def config_body(request: Request):
+    if (await request.body()).strip() == b"null":
+        raise InvalidRequest.single(["body"], "configuration request must be an object", "dict_type")
 
 
-@router.post("/api/v1/backup/create", tags=["backup"], operation_id="opal_backup_create",
-             response_model=BackupCreateResponse, status_code=201)
-def create_backup(response: Response, svc: Services = Depends(services)):
-    result = svc.config_ops.create_backup()
-    response.headers["Location"] = f"/api/v1/backup/download/{result['filename']}"
+@router.post("/api/v1/config/save", tags=["config"], operation_id="opal_config_save", dependencies=[Depends(config_body)])
+def save_config(response: Response, body: ConfigSaveRequest | None = None, svc: Services = Depends(services)):
+    result, revision = svc.config_ops.save_snapshot(body.destination if body else "managed")
+    response.headers["ETag"] = revision
     return result
 
 
-@router.get("/api/v1/backup/download/{filename}", tags=["backup"],
-            operation_id="opal_backup_download", response_class=FileResponse)
-def download_backup(filename: str = BackupFilename, svc: Services = Depends(services)):
-    path = svc.config_ops.backup_path(filename)
-    return FileResponse(path, media_type="application/octet-stream", filename=filename)
+@router.post("/api/v1/config/load", tags=["config"], operation_id="opal_config_load", dependencies=[Depends(config_body)])
+def load_config(response: Response, body: ConfigSnapshotRequest | None = None,
+                if_match: str | None = Header(None), svc: Services = Depends(services)):
+    def apply():
+        result = svc.config_ops.load_snapshot(body.snapshot if body else None)
+        response.headers["ETag"] = config_etag(svc.store)
+        return result
+
+    return mutate_with_revision(svc.store, if_match, apply)
 
 
-@router.post("/api/v1/backup/restore/{filename}", tags=["backup"],
-             operation_id="opal_backup_restore", response_model=OperationResult)
-def restore_backup(filename: str = BackupFilename, if_match: str | None = Header(None),
-                   svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.config_ops.restore_backup(filename))
-
-
-@router.get("/api/v1/backup/export", tags=["backup"], operation_id="opal_backup_export",
-            response_model=ConfigExport)
-def export_config(svc: Services = Depends(services)):
-    return svc.config_ops.export()
-
-
-@router.post("/api/v1/backup/import", tags=["backup"], operation_id="opal_backup_import",
-             response_model=ConfigImportResult)
-def import_config(body: ConfigExport | None = None, if_match: str | None = Header(None),
-                  svc: Services = Depends(services)):
-    def do_import() -> dict[str, Any]:
-        if body is not None:
-            return svc.config_ops.import_bundle(body.model_dump(mode="json"))
-        return svc.config_ops.import_config()
-
-    result = mutate_with_revision(svc.store, if_match, do_import)
-    return {**result, "validation": report_dict(result["validation"])}
-
-
-@router.get("/api/v1/backup/validate", tags=["backup"], operation_id="opal_backup_validate_stored",
-            response_model=ValidationResult)
-def validate_config(svc: Services = Depends(services)):
-    return report_dict(svc.config_ops.validate_current())
-
-
-@router.post("/api/v1/backup/validate", tags=["backup"], operation_id="opal_backup_validate",
-             response_model=ValidationResult)
-def validate_backup_payload(body: ConfigExport, svc: Services = Depends(services)):
+@router.post("/api/v1/config/validate", tags=["config"], operation_id="opal_config_validate",
+             dependencies=[Depends(config_body)])
+def validate_config(body: ConfigSnapshotRequest | None = None, svc: Services = Depends(services)):
     """Validate a supplied configuration payload against host resources. No writes."""
-    dump = body.model_dump(mode="json")
-    cand = Candidate(
-        engines={e["engine_id"]: {"enabled": e["enabled"], "options": e["options"]} for e in dump["engines"]},
-        voices=dump["voices"],
-        profiles=dump["profiles"],
-        settings=settings_to_str(dump["settings"]),
-    )
-    return report_dict(svc.config_ops.validate_candidate(cand, resources_are_errors=True)[0])
+    with svc.store.write_lock():
+        return svc.config_ops.validate_snapshot(body.snapshot if body else None)
 
 
-# Registered after /backup/list etc. so the literal paths win for GET/POST.
-@router.delete("/api/v1/backup/{filename}", tags=["backup"],
-               operation_id="opal_backup_delete", status_code=204)
-def delete_backup(filename: str = BackupFilename, svc: Services = Depends(services)):
-    svc.config_ops.delete_backup(filename)
-    return Response(status_code=204)
+# Configuration snapshots replace the retired backup routes.
 
 
 # -- service process lifecycle -----------------------------------------------------
@@ -898,18 +846,3 @@ def tail_service_log(lines: int = Query(10, ge=1, le=1000), svc: Services = Depe
 
 
 # -- service identity ---------------------------------------------------------------
-
-
-@router.get("/api/v1/info/", operation_id="opal_info_get", response_model=ServiceInfo)
-def root():
-    return {
-        "name": SERVICE_NAME,
-        "version": __version__,
-        "api_version": API_VERSION,
-        "description": "Implementation-neutral OPAL text-to-speech service",
-    }
-
-
-@router.get("/api/v1/info/ping", operation_id="opal_info_ping", response_model=LivenessRead)
-def healthz():
-    return {"status": "ok"}

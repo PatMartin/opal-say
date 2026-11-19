@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
@@ -48,6 +49,9 @@ class CorrelationIds:
         if self.causation_id is not None:
             headers[CAUSATION_ID] = self.causation_id
         return headers
+
+
+CURRENT_IDS: ContextVar[CorrelationIds | None] = ContextVar("opal_ids", default=None)
 
 
 def correlation_ids(request: Request) -> CorrelationIds | None:
@@ -126,6 +130,11 @@ class CorrelationMiddleware:
                 headers = MutableHeaders(scope=message)
                 for name, value in ids.response_headers().items():
                     headers[name] = value
+                if 200 <= message["status"] < 300 and scope["path"].startswith(
+                    ("/api/v1/setting/", "/api/v1/config/", "/api/v1/persona/",
+                     "/api/v1/profile/", "/api/v1/voice/", "/api/v1/engine/")
+                ):
+                    headers.setdefault("ETag", f'"r{scope["app"].state.services.store.config_revision()}"')
             await send(message)
 
         if errors:
@@ -134,4 +143,8 @@ class CorrelationMiddleware:
             )
             await JSONResponse(body, status_code=422)(scope, receive, send_with_ids)
             return
-        await self.app(scope, receive, send_with_ids)
+        context = CURRENT_IDS.set(ids)
+        try:
+            await self.app(scope, receive, send_with_ids)
+        finally:
+            CURRENT_IDS.reset(context)

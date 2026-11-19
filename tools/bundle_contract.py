@@ -97,7 +97,9 @@ def bundle(source: Path = SOURCE) -> dict:
                 return node  # internal ref of the root document: already bundle-local
             # Snapshot: resolving a child may import a new component into the very
             # dict being iterated (e.g. a kernel $ref inside components.schemas).
-            return {k: resolve(v, src_file) for k, v in list(node.items())}
+            for k, v in list(node.items()):
+                node[k] = resolve(v, src_file)
+            return node
         if isinstance(node, list):
             return [resolve(v, src_file) for v in node]
         return node

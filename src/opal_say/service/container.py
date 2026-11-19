@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from opal_say import __version__
+from opal_say import API_VERSION, SERVICE_NAME, __version__
 from opal_say.config import ServiceConfig
 from opal_say.persistence.store import Store
 from opal_say.service.catalog import EngineService, PersonaService, ProfileService, VoiceService
@@ -47,12 +47,18 @@ class Services:
         broken = [e for e in engine_states if e["enabled"] and not e["available"]]
         status = "error" if not usable else ("degraded" if broken else "ok")
         active = self.store.active_profile()
+        speech = self.generation.default_path()
         return {
+            "name": SERVICE_NAME,
+            "api_version": API_VERSION,
             "status": status,
             "version": __version__,
-            "active_profile_id": active["id"] if active else None,
-            "engines": engine_states,
+            "live": True,
+            "ready": bool(speech["ok"]),
+            "active_profile_id": str(active["id"]) if active else None,
             "details": {
+                "engines": engine_states,
+                "speech": speech,
                 "voices": len(self.store.list_voices()),
                 "enabled_voices": len(self.store.list_voices(enabled=True)),
                 "profile": len(self.store.list_profiles()),
@@ -76,7 +82,6 @@ class Services:
             "status": health["status"] if speech["ok"] else "unavailable",
             "ready": bool(speech["ok"]),
             "version": health["version"],
-            "engines": health["engines"],
             "details": {**health["details"], "speech": speech},
         }
         return body

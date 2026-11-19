@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from typing import Any
 
@@ -92,7 +93,7 @@ def setting_typed_value(key: str, raw: str) -> Any:
 
 def setting_problem(key: str, value: str) -> str | None:
     if key not in KNOWN_SETTINGS:
-        return None
+        return "is not a registered setting"
     try:
         KNOWN_SETTINGS[key][0](value)
     except ValueError as exc:
@@ -105,21 +106,36 @@ class SettingsService:
         self.store = store
 
     def all(self) -> dict[str, Any]:
-        return {row["key"]: setting_typed_value(row["key"], row["value"]) for row in self.store.list_settings()}
+        return {key: self.effective(key) for key in sorted(KNOWN_SETTINGS)}
 
     def get(self, key: str) -> dict[str, Any]:
+        if key not in KNOWN_SETTINGS:
+            raise NotFound(f"setting '{key}' is not registered", details={"key": key})
         row = self.store.get_setting(key)
-        if row is None:
-            raise NotFound(f"setting '{key}' not found", details={"key": key})
-        return {**row, "value": setting_typed_value(key, row["value"])}
+        default = KNOWN_SETTINGS[key][1]
+        configured = setting_typed_value(key, row["value"]) if row else default
+        env_key = f"OPAL_SAY_{key.upper()}"
+        source = "persisted" if row else "default"
+        warnings = []
+        if env_key in os.environ:
+            from opal_say.dotenv import DOTENV_VALUES
+
+            source = "dotenv" if DOTENV_VALUES.get(env_key) == os.environ[env_key] else "environment"
+            if row:
+                warnings.append({"code": "masked_override", "message": "environment overlay masks the persistent override",
+                                 "field": key})
+        return {**(row or {}), "key": key, "value": self.effective(key), "configured_value": configured,
+                "default": default, "has_override": row is not None, "is_default": source == "default",
+                "source": source, "restart_required": False, "pending_restart": False, "warnings": warnings}
 
     def upsert(self, key: str, value: Any) -> dict[str, Any]:
+        self.get(key)
         text = settings_to_str({key: value})[key]
         problem = setting_problem(key, text)
         if problem:
             raise InvalidRequest.single(["body", "value"], f"setting '{key}' {problem}", input_=value)
-        row = self.store.upsert_setting(key, text)
-        return {**row, "value": setting_typed_value(key, row["value"])}
+        self.store.upsert_setting(key, text)
+        return self.get(key)
 
     def delete(self, key: str) -> None:
         self.get(key)
@@ -156,9 +172,8 @@ class SettingsService:
     def effective(self, key: str) -> Any:
         parser, default = KNOWN_SETTINGS[key]
         row = self.store.get_setting(key)
-        if row is None:
-            return default
+        raw = os.environ.get(f"OPAL_SAY_{key.upper()}", row["value"] if row else str(default))
         try:
-            return parser(row["value"])
+            return parser(raw)
         except ValueError:
-            return default
+            return parser(row["value"]) if row else default

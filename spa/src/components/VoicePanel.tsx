@@ -22,7 +22,7 @@ export function VoicePanel() {
   const [enabledFilter, setEnabledFilter] = useState('')
   const [languageFilter, setLanguageFilter] = useState('')
   const voice = useLoad(
-    () => call<Voice[]>('opal_voice_list', { query: { engine_id: engineFilter, enabled: enabledFilter, language: languageFilter } }),
+    () => call<Voice[]>('list_voices', { query: { engine_id: engineFilter, enabled: enabledFilter, language: languageFilter } }),
     [],
   )
   const engines = useLoad(() => call<Engine[]>('opal_engine_list'), [])
@@ -52,9 +52,9 @@ export function VoicePanel() {
         engine_options: parseOptions(form.options) ?? {},
       }
       if (editing) {
-        await call('opal_voice_patch', { path: { voice_id: editing }, body })
+        await call('update_voice', { path: { voice_id: editing }, body })
       } else {
-        await call('opal_voice_create', { body: { voice_id: form.voice_id, ...body } })
+        await call('create_voice', { body: { voice_id: form.voice_id, ...body } })
       }
       setForm(EMPTY)
       setEditing(null)
@@ -78,23 +78,23 @@ export function VoicePanel() {
 
   const show = (id: string) =>
     action.run(async () => {
-      setSelected(await call<Voice>('opal_voice_get', { path: { voice_id: id } }))
+      setSelected(await call<Voice>('show_voice', { path: { voice_id: id } }))
     })
 
   const remove = (id: string) =>
     action.run(async () => {
-      await call('opal_voice_delete', { path: { voice_id: id } })
+      await call('remove_voice', { path: { voice_id: id } })
       await voice.reload()
     })
 
   const validate = (id: string) =>
     action.run(async () => {
-      setValidation(await call<ValidationResult>('opal_voice_validate', { path: { voice_id: id } }))
+      setValidation(await call<ValidationResult>('validate_voice', { path: { voice_id: id } }))
     })
 
   const test = (id: string) =>
     action.run(async () => {
-      const resp = await callRaw('opal_voice_test', { path: { voice_id: id }, body: {} })
+      const resp = await callRaw('test_voice', { path: { voice_id: id }, body: {} })
       const meta = audioMeta(resp)
       const raw = new Uint8Array(await resp.arrayBuffer())
       const blob = meta.format === 'pcm' ? pcmToWav(raw, meta.sampleRate) : new Blob([raw], { type: 'audio/wav' })

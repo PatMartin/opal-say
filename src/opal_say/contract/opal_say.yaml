@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: OPAL Say API
-  version: 1.7.1
+  version: 0.1.0
   description: "Implementation-neutral text-to-speech (TTS) service for the OPAL suite.\n\nOPAL Say provides a stable REST\
     \ contract over one or more host-installed TTS\nengine such as Piper or Kokoro. Clients interact with OPAL concepts—engine,\n\
     voice, profile, generation setting, and audio output—without depending on a\nspecific engine's command line, model layout,\
@@ -17,8 +17,8 @@ info:
     \ the caller's perspective and returns a\n  progressive raw PCM byte stream. Streaming never returns a WAV container.\n\
     * Long input is internally chunked by the service. Internal chunk boundaries are\n  not visible in the generated audio\
     \ contract.\n* Audio playback, audio-device control, synthesis history, request logging,\n  performance history, and asynchronous\
-    \ job management are intentionally outside\n  this API.\n* Configuration backup/import/export follows the same operational\
-    \ model as the\n  sister OPAL Listen service.\n\n\nOPAL SUITE STANDARD v1.2 (normative)\nX-Opal-Session-Id is an optional\
+    \ job management are intentionally outside\n  this API.\n* Configuration save/load/validate follows the same operational\
+    \ model as the\n  sister OPAL Listen service.\n\n\nOPAL SUITE STANDARD v2.0.0 (normative)\nX-Opal-Session-Id is an optional\
     \ logical context identifier; it does not create a server-managed session or grant authorization. Entry-point services\
     \ generate one when absent where a workflow requires it, and propagate it unchanged. A preexisting service-local session\
     \ resource has a separate lifecycle. X-Opal-Transaction-Id is a single logical end-to-end operation and is not an atomic\
@@ -28,13 +28,14 @@ info:
     \ errors, streamed headers, and binary bodies) return session ID if known and transaction/request IDs. Never trust these\
     \ values for access control. Propagate them into derived ZeroMQ envelope metadata. All identifiers are opaque 1..128-character\
     \ printable ASCII tokens with no control/whitespace characters; client-supplied invalid values yield 422.\nStandard health\
-    \ routes: /api/v1/health/, /api/v1/health/live, /api/v1/health/ready. Setting: GET and PATCH /api/v1/setting/ for the\
-    \ whole map, plus GET, PUT and DELETE /api/v1/setting/{key} for individual keys retained for OPAL suite consistency; PATCH\
-    \ is atomic. Mutable configuration uses strong ETags and mandatory If-Match with 428 missing, 412 stale. For bounded configuration\
-    \ catalogs return full arrays (subject to explicit deployment caps); growing histories return bounded arrays in stable\
-    \ deterministic order and `limit` caps the returned items. Standard HTTP creation 201 Location, async admission 202, empty\
-    \ deletion 204. Streaming keeps media-specific transports but exposes correlation headers, defined failure behavior, and\
-    \ no unsupported replay guarantee. Configuration export/import/validation excludes secrets and history.\n"
+    \ routes: /api/v1/health/, /api/v1/health/live, /api/v1/health/ready. Setting: GET /api/v1/setting/ for the flat map,\
+    \ plus GET, PUT and  DELETE /api/v1/setting/{key} for individual overrides; configuration snapshots via  POST /api/v1/config/save,\
+    \ /config/load and /config/validate. Mutable configuration uses strong ETags and mandatory If-Match with 428 missing,\
+    \ 412 stale. For bounded configuration catalogs return full arrays (subject to explicit deployment caps); growing histories\
+    \ return bounded arrays in stable deterministic order and `limit` caps the returned items. Standard HTTP creation 201\
+    \ Location, async admission 202, empty deletion 204. Streaming keeps media-specific transports but exposes correlation\
+    \ headers, defined failure behavior, and no unsupported replay guarantee. Configuration save/load/validate excludes secrets\
+    \ and history.\n"
 tags:
 - name: engine
   description: 'Discover and configure TTS engine installed by the service implementation.
@@ -48,18 +49,20 @@ tags:
     present on the host. Voice operations never upload, modify, or delete model files.
 
     '
-- name: profile
-  description: 'Manage reusable generation presets. Exactly one profile may be active at a time.
+- name: profiles
+  description: 'Manage reusable generation presets held as namespaced profile documents.
 
-    The active profile supplies defaults when a generation request does not name a
+    At most one profile is locally active at a time; the active profile''s `shared`
 
-    profile explicitly.
+    values and `modules.opal-say` compartment supply defaults when a generation
+
+    request does not name a profile explicitly.
 
     '
 - name: persona
   description: 'Manage named persona: identities that bind a registered voice so requests can
 
-    select a consistent character with a single `persona` field. Personas and profiles are explained together in the shared
+    select a consistent character with a single `persona_id` field. Personas and profiles are explained together in the shared
     kernel doc `x-opal-persona` (`profiles_vs_personas`). The schema is kept
 
     flat for Say v1; sister OPAL services may adopt the same persona identifiers for
@@ -73,16 +76,14 @@ tags:
     SSML is not supported by version 1 of this contract.
 
     '
-- name: setting
-  description: Service-wide key/value setting.
-- name: info
-  description: Service identity, version and liveness probes.
 - name: health
   description: Service readiness and health information. Playback devices are out of scope.
-- name: backup
-  description: Backup, restore, import, export, and validate OPAL Say configuration.
+- name: config
+  description: Save, load, validate, and inspect portable module configuration.
 - name: service
   description: Service process lifecycle (start, stop, log tail).
+- name: engines
+  description: Engine registration and inspection.
 servers:
 - url: http://127.0.0.1:8080
   description: Illustrative local endpoint; actual bind address and port are configurable.
@@ -231,7 +232,7 @@ paths:
         diagnostic messages because the validation operation itself completed normally.
 
         '
-      operationId: opal_engine_validate
+      operationId: validate_engine
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -270,7 +271,7 @@ paths:
         sizes over an advertised deployment cap, rather than silently truncate.
 
         '
-      operationId: opal_voice_list
+      operationId: list_voices
       parameters:
       - name: engine_id
         in: query
@@ -344,7 +345,7 @@ paths:
         resolved before accepting the registration.
 
         '
-      operationId: opal_voice_create
+      operationId: create_voice
       requestBody:
         required: true
         content:
@@ -430,7 +431,7 @@ paths:
       - voice
       summary: Get Voice
       description: Return one registered voice.
-      operationId: opal_voice_get
+      operationId: show_voice
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -470,7 +471,7 @@ paths:
         never modified by this API.
 
         '
-      operationId: opal_voice_patch
+      operationId: update_voice
       requestBody:
         required: true
         content:
@@ -538,7 +539,7 @@ paths:
         is changed or removed.
 
         '
-      operationId: opal_voice_delete
+      operationId: remove_voice
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -598,7 +599,7 @@ paths:
         lightweight engine-specific load check but does not return generated speech.
 
         '
-      operationId: opal_voice_validate
+      operationId: validate_voice
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -644,7 +645,7 @@ paths:
         returns completed WAV or PCM audio.
 
         '
-      operationId: opal_voice_test
+      operationId: test_voice
       requestBody:
         required: false
         content:
@@ -677,8 +678,9 @@ paths:
       - profiles
       summary: List profiles
       operationId: opal_profile_list
-      description: Return the complete bounded profile collection; pagination is not supported. An implementation may reject
-        catalog sizes over an advertised deployment cap rather than silently truncate.
+      description: Return the complete bounded collection of this service's local profile records; pagination is not supported.
+        Records are the full portable documents including preserved foreign compartments; `is_active` is the local selection
+        projection. An implementation may reject catalog sizes over an advertised deployment cap rather than silently truncate.
       responses:
         '200':
           description: Configured profiles.
@@ -705,13 +707,19 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+      x-opal-cli:
+        group: profile
+        command: list
     post:
       tags:
       - profiles
       summary: Create profile
       operationId: opal_profile_create
-      description: Create a reusable named profile. If `is_active` is true, the new profile becomes the only active profile.
-        Strong If-Match on the current collection revision is mandatory.
+      description: 'Create a reusable named profile. The body is a portable document that may carry compartments for multiple
+        modules: the service stores the complete record verbatim, honors only `shared` and its own compartment, and preserves
+        foreign compartments for later transfer. Omitted `shared`/`modules` normalize to empty objects. If `is_active` is
+        true, the new profile becomes the only locally active profile. Strong If-Match on the current collection revision
+        is mandatory.'
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -752,6 +760,49 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+      x-opal-cli:
+        group: profile
+        command: add
+        options:
+        - flag: --in
+          value: FILE
+          binds:
+            kind: local_in
+            target: body
+            parse: yaml_or_json_file
+          description: Whole portable profile document; exclusive with --name/--shared/--module.
+        - flag: --name
+          value: NAME
+          binds:
+            kind: body
+            target: name
+        - flag: --description
+          value: TEXT
+          binds:
+            kind: body
+            target: description
+        - flag: --is-active
+          binds:
+            kind: body
+            target: is_active
+        - flag: --no-is-active
+          binds:
+            kind: body
+            target: is_active
+        - flag: --shared
+          value: FILE
+          binds:
+            kind: local_in
+            target: shared
+            parse: yaml_or_json_file
+          description: Shared-values object merged into the submitted document.
+        - flag: --module
+          value: FILE
+          binds:
+            kind: local_in
+            target: modules.<module-key>
+            parse: yaml_or_json_file
+          description: The receiving service's own compartment; <module-key> resolves to the service's declared compartment.
   /api/v1/profile/{profile_id}:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -764,7 +815,7 @@ paths:
       - profiles
       summary: Get profile
       operationId: opal_profile_get
-      description: Return one profile.
+      description: Return one local profile record, including all stored module compartments and the local `is_active` projection.
       responses:
         '200':
           description: Profile.
@@ -791,12 +842,17 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+      x-opal-cli:
+        group: profile
+        command: show
     patch:
       tags:
       - profiles
       summary: Update profile
       operationId: opal_profile_patch
-      description: Partially update one profile. Strong If-Match is mandatory.
+      description: 'Partially update one local profile record under the `OpalProfilePatch` rules: field-wise merge inside
+        the receiving module''s own compartment, untouched foreign compartments, null-removal for nullable overrides, atomic
+        application. Strong If-Match is mandatory.'
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -837,12 +893,56 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+      x-opal-cli:
+        group: profile
+        command: update
+        options:
+        - flag: --in
+          value: FILE
+          binds:
+            kind: local_in
+            target: body
+            parse: yaml_or_json_file
+          description: Patch document; exclusive with --name/--shared/--module.
+        - flag: --name
+          value: NAME
+          binds:
+            kind: body
+            target: name
+        - flag: --description
+          value: TEXT
+          binds:
+            kind: body
+            target: description
+        - flag: --is-active
+          binds:
+            kind: body
+            target: is_active
+        - flag: --no-is-active
+          binds:
+            kind: body
+            target: is_active
+        - flag: --shared
+          value: FILE
+          binds:
+            kind: local_in
+            target: shared
+            parse: yaml_or_json_file
+        - flag: --module
+          value: FILE
+          binds:
+            kind: local_in
+            target: modules.<module-key>
+            parse: yaml_or_json_file
+          description: Partial own-compartment document; supplied fields merge field-wise, unmentioned compartments are preserved.
+            <module-key> resolves to the service's declared compartment.
     delete:
       tags:
       - profiles
       summary: Delete profile
       operationId: opal_profile_delete
-      description: Delete one profile. The active profile cannot be deleted. Strong If-Match is mandatory.
+      description: Delete this service's local copy of one profile record, including all stored compartments; other services'
+        copies are unaffected. The active profile cannot be deleted. Strong If-Match is mandatory.
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       responses:
@@ -867,8 +967,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+      x-opal-cli:
+        group: profile
+        command: remove
   /api/v1/profile/{profile_id}/activate:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -881,7 +986,9 @@ paths:
       - profiles
       summary: Activate profile
       operationId: opal_profile_activate
-      description: Make this profile the only active profile. Strong If-Match is mandatory.
+      description: 'Make this profile the only locally active profile. Activation is local runtime/configuration state: the
+        service resolves defaults from `shared` plus its own compartment; missing compartments contribute no overrides. Strong
+        If-Match is mandatory.'
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       responses:
@@ -914,24 +1021,24 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+      x-opal-cli:
+        group: profile
+        command: activate
   /api/v1/persona/:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
     get:
       tags:
       - persona
-      summary: List Personas
-      description: 'List registered OPAL persona. A persona is a named character that binds a
-
-        registered voice (and, in future contract versions, per-service fragments for
-
-        sister OPAL services) so that generation requests can select a consistent
-
-        identity with a single `persona` field.
-
-
-        Return the complete bounded configuration collection; pagination is not supported.
-
-        '
+      summary: List personas
       operationId: opal_persona_list
+      description: List the personas registered in this service's local catalog. A persona is a named identity that binds
+        an OPAL Say voice (and, in future contract versions, per-service fragments for sister services) so requests can select
+        a consistent identity by `persona_id`. Returns the complete bounded collection; pagination is not supported. The optional
+        `enabled` query parameter filters by enabled state; omission returns the unfiltered catalog.
       parameters:
       - name: enabled
         in: query
@@ -940,182 +1047,66 @@ paths:
         schema:
           type: boolean
       responses:
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '200':
-          description: Registered persona.
+          description: Registered personas.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PersonaRead'
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-            ETag:
-              description: Strong revision of logical portable configuration
-              schema:
-                type: string
+                  $ref: '#/components/schemas/OpalPersonaRead'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+      x-opal-cli:
+        group: persona
+        command: list
+        options:
+        - flag: --enabled
+          description: Include only enabled personas.
+          binds:
+            kind: query
+            target: enabled
+        - flag: --no-enabled
+          description: Send enabled=false; include only disabled personas.
+          binds:
+            kind: query
+            target: enabled
     post:
       tags:
       - persona
-      summary: Create Persona
-      description: 'Register a persona that binds a registered voice to a stable identity.
-
-        The referenced `voice_id` must already exist; implementations SHOULD reject a
-
-        persona whose voice cannot be resolved rather than registering a broken
-
-        binding. Strong If-Match is mandatory.
-
-        '
+      summary: Create persona
       operationId: opal_persona_create
+      description: 'Register a persona in the receiving service''s local catalog. OPAL Think hosts the authoritative registry
+        (see `x-opal-persona`); every service accepts local creation for standalone operation and owner records win on conflict
+        where an owner is configured. Referenced bindings SHOULD resolve locally: opal-say rejects an unregistered `voice_id`
+        with 404; services without resolvable bindings treat the reference as opaque. Strong If-Match on the current catalog
+        revision is mandatory; a missing precondition is 428 and a stale revision is 412.'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PersonaCreate'
+              $ref: '#/components/schemas/OpalPersonaCreate'
       responses:
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '201':
           description: Persona created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PersonaRead'
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-            Location:
-              description: Resource URL
-              schema:
-                type: string
-        '404':
-          description: The specified `voice_id` is not registered.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalError'
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-        '409':
-          description: The requested `persona_id` is already registered.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalError'
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '412':
-          $ref: '#/components/responses/PreconditionFailed'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-      parameters:
-      - $ref: '#/components/parameters/IfMatch'
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-  /api/v1/persona/{persona_id}/validate:
-    post:
-      summary: Validate Persona
-      description: 'Check that a persona resolves for generation: the persona is registered and enabled, its bound voice exists
-        and validates against its engine. No audio is synthesized.'
-      operationId: opal_persona_validate
-      tags:
-      - persona
-      responses:
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '200':
-          description: Persona validation report.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalValidationReport'
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-    parameters:
-    - $ref: '#/components/parameters/PersonaId'
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-  /api/v1/persona/{persona_id}:
-    parameters:
-    - $ref: '#/components/parameters/PersonaId'
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    get:
-      tags:
-      - persona
-      summary: Get Persona
-      description: Return one registered persona.
-      operationId: opal_persona_get
-      responses:
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '200':
-          description: Persona.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PersonaRead'
           headers:
             X-Opal-Session-Id:
               $ref: '#/components/headers/OpalSessionIdHeader'
@@ -1126,47 +1117,17 @@ paths:
             X-Opal-Causation-Id:
               $ref: '#/components/headers/OpalCausationIdHeader'
             ETag:
-              description: Strong revision of logical portable configuration
+              $ref: '#/components/headers/ETag'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
               schema:
-                type: string
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-    patch:
-      tags:
-      - persona
-      summary: Update Persona
-      description: Partially update a persona. If `voice_id` changes, the new voice must resolve. Strong If-Match is mandatory.
-      operationId: opal_persona_patch
-      parameters:
-      - $ref: '#/components/parameters/IfMatch'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PersonaUpdate'
-      responses:
+                $ref: '#/components/schemas/OpalPersonaRead'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-        '200':
-          description: Updated persona.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PersonaRead'
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -1177,19 +1138,224 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
-    delete:
+      x-opal-cli:
+        group: persona
+        command: add
+        options:
+        - flag: --if-match
+          value: ETAG
+          description: Strong If-Match precondition on the current catalog revision (required).
+          binds:
+            kind: header
+            target: If-Match
+        - flag: --persona-id
+          value: ID
+          required: true
+          binds:
+            kind: body
+            target: persona_id
+        - flag: --name
+          value: TEXT
+          required: true
+          binds:
+            kind: body
+            target: name
+        - flag: --description
+          value: TEXT
+          binds:
+            kind: body
+            target: description
+        - flag: --voice-id
+          value: ID
+          binds:
+            kind: body
+            target: voice_id
+        - flag: --enabled
+          binds:
+            kind: body
+            target: enabled
+        - flag: --no-enabled
+          binds:
+            kind: body
+            target: enabled
+  /api/v1/persona/{persona_id}/validate:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    - $ref: '#/components/parameters/OpalPersonaIdParameter'
+    post:
       tags:
       - persona
-      summary: Delete Persona
-      description: Remove a persona. The bound voice registration is unaffected. Strong If-Match is mandatory.
-      operationId: opal_persona_delete
-      parameters:
-      - $ref: '#/components/parameters/IfMatch'
+      summary: Validate persona
+      operationId: opal_persona_validate
+      description: 'Evaluate one local persona record against the receiving service''s rules and return an `OpalValidationReport`.
+        Read-only and service-local: no state changes. Each service validates the bindings it understands - opal-say checks
+        voice and engine compatibility, opal-think checks its service-local model and instruction bindings, opal-look and
+        opal-look-yolo validate the registered identity and enabled state; foreign bindings are opaque references. 404 means
+        no such record; 422 reports invalid input.'
       responses:
+        '200':
+          description: Validation report for the persona.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalValidationReport'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      x-opal-cli:
+        group: persona
+        command: validate
+  /api/v1/persona/{persona_id}:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    - $ref: '#/components/parameters/OpalPersonaIdParameter'
+    get:
+      tags:
+      - persona
+      summary: Get persona
+      operationId: opal_persona_get
+      description: Return one persona record from the local catalog. Consumers configured with an owner resolve unknown personas
+        against the authoritative registry and revalidate the cached ETag (see `x-opal-persona`).
+      responses:
+        '200':
+          description: Persona record.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalPersonaRead'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      x-opal-cli:
+        group: persona
+        command: show
+    patch:
+      tags:
+      - persona
+      summary: Update persona
+      operationId: opal_persona_patch
+      description: 'Partially update one local persona record under the `OpalPersonaUpdate` rules: field-wise merge, `null`
+        clears a nullable field, atomic application. Strong If-Match is mandatory. 409 reports a conflicting update - for
+        example a binding change published by opal-say that conflicts with its registry state.'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpalPersonaUpdate'
+      responses:
+        '200':
+          description: Updated persona.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalPersonaRead'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+      x-opal-cli:
+        group: persona
+        command: update
+        options:
+        - flag: --if-match
+          value: ETAG
+          description: Strong If-Match precondition on the record revision (required).
+          binds:
+            kind: header
+            target: If-Match
+        - flag: --name
+          value: TEXT
+          binds:
+            kind: body
+            target: name
+        - flag: --description
+          value: TEXT
+          binds:
+            kind: body
+            target: description
+        - flag: --voice-id
+          value: ID
+          binds:
+            kind: body
+            target: voice_id
+        - flag: --enabled
+          binds:
+            kind: body
+            target: enabled
+        - flag: --no-enabled
+          binds:
+            kind: body
+            target: enabled
+    delete:
+      tags:
+      - persona
+      summary: Delete persona
+      operationId: opal_persona_delete
+      description: Delete this service's local copy of one persona record; other services' catalogs are unaffected. Returns
+        a bodyless 204. Strong If-Match is mandatory.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
         '204':
           description: Persona deleted.
           headers:
@@ -1201,6 +1367,12 @@ paths:
               $ref: '#/components/headers/OpalRequestIdHeader'
             X-Opal-Causation-Id:
               $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '412':
@@ -1209,6 +1381,16 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+      x-opal-cli:
+        group: persona
+        command: remove
+        options:
+        - flag: --if-match
+          value: ETAG
+          description: Strong If-Match precondition on the record revision (required).
+          binds:
+            kind: header
+            target: If-Match
   /api/v1/generate:
     post:
       tags:
@@ -1217,21 +1399,23 @@ paths:
       description: "Generate completed speech audio from plain text.\n\nThe service may internally split long text into multiple\
         \ engine calls, but it\nMUST preserve the original text order and return one logically continuous audio\nresult. Internal\
         \ chunk boundaries are not part of the public API.\n\nGeneration setting are resolved in this order, from lowest to\
-        \ highest precedence:\n\n1. Service defaults.\n2. The active profile, when `profile_id` is omitted and an active profile\
-        \ exists.\n3. The explicitly selected `profile_id`, when present.\n4. The `persona`'s bound voice, when `persona`\
-        \ is present (voice field only).\n5. Fields supplied directly in this request.\n\nRequest-level `engine_options` are\
-        \ shallow-merged over profile-level\n`engine_options`; request keys win. Other request fields directly replace their\n\
-        corresponding profile defaults.\n\nVoice and engine selection:\n\n* A request-level `voice_id` overrides the `persona`\
-        \ voice; the persona voice\n  overrides the profile voice.\n* An unknown or disabled `persona` is rejected with `422\
-        \ Unprocessable Entity`.\n* The resolved voice normally determines the engine.\n* `engine_id` is an optional advanced\
-        \ override. The service MUST reject an\n  override that cannot use the resolved voice rather than silently substituting\n\
-        \  another voice.\n* If no voice can be resolved from either the request or a profile, generation\n  fails with `409\
-        \ Conflict`.\n\nOutput behavior:\n\n* `wav` returns a completed WAV container as `audio/wav`.\n* `pcm` returns headerless\
-        \ signed 16-bit little-endian mono PCM as\n  `application/octet-stream`.\n* The actual output sample rate is always\
-        \ returned in `X-Opal-Sample-Rate`.\n* When a `sample_rate` is explicitly requested, the service either returns audio\n\
-        \  at that rate or rejects the request; it must not silently return another rate.\n* Plain text only is accepted.\
-        \ SSML markup has no special meaning and is not a\n  supported input mode.\n"
-      operationId: opal_generate
+        \ highest precedence:\n\n1. Service defaults.\n2. The selected profile's `shared` values.\n3. The selected profile's\
+        \ `modules.opal-say` compartment (its voice_id, speed, volume, output_format, sample_rate and engine_options overrides).\
+        \ The selected profile is the active profile when `profile_id` is omitted and an active profile exists, else the explicitly\
+        \ selected `profile_id`.\n4. The `persona_id`'s bound voice, when `persona_id` is present (voice field only).\n5.\
+        \ Fields supplied directly in this request.\n\nRequest-level `engine_options` are shallow-merged over profile-level\n\
+        `engine_options`; request keys win. Other request fields directly replace their\ncorresponding profile defaults.\n\
+        \nVoice and engine selection:\n\n* A request-level `voice_id` overrides the `persona_id` voice; the persona voice\n\
+        \  overrides the profile voice.\n* An unknown or disabled `persona_id` is rejected with `422 Unprocessable Entity`.\n\
+        * The resolved voice normally determines the engine.\n* `engine_id` is an optional advanced override. The service\
+        \ MUST reject an\n  override that cannot use the resolved voice rather than silently substituting\n  another voice.\n\
+        * If no voice can be resolved from either the request or a profile, generation\n  fails with `409 Conflict`.\n\nOutput\
+        \ behavior:\n\n* `wav` returns a completed WAV container as `audio/wav`.\n* `pcm` returns headerless signed 16-bit\
+        \ little-endian mono PCM as\n  `application/octet-stream`.\n* The actual output sample rate is always returned in\
+        \ `X-Opal-Sample-Rate`.\n* When a `sample_rate` is explicitly requested, the service either returns audio\n  at that\
+        \ rate or rejects the request; it must not silently return another rate.\n* Plain text only is accepted. SSML markup\
+        \ has no special meaning and is not a\n  supported input mode.\n"
+      operationId: generate_speech
       requestBody:
         required: true
         content:
@@ -1249,13 +1433,13 @@ paths:
                   the active profile's voice for this request.
                 value:
                   text: Hello from Amy.
-                  persona: amy
+                  persona_id: amy
               explicit-voice-overrides:
                 summary: Explicit voice_id wins. Even with persona "amy" selected, the request voice en-us-ryan-high overrides
                   both the persona and the profile.
                 value:
                   text: Hello in Ryan's voice.
-                  persona: amy
+                  persona_id: amy
                   voice_id: en-us-ryan-high
       responses:
         '401':
@@ -1297,7 +1481,7 @@ paths:
         * If generation fails after a 200 response has begun, the service terminates the\n  stream. Clients MUST treat premature\
         \ termination as a failed generation; the\n  protocol does not inject an error object into the audio byte stream.\n\
         * Service-side text chunking MUST NOT reset sample format or sample rate between\n  internal chunks.\n"
-      operationId: opal_generate_stream
+      operationId: stream_speech
       requestBody:
         required: true
         content:
@@ -1346,7 +1530,7 @@ paths:
         \ body; producers should throttle their send loop.\n\nThe response is identical to `/api/v1/generate/stream`: headerless\
         \ s16le mono PCM at\n`X-Opal-Sample-Rate`. A failure before the first audio block returns a normal JSON error; a\n\
         failure after 200 truncates the stream, which clients MUST treat as a failed generation."
-      operationId: opal_generate_stream_incremental
+      operationId: stream_speech_incremental
       requestBody:
         required: true
         content:
@@ -1388,7 +1572,7 @@ paths:
     - $ref: '#/components/parameters/OpalCausationIdParameter'
     get:
       tags:
-      - settings
+      - config
       summary: List settings
       operationId: opal_setting_list
       description: Return the complete portable settings map with values; never returns secret material. ETag carries the
@@ -1417,23 +1601,27 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-    patch:
+      x-opal-cli:
+        parent: config
+        group: setting
+        command: list
+  /api/v1/setting/{key}:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    - $ref: '#/components/parameters/SettingKey'
+    get:
       tags:
-      - settings
-      summary: Patch settings
-      operationId: opal_setting_patch
-      description: Atomically apply a partial update to the portable settings map. Strong If-Match is mandatory.
-      parameters:
-      - $ref: '#/components/parameters/IfMatch'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OpalSettingsMap'
+      - config
+      summary: Get setting
+      operationId: opal_setting_get
+      description: Return one setting record with effective value, configured value, default, and provenance. ETag carries
+        the current revision for subsequent If-Match writes.
       responses:
         '200':
-          description: Updated settings map.
+          description: Setting record.
           headers:
             X-Opal-Session-Id:
               $ref: '#/components/headers/OpalSessionIdHeader'
@@ -1448,59 +1636,6 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OpalSettingsMap'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '412':
-          $ref: '#/components/responses/PreconditionFailed'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-    x-opal-cli:
-      get:
-        parent: config
-        group: setting
-        command: list
-        aliases: null
-      patch:
-        parent: config
-        group: setting
-        command: update
-        aliases:
-        - config setting patch
-  /api/v1/setting/{key}:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    - $ref: '#/components/parameters/SettingKey'
-    get:
-      tags:
-      - settings
-      summary: Get setting
-      operationId: opal_setting_get
-      description: Return a single setting key/value pair.
-      responses:
-        '200':
-          description: Setting value.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-          content:
-            application/json:
-              schema:
                 $ref: '#/components/schemas/SettingRead'
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1510,12 +1645,26 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+      x-opal-cli:
+        parent: config
+        group: setting
+        command: show
+        options:
+        - flag: --name
+          value: NAME
+          required: true
+          binds:
+            kind: path
+            target: key
     put:
       tags:
-      - settings
+      - config
       summary: Set setting
       operationId: opal_setting_put
-      description: Create or replace one setting value. Strong If-Match is mandatory.
+      description: Validate and immediately persist one setting override; creates or replaces the override for a registered
+        setting - never a new setting definition. Strong If-Match is mandatory. When an environment overlay masks the persisted
+        value, the returned record shows configured and effective values accurately and carries a structured warning; the
+        environment is never modified.
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -1526,7 +1675,7 @@ paths:
               $ref: '#/components/schemas/SettingUpdate'
       responses:
         '200':
-          description: Updated setting.
+          description: Updated setting record (the new revision travels in the ETag header).
           headers:
             X-Opal-Session-Id:
               $ref: '#/components/headers/OpalSessionIdHeader'
@@ -1536,6 +1685,8 @@ paths:
               $ref: '#/components/headers/OpalRequestIdHeader'
             X-Opal-Causation-Id:
               $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1554,17 +1705,36 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+      x-opal-cli:
+        parent: config
+        group: setting
+        command: set
+        options:
+        - flag: --name
+          value: NAME
+          required: true
+          binds:
+            kind: path
+            target: key
+        - flag: --value
+          value: VALUE
+          required: true
+          binds:
+            kind: body
+            target: value
+            parse: json_or_string
     delete:
       tags:
-      - settings
+      - config
       summary: Delete setting
       operationId: opal_setting_delete
-      description: Remove one setting key and revert it to its implementation default. Strong If-Match is mandatory.
+      description: Delete the persistent override for one registered setting key - never the setting definition. Returns 204
+        even when the key already has no override; environment overlays continue to apply afterwards. Strong If-Match is mandatory.
       parameters:
       - $ref: '#/components/parameters/IfMatch'
       responses:
         '204':
-          description: Setting removed.
+          description: Setting override removed (the new revision travels in the ETag header).
           headers:
             X-Opal-Session-Id:
               $ref: '#/components/headers/OpalSessionIdHeader'
@@ -1574,6 +1744,8 @@ paths:
               $ref: '#/components/headers/OpalRequestIdHeader'
             X-Opal-Causation-Id:
               $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              $ref: '#/components/headers/ETag'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1584,26 +1756,208 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
-    x-opal-cli:
-      get:
-        parent: config
-        group: setting
-        command: show
-        aliases:
-        - setting get
-      put:
-        parent: config
-        group: setting
-        command: set
-        aliases: null
-      delete:
+      x-opal-cli:
         parent: config
         group: setting
         command: remove
-        aliases:
-        - setting delete
+        options:
+        - flag: --name
+          value: NAME
+          required: true
+          binds:
+            kind: path
+            target: key
+  /api/v1/config/save:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    post:
+      tags:
+      - config
+      summary: Save configuration snapshot
+      operationId: opal_config_save
+      description: 'Capture the module''s persistent desired configuration as a portable snapshot. `destination: managed`
+        (default) atomically creates or replaces the module''s single default managed snapshot - an explicit recovery snapshot,
+        separate from live persisted configuration; a failed write preserves the previous managed snapshot and does not report
+        success. `destination: response` returns the snapshot in the body for the caller to store (CLI `config save --out
+        FILE`); it never replaces the managed snapshot. Save is not a live-configuration mutation: no If-Match and no live-revision
+        bump. The response ETag carries the captured live-configuration revision.'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpalConfigSaveRequest'
+      responses:
+        '200':
+          description: Snapshot result; ETag carries the captured live-configuration revision.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalConfigSaveResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/OperationFailed'
+      x-opal-cli:
+        group: config
+        command: save
+        options:
+        - flag: --out
+          value: FILE
+          binds:
+            kind: local_out
+            target: snapshot
+  /api/v1/config/load:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    post:
+      tags:
+      - config
+      summary: Load configuration snapshot
+      operationId: opal_config_load
+      description: 'Atomically replace the module''s complete persistent portable configuration - settings overrides and declarative
+        resource collections - with a snapshot. Omit the body or send `{}` to load the default managed snapshot (404 when
+        none exists); a supplied `snapshot` selects that candidate; an explicit null is invalid. This is replacement, not
+        merge: omitted registered setting overrides revert to defaults and omitted resource collections become empty, subject
+        to module invariants. Resource identifiers and references are preserved, never regenerated. Validation of the entire
+        candidate precedes any change; a failure, stale revision, invalid resource reference, or incompatible snapshot leaves
+        the previous configuration intact - the revision check and all changes apply in one atomic unit. Loading executes
+        no actions, starts no pipelines, downloads no models, and restarts no process; supported live settings activate and
+        restart-only fields are reported in `pending_restart_fields`. Loading never overwrites the managed snapshot with pre-load
+        live state, and never mutates another module or the authoritative persona registry (restored owner-linked records
+        remain subject to the owner-resolution policy). Strong If-Match is mandatory: 428 when missing, 412 when stale.'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpalConfigLoadRequest'
+      responses:
+        '200':
+          description: Load result; ETag carries the new live-configuration revision.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalConfigLoadResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '500':
+          $ref: '#/components/responses/OperationFailed'
+      x-opal-cli:
+        group: config
+        command: load
+        options:
+        - flag: --in
+          value: FILE
+          binds:
+            kind: local_in
+            target: snapshot
+            parse: yaml_or_json_file
+  /api/v1/config/validate:
+    parameters:
+    - $ref: '#/components/parameters/OpalSessionIdParameter'
+    - $ref: '#/components/parameters/OpalTransactionIdParameter'
+    - $ref: '#/components/parameters/OpalRequestIdParameter'
+    - $ref: '#/components/parameters/OpalCausationIdParameter'
+    post:
+      tags:
+      - config
+      summary: Validate configuration
+      operationId: opal_config_validate
+      description: Validate configuration without mutating anything. Omit `snapshot` to validate the current live configuration
+        (the managed snapshot is never read implicitly); supply a candidate `snapshot` to validate it without applying it
+        or storing it. Validation must not modify configuration, snapshots, revisions, active profiles, model residency, or
+        runtime state. The same checks run inside `config load`; a prior successful validate never bypasses them.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpalConfigValidateRequest'
+      responses:
+        '200':
+          description: Validation report.
+          headers:
+            X-Opal-Session-Id:
+              $ref: '#/components/headers/OpalSessionIdHeader'
+            X-Opal-Transaction-Id:
+              $ref: '#/components/headers/OpalTransactionIdHeader'
+            X-Opal-Request-Id:
+              $ref: '#/components/headers/OpalRequestIdHeader'
+            X-Opal-Causation-Id:
+              $ref: '#/components/headers/OpalCausationIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpalConfigValidation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      x-opal-cli:
+        group: config
+        command: validate
+        options:
+        - flag: --in
+          value: FILE
+          binds:
+            kind: local_in
+            target: snapshot
+            parse: yaml_or_json_file
   /api/v1/health/:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -1615,8 +1969,10 @@ paths:
       - health
       summary: Service health report
       operationId: opal_health_get
-      description: Aggregate health report for the service and its dependencies. The only suite-standard member is `status`;
-        all other sections are service-defined.
+      description: 'Aggregate health report for the service: identity (`name`, `version`, `api_version`), overall `status`,
+        `live`/`ready` flags and module-defined `details`. This is the single service information surface - it replaces the
+        retired `GET /api/v1/info/` and `GET /api/v1/info/ping` reports. Returns HTTP 200 whenever the report is available,
+        including when `ready` is false; 503 is used only when the report itself cannot be produced.'
       responses:
         '200':
           description: Service health report.
@@ -1633,6 +1989,85 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OpalHealthReport'
+              examples:
+                healthy:
+                  summary: Healthy module with module-defined details
+                  value:
+                    name: opal-say-svc
+                    version: 1.4.2
+                    api_version: v1
+                    status: ok
+                    live: true
+                    ready: true
+                    details:
+                      engines:
+                      - name: local-piper
+                        available: true
+                    checked_at: '2026-01-15T09:30:00Z'
+                    uptime_seconds: 8421.5
+                live_not_ready:
+                  summary: Live but unready module (still HTTP 200)
+                  value:
+                    name: opal-think-svc
+                    version: 2.1.0
+                    api_version: v1
+                    status: degraded
+                    live: true
+                    ready: false
+                    details:
+                      components:
+                        model_registry:
+                          state: initializing
+                    checked_at: '2026-01-15T09:31:12Z'
+                    uptime_seconds: 41.0
+                event_counters:
+                  summary: OPAL Event counter diagnostics under details.stats
+                  value:
+                    name: opal-event-svc
+                    version: 1.9.0
+                    api_version: v1
+                    status: ok
+                    live: true
+                    ready: true
+                    details:
+                      stats:
+                        observed_events: 120445
+                        matched_events: 8871
+                        executions_completed: 8650
+                        executions_failed: 3
+                        queue_depth: 0
+                        active_workers: 4
+                    checked_at: '2026-01-15T09:32:00Z'
+                    uptime_seconds: 51033.2
+                listen_audio_devices:
+                  summary: OPAL Listen device diagnostics under details.audio_devices
+                  value:
+                    name: opal-listen-svc
+                    version: 1.7.1
+                    api_version: v1
+                    status: ok
+                    live: true
+                    ready: true
+                    details:
+                      audio_devices:
+                      - id: default
+                        name: Built-in Microphone
+                        channels: 1
+                        sample_rate: 16000
+                    checked_at: '2026-01-15T09:32:44Z'
+                    uptime_seconds: 30012.0
+                minimal:
+                  summary: Module without extra diagnostics
+                  value:
+                    name: opal-look-yolo-svc
+                    version: 1.0.0
+                    api_version: v1
+                    status: ok
+                    live: true
+                    ready: true
+                    details: {}
+                    checked_at: '2026-01-15T09:33:10Z'
+                    uptime_seconds: 12.4
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1641,430 +2076,9 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /api/v1/backup/list:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    get:
-      tags:
-      - backup
-      summary: List backups
-      operationId: opal_backup_list
-      description: List backup archives managed by this service instance.
-      responses:
-        '200':
-          description: Known backups.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OpalBackupInfo'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-  /api/v1/backup/create:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    post:
-      tags:
-      - backup
-      summary: Create backup
-      operationId: opal_backup_create
-      description: Write a timestamped archive of the current logical configuration to the service's backup directory.
-      responses:
-        '201':
-          description: Backup created.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-            Location:
-              $ref: '#/components/headers/Location'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalBackupCreateResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '500':
-          $ref: '#/components/responses/OperationFailed'
-  /api/v1/backup/download/{filename}:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    - $ref: '#/components/parameters/BackupFilename'
-    get:
-      tags:
-      - backup
-      summary: Download backup
-      operationId: opal_backup_download
-      description: Download one service-managed backup archive.
-      responses:
-        '200':
-          description: Backup archive.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-  /api/v1/backup/restore/{filename}:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    - $ref: '#/components/parameters/BackupFilename'
-    post:
-      tags:
-      - backup
-      summary: Restore backup
-      operationId: opal_backup_restore
-      parameters:
-      - $ref: '#/components/parameters/IfMatch'
-      description: 'Atomically restore a named service-managed backup. Validation runs before application; the restore is
-        applied as a single atomic operation and a failed restore leaves the previous configuration intact. Strong If-Match
-        is mandatory: 428 when the precondition is missing, 412 when the supplied precondition is stale.'
-      responses:
-        '200':
-          description: Restore result.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalImportResult'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '412':
-          $ref: '#/components/responses/PreconditionFailed'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-        '500':
-          $ref: '#/components/responses/OperationFailed'
-  /api/v1/backup/{filename}:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    - $ref: '#/components/parameters/BackupFilename'
-    delete:
-      tags:
-      - backup
-      summary: Delete backup
-      operationId: opal_backup_delete
-      description: Delete a named backup file managed by this service.
-      responses:
-        '204':
-          description: Backup deleted.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-  /api/v1/backup/export:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    get:
-      tags:
-      - backup
-      summary: Export configuration
-      operationId: opal_backup_export
-      description: 'Export the full logical service configuration as JSON. The bundle describes portable configuration only:
-        it never embeds secrets, binaries, model files, or history.'
-      responses:
-        '200':
-          description: Logical service configuration.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalConfigExport'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '500':
-          $ref: '#/components/responses/OperationFailed'
-  /api/v1/backup/import:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    post:
-      tags:
-      - backup
-      summary: Import configuration
-      operationId: opal_backup_import
-      parameters:
-      - $ref: '#/components/parameters/IfMatch'
-      description: 'Atomically import a logical configuration bundle. Validation runs before application; the import is applied
-        as a single atomic operation and a failed import leaves the previous configuration intact. Omit the body to import
-        the implementation''s `./config/` file set. Strong If-Match is mandatory: 428 when the precondition is missing, 412
-        when the supplied precondition is stale.'
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              anyOf:
-              - $ref: '#/components/schemas/OpalConfigExport'
-              - type: 'null'
-              description: Bundle to import; omit to use ./config/
-      responses:
-        '200':
-          description: Import result.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalImportResult'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '412':
-          $ref: '#/components/responses/PreconditionFailed'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-        '500':
-          $ref: '#/components/responses/OperationFailed'
-  /api/v1/backup/validate:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    post:
-      tags:
-      - backup
-      summary: Validate configuration
-      operationId: opal_backup_validate
-      description: Validate a configuration bundle without applying it.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OpalConfigExport'
-      responses:
-        '200':
-          description: Validation report.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalValidationReport'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-    get:
-      tags:
-      - backup
-      summary: Validate stored configuration
-      operationId: opal_backup_validate_stored
-      description: Validate the configuration currently staged in the implementation's `./config/` file set without applying
-        it.
-      responses:
-        '200':
-          description: Validation report.
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OpalValidationReport'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-  /api/v1/info/:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    get:
-      tags:
-      - info
-      summary: Service Info
-      description: 'Service identity: name, package version and API version.'
-      operationId: opal_info_get
-      responses:
-        '200':
-          description: Service identity.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ServiceInfo'
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-  /api/v1/info/ping:
-    parameters:
-    - $ref: '#/components/parameters/OpalSessionIdParameter'
-    - $ref: '#/components/parameters/OpalTransactionIdParameter'
-    - $ref: '#/components/parameters/OpalRequestIdParameter'
-    - $ref: '#/components/parameters/OpalCausationIdParameter'
-    get:
-      tags:
-      - info
-      summary: Ping
-      description: Lightweight liveness probe for process supervisors.
-      operationId: opal_info_ping
-      responses:
-        '200':
-          description: Service process is alive.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LivenessRead'
-          headers:
-            X-Opal-Session-Id:
-              $ref: '#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: '#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: '#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: '#/components/headers/OpalCausationIdHeader'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+      x-opal-cli:
+        group: info
+        command: health
   /api/v1/health/live:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -2076,7 +2090,9 @@ paths:
       - health
       summary: Liveness probe
       operationId: opal_health_live_get
-      description: 'Cheap liveness check: the process is up and its minimal runtime is reachable.'
+      description: 'Cheap liveness check for machine callers: the process is up and its minimal runtime is reachable. This
+        is the supported machine probe - it replaces the retired `GET /api/v1/info/ping` for supervisors and load balancers.
+        No CLI binding; use `info health` for the human-readable report.'
       responses:
         '200':
           description: Health probe.
@@ -2125,7 +2141,8 @@ paths:
       - health
       summary: Readiness probe
       operationId: opal_health_ready_get
-      description: 'Readiness check: the service can accept traffic because every required dependency is initialized and reachable.'
+      description: 'Readiness check for machine callers: the service can accept traffic because every required dependency
+        is initialized and reachable. No CLI binding; use `info health` for the human-readable report.'
       responses:
         '200':
           description: Health probe.
@@ -2208,10 +2225,15 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/OperationFailed'
-    x-opal-cli:
-      post:
+      x-opal-cli:
         group: service
         command: start
+        options:
+        - flag: --append
+          description: Append to the existing service log instead of truncating it.
+          binds:
+            kind: body
+            target: append
   /api/v1/service/stop:
     parameters:
     - $ref: '#/components/parameters/OpalSessionIdParameter'
@@ -2249,8 +2271,7 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/OperationFailed'
-    x-opal-cli:
-      post:
+      x-opal-cli:
         group: service
         command: stop
   /api/v1/service/log:
@@ -2292,10 +2313,16 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-    x-opal-cli:
-      get:
+      x-opal-cli:
         group: service
         command: log
+        options:
+        - flag: --lines
+          value: N
+          description: Number of trailing log lines to return (1-1000, default 10).
+          binds:
+            kind: query
+            target: lines
 components:
   securitySchemes:
     BearerAuth:
@@ -2389,11 +2416,22 @@ components:
       name: profile_id
       in: path
       required: true
-      description: Numeric profile identifier.
+      description: Profile identifier.
       schema:
-        type: integer
-        minimum: 1
-      example: 1
+        type: string
+        minLength: 1
+      example: home
+    OpalPersonaIdParameter:
+      name: persona_id
+      in: path
+      required: true
+      description: Globally unique OPAL persona identifier.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+        pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
+      example: amy
     SettingKey:
       name: key
       in: path
@@ -2402,21 +2440,6 @@ components:
       schema:
         type: string
         minLength: 1
-    BackupFilename:
-      name: filename
-      in: path
-      required: true
-      description: 'Filename/identifier of a backup managed by the service. It must not contain
-
-        path separators or traversal components.
-
-        '
-      schema:
-        type: string
-        minLength: 1
-        maxLength: 255
-        pattern: ^[^/\\]+$
-      example: opal-say-2026-10-04T230000Z.tar.gz
     ServiceLogLines:
       name: lines
       in: query
@@ -2464,9 +2487,9 @@ components:
     ResolvedProfileId:
       description: Profile used to supply defaults, when a profile participated in resolution.
       schema:
-        type: integer
-        minimum: 1
-      example: 1
+        type: string
+        minLength: 1
+      example: home
     OpalSessionIdHeader:
       description: Effective OPAL session context for this response. Returned when a session identifier is known; conditionally
         present.
@@ -2749,6 +2772,21 @@ components:
           $ref: '#/components/headers/OpalRequestIdHeader'
         X-Opal-Causation-Id:
           $ref: '#/components/headers/OpalCausationIdHeader'
+    BadRequest:
+      description: Malformed request syntax or invalid parameter encoding.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpalError'
+      headers:
+        X-Opal-Session-Id:
+          $ref: '#/components/headers/OpalSessionIdHeader'
+        X-Opal-Transaction-Id:
+          $ref: '#/components/headers/OpalTransactionIdHeader'
+        X-Opal-Request-Id:
+          $ref: '#/components/headers/OpalRequestIdHeader'
+        X-Opal-Causation-Id:
+          $ref: '#/components/headers/OpalCausationIdHeader'
   schemas:
     AudioFormat:
       type: string
@@ -2943,100 +2981,6 @@ components:
         updated_at:
           type: string
           format: date-time
-    PersonaCreate:
-      type: object
-      additionalProperties: false
-      required:
-      - persona_id
-      - name
-      - voice_id
-      properties:
-        persona_id:
-          type: string
-          minLength: 1
-          maxLength: 200
-          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
-          description: Globally unique OPAL persona identifier.
-          example: amy
-        name:
-          type: string
-          minLength: 1
-          maxLength: 200
-          description: Human-readable persona name.
-          example: Amy
-        description:
-          anyOf:
-          - type: string
-            maxLength: 1000
-          - type: 'null'
-          description: Optional human-readable description or character notes.
-        voice_id:
-          type: string
-          minLength: 1
-          description: Registered voice this persona speaks with.
-          example: en-gb-alan-low
-        enabled:
-          type: boolean
-          default: true
-          description: Whether this persona may be selected for generation.
-      example:
-        persona_id: amy
-        name: Amy
-        voice_id: en-gb-alan-low
-        enabled: true
-    PersonaUpdate:
-      type: object
-      minProperties: 1
-      additionalProperties: false
-      description: Partial update to a persona.
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 200
-        description:
-          anyOf:
-          - type: string
-            maxLength: 1000
-          - type: 'null'
-        voice_id:
-          type: string
-          minLength: 1
-          description: Rebind the persona to a different registered voice.
-        enabled:
-          type: boolean
-    PersonaRead:
-      type: object
-      required:
-      - persona_id
-      - name
-      - voice_id
-      - enabled
-      - created_at
-      - updated_at
-      properties:
-        persona_id:
-          type: string
-          example: amy
-        name:
-          type: string
-          example: Amy
-        description:
-          anyOf:
-          - type: string
-          - type: 'null'
-        voice_id:
-          type: string
-          description: Registered voice this persona speaks with.
-          example: en-gb-alan-low
-        enabled:
-          type: boolean
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
     GenerateRequestBase:
       type: object
       required:
@@ -3061,8 +3005,8 @@ components:
             '
         profile_id:
           anyOf:
-          - type: integer
-            minimum: 1
+          - type: string
+            minLength: 1
           - type: 'null'
           description: Explicit profile to use. If omitted/null, the active profile may supply defaults.
         voice_id:
@@ -3072,7 +3016,7 @@ components:
           - type: 'null'
           description: Request-level voice override. Takes precedence over the profile voice.
           example: en-us-lessac-medium
-        persona:
+        persona_id:
           anyOf:
           - $ref: '#/components/schemas/OpalPersonaRef'
           - type: 'null'
@@ -3086,6 +3030,12 @@ components:
 
             '
           example: amy
+        persona:
+          anyOf:
+          - $ref: '#/components/schemas/OpalPersonaRef'
+          - type: 'null'
+          deprecated: true
+          description: Deprecated alias of `persona_id`.
         engine_id:
           anyOf:
           - type: string
@@ -3157,7 +3107,7 @@ components:
       - $ref: '#/components/schemas/GenerateRequestBase'
       example:
         text: Stream this sentence as raw PCM audio.
-        profile_id: 1
+        profile_id: home
         speed: 1.0
         volume: 1.0
         sample_rate: 22050
@@ -3315,6 +3265,7 @@ components:
       description: Standard OPAL error envelope for all 4xx/5xx JSON responses.
     OpalEnginePatch:
       type: object
+      minProperties: 1
       properties:
         enabled:
           type: boolean
@@ -3350,12 +3301,6 @@ components:
           type: object
           additionalProperties: true
           description: Optional implementation-specific validation details.
-        sources:
-          additionalProperties:
-            type: boolean
-          type: object
-          title: Sources
-          default: {}
         issues:
           type: array
           items:
@@ -3373,11 +3318,147 @@ components:
       - valid
       additionalProperties: true
       description: Non-mutating validation result. `valid` is suite-standard; remaining fields describe per-service diagnostics.
+    OpalProfileShared:
+      type: object
+      additionalProperties: false
+      description: 'Shared profile values: fields with proven identical meaning across multiple modules. Starts empty - a
+        field is promoted here only when two or more module contracts already accept it with the same name, type and semantics.
+        Promotion records consumers, units, accepted values and the compartment mapping in docs/PROFILE_MIGRATION.md. Until
+        then this is a closed empty object: any member is rejected.'
+    OpalEventProfileNamespace:
+      type: object
+      additionalProperties: false
+      description: opal-event compartment. Event currently declares no profile-specific defaults; this is an explicit empty
+        closed schema so the compartment is registered, validated and round-tripped.
+    OpalListenProfileNamespace:
+      type: object
+      properties:
+        wakeword_names:
+          type: array
+          items:
+            type: string
+          title: Wakeword Names
+          description: Wakewords the recognition pipeline listens for by default.
+        confidence_thresholds:
+          type: object
+          additionalProperties: true
+          title: Confidence Thresholds
+          description: Per-intent or global minimum recognition confidence overrides.
+        vad_settings:
+          type: object
+          additionalProperties: true
+          title: Vad Settings
+          description: Voice-activity-detection overrides used by the recognition pipeline.
+        enabled_intents:
+          type: array
+          items:
+            type: string
+          title: Enabled Intents
+          description: Intent identifiers enabled by default.
+        enabled_slots:
+          type: array
+          items:
+            type: string
+          title: Enabled Slots
+          description: Slot identifiers enabled by default.
+        model_paths:
+          type: object
+          additionalProperties:
+            type: string
+          title: Model Paths
+          description: Named model-resource path overrides (e.g. stt, tts-adjacent assets).
+      additionalProperties: false
+      description: 'opal-listen compartment: recognition defaults migrated from the v2 flat profile fields `wakeword_names`,
+        `confidence_thresholds`, `vad_settings`, `enabled_intents`, `enabled_slots`, `model_paths`. All fields are optional
+        overrides; omission inherits.'
+    OpalLookProfileNamespace:
+      type: object
+      additionalProperties: false
+      description: opal-look compartment. Look currently declares no profile-specific defaults; this is an explicit empty
+        closed schema so the compartment is registered, validated and round-tripped. Fields added later must be declared here
+        before they are accepted.
+    OpalYoloProfileNamespace:
+      type: object
+      additionalProperties: false
+      description: opal-look-yolo compartment. The nested YOLO engine adapter currently declares no profile-specific defaults;
+        this is an explicit empty closed schema so the engine compartment is registered, validated and round-tripped like
+        every other runtime module.
+    OpalSayProfileNamespace:
+      type: object
+      properties:
+        voice_id:
+          type: string
+          minLength: 1
+          description: Registered OPAL Say voice used by default.
+          example: en-us-lessac-medium
+        speed:
+          type: number
+          format: float
+          minimum: 0.25
+          maximum: 4.0
+          description: Default speaking-rate multiplier for generation.
+        volume:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 2.0
+          description: Default output volume multiplier for generation.
+        output_format:
+          type: string
+          description: Default audio output format; values are service-defined (e.g. 'wav', 'pcm').
+        sample_rate:
+          anyOf:
+          - type: integer
+            minimum: 8000
+            maximum: 192000
+          - type: 'null'
+          description: Optional default output sample rate. Stored `null` is an allowed value meaning the service chooses;
+            it is not a deletion marker.
+        engine_options:
+          type: object
+          additionalProperties: true
+          description: Engine-specific option passthrough, shallow-merged under request-level `engine_options` during generation
+            (request keys win). The engine-options extension point is unchanged.
+      additionalProperties: false
+      description: 'opal-say compartment: generation defaults migrated from the v2 flat profile fields `voice_id`, `speed`,
+        `volume`, `output_format`, `sample_rate`, `engine_options`. All fields are optional overrides; omission inherits.'
+    OpalThinkProfileNamespace:
+      type: object
+      additionalProperties: false
+      description: opal-think compartment. Think currently declares no profile-specific defaults; this is an explicit empty
+        closed schema so the compartment is registered, validated and round-tripped.
+    OpalProfileModules:
+      type: object
+      properties:
+        opal-event:
+          $ref: '#/components/schemas/OpalEventProfileNamespace'
+        opal-listen:
+          $ref: '#/components/schemas/OpalListenProfileNamespace'
+        opal-look:
+          $ref: '#/components/schemas/OpalLookProfileNamespace'
+        opal-look-yolo:
+          $ref: '#/components/schemas/OpalYoloProfileNamespace'
+        opal-say:
+          $ref: '#/components/schemas/OpalSayProfileNamespace'
+        opal-think:
+          $ref: '#/components/schemas/OpalThinkProfileNamespace'
+      additionalProperties:
+        type: object
+        description: Unrecognized module namespace. Any well-formed object is accepted and preserved verbatim through reads,
+          own-compartment edits and config save/load; its validation status is unverified. Declared compartments above enforce
+          their strict schemas.
+      description: The reference-connected catalog of module-owned profile compartments, keyed by canonical module identity
+        (`x-opal-snapshot.module`). Every participating runtime module, including nested engine contracts, is registered -
+        modules with no profile-specific defaults use an explicit empty compartment schema. Each service stores and returns
+        this complete map on profile records; it reads only `shared` and its own compartment, and preserves all others.
     OpalProfile:
       type: object
       properties:
         id:
-          description: Opaque profile identifier; string or integer per service.
+          type: string
+          minLength: 1
+          readOnly: true
+          description: Opaque profile identifier.
         name:
           type: string
         description:
@@ -3386,78 +3467,51 @@ components:
           - type: 'null'
         is_active:
           type: boolean
-        voice_id:
-          type: string
-        speed:
-          type: number
-          format: float
-        volume:
-          type: number
-          format: float
-        output_format:
-          type: string
-          description: Audio output format; values are service-defined (e.g. 'wav', 'pcm').
-        sample_rate:
-          anyOf:
-          - type: integer
-          - type: 'null'
-        engine_options:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
+          description: Local projection of this service's active-profile selection, not portable payload. At most one profile
+            reports true in a service's local catalog; config save/load stores and restores it so the local selection survives
+            transfer.
+        shared:
+          $ref: '#/components/schemas/OpalProfileShared'
+        modules:
+          $ref: '#/components/schemas/OpalProfileModules'
         created_at:
           type: string
           format: date-time
+          readOnly: true
         updated_at:
           type: string
           format: date-time
-        wakeword_names:
-          items:
-            type: string
-          type: array
-          title: Wakeword Names
-        confidence_thresholds:
-          additionalProperties: true
-          type: object
-          title: Confidence Thresholds
-        vad_settings:
-          additionalProperties: true
-          type: object
-          title: Vad Settings
-        enabled_intents:
-          items:
-            type: string
-          type: array
-          title: Enabled Intents
-        enabled_slots:
-          items:
-            type: string
-          type: array
-          title: Enabled Slots
-        model_paths:
-          additionalProperties:
-            type: string
-          type: object
-          title: Model Paths
-        pipeline_id:
-          type: string
-          minLength: 1
-          maxLength: 128
-        inference:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
-        retention:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
+          readOnly: true
       required:
       - id
       - is_active
       - name
-      additionalProperties: true
-      description: A reusable named generation/processing profile. `id`, `name` and `is_active` are suite-standard; all other
-        fields are service-defined. Exactly one profile may be active at a time.
+      - shared
+      - modules
+      additionalProperties: false
+      description: 'A complete local profile record: identity, display metadata, a `shared` section and a `modules` map of
+        module-owned compartments (catalog in `OpalProfileModules`). `shared` and `modules` are required and always objects
+        - empty objects and missing module compartments are valid. The envelope is closed: undeclared fields are rejected.
+        Exactly one active profile per service is the local ceiling; zero is legal. Lifecycle semantics are defined by `x-opal-profiles`.'
+      example:
+        id: studio
+        name: Studio defaults
+        description: Reusable defaults across OPAL modules
+        is_active: true
+        shared: {}
+        modules:
+          opal-say:
+            voice_id: en-us-lessac-medium
+            speed: 1.1
+            sample_rate: null
+          opal-listen:
+            wakeword_names:
+            - hey_opal
+            enabled_intents:
+            - lights_on
+          opal-look: {}
+        created_at: '2026-01-01T00:00:00Z'
+        updated_at: '2026-01-02T00:00:00Z'
     OpalProfileCreate:
       type: object
       properties:
@@ -3466,7 +3520,7 @@ components:
           minLength: 1
           maxLength: 100
           description: Unique or human-distinguishable profile name.
-          example: default
+          example: Studio defaults
         description:
           anyOf:
           - type: string
@@ -3475,97 +3529,166 @@ components:
         is_active:
           type: boolean
           default: false
-          description: If true, activate this profile and deactivate all others.
-        voice_id:
+          description: If true, activate this profile locally and deactivate all others.
+        shared:
+          $ref: '#/components/schemas/OpalProfileShared'
+        modules:
+          $ref: '#/components/schemas/OpalProfileModules'
+        id:
           type: string
           minLength: 1
-          description: Registered voice used by default for this profile.
-          example: en-us-lessac-medium
-        speed:
-          type: number
-          format: float
-          minimum: 0.25
-          maximum: 4.0
-          default: 1.0
-        volume:
-          type: number
-          format: float
-          minimum: 0.0
-          maximum: 2.0
-          default: 1.0
-        output_format:
-          allOf:
+          description: Client-supplied profile identifier where supported.
+      required:
+      - name
+      additionalProperties: false
+      description: 'Profile creation request: a portable document that may carry compartments for multiple modules, which
+        the receiving service stores verbatim while honoring only `shared` and its own compartment. `name` is required; omitted
+        `shared` and `modules` normalize to empty objects, so a created record always carries both. `is_active: true` activates
+        the new profile and deactivates all others. Closed envelope.'
+      example:
+        name: Studio defaults
+        description: Reusable defaults across OPAL modules
+        is_active: true
+        modules:
+          opal-say:
+            voice_id: en-us-lessac-medium
+            speed: 1.1
+          opal-listen:
+            enabled_slots:
+            - city
+    OpalEventProfileNamespacePatch:
+      type: object
+      additionalProperties: false
+      description: Patch form of the opal-event compartment. No fields are declared; any member is rejected until a declared
+        field exists.
+    OpalListenProfileNamespacePatch:
+      type: object
+      properties:
+        wakeword_names:
+          anyOf:
+          - type: array
+            items:
+              type: string
+          - type: 'null'
+          title: Wakeword Names
+        confidence_thresholds:
+          anyOf:
+          - type: object
+            additionalProperties: true
+          - type: 'null'
+          title: Confidence Thresholds
+        vad_settings:
+          anyOf:
+          - type: object
+            additionalProperties: true
+          - type: 'null'
+          title: Vad Settings
+        enabled_intents:
+          anyOf:
+          - type: array
+            items:
+              type: string
+          - type: 'null'
+          title: Enabled Intents
+        enabled_slots:
+          anyOf:
+          - type: array
+            items:
+              type: string
+          - type: 'null'
+          title: Enabled Slots
+        model_paths:
+          anyOf:
+          - type: object
+            additionalProperties:
+              type: string
+          - type: 'null'
+          title: Model Paths
+      additionalProperties: false
+      description: Patch form of the opal-listen compartment. Supplied fields merge field-wise; arrays replace as whole values;
+        explicit `null` removes that override and restores inheritance.
+    OpalLookProfileNamespacePatch:
+      type: object
+      additionalProperties: false
+      description: Patch form of the opal-look compartment. No fields are declared; any member is rejected until a declared
+        field exists.
+    OpalYoloProfileNamespacePatch:
+      type: object
+      additionalProperties: false
+      description: Patch form of the opal-look-yolo compartment. No fields are declared; any member is rejected until a declared
+        field exists.
+    OpalSayProfileNamespacePatch:
+      type: object
+      properties:
+        voice_id:
+          anyOf:
           - type: string
-            description: Audio output format; values are service-defined (e.g. 'wav', 'pcm').
-          default: wav
-          description: Default format for completed `/generate` requests using this profile.
+            minLength: 1
+          - type: 'null'
+        speed:
+          anyOf:
+          - type: number
+            format: float
+            minimum: 0.25
+            maximum: 4.0
+          - type: 'null'
+        volume:
+          anyOf:
+          - type: number
+            format: float
+            minimum: 0.0
+            maximum: 2.0
+          - type: 'null'
+        output_format:
+          anyOf:
+          - type: string
+          - type: 'null'
         sample_rate:
           anyOf:
           - type: integer
             minimum: 8000
             maximum: 192000
           - type: 'null'
-          default: null
-          description: Optional default output sample rate. Null lets the service choose.
         engine_options:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
-        wakeword_names:
-          items:
-            type: string
-          type: array
-          title: Wakeword Names
-          default: []
-        confidence_thresholds:
-          additionalProperties: true
-          type: object
-          title: Confidence Thresholds
-          default: {}
-        vad_settings:
-          additionalProperties: true
-          type: object
-          title: Vad Settings
-          default: {}
-        enabled_intents:
-          items:
-            type: string
-          type: array
-          title: Enabled Intents
-          default: []
-        enabled_slots:
-          items:
-            type: string
-          type: array
-          title: Enabled Slots
-          default: []
-        model_paths:
-          additionalProperties:
-            type: string
-          type: object
-          title: Model Paths
-          default: {}
-        id:
-          description: Client-supplied profile identifier where supported; string or integer per service.
-        pipeline_id:
-          type: string
-          minLength: 1
-          maxLength: 128
-        inference:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
-        retention:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
-      required:
-      - name
-      additionalProperties: true
-      description: 'Profile creation request. `name` is required; `is_active: true` activates the new profile and deactivates
-        all others.'
+          anyOf:
+          - type: object
+            additionalProperties: true
+          - type: 'null'
+      additionalProperties: false
+      description: 'Patch form of the opal-say compartment. Supplied fields merge field-wise; explicit `null` removes that
+        override and restores inheritance (`sample_rate` removal is equivalent to its stored null value: the service chooses).
+        Non-object values and undeclared fields are rejected.'
+    OpalThinkProfileNamespacePatch:
+      type: object
+      additionalProperties: false
+      description: Patch form of the opal-think compartment. No fields are declared; any member is rejected until a declared
+        field exists.
+    OpalProfileModulesPatch:
+      type: object
+      properties:
+        opal-event:
+          $ref: '#/components/schemas/OpalEventProfileNamespacePatch'
+        opal-listen:
+          $ref: '#/components/schemas/OpalListenProfileNamespacePatch'
+        opal-look:
+          $ref: '#/components/schemas/OpalLookProfileNamespacePatch'
+        opal-look-yolo:
+          $ref: '#/components/schemas/OpalYoloProfileNamespacePatch'
+        opal-say:
+          $ref: '#/components/schemas/OpalSayProfileNamespacePatch'
+        opal-think:
+          $ref: '#/components/schemas/OpalThinkProfileNamespacePatch'
+      additionalProperties:
+        type: object
+        description: Unrecognized module namespace in a patch document. Structurally any object is accepted, but ordinary
+          partial edits may target only the receiving service''s own compartment; a service rejects foreign compartment edits
+          with 422 and preserves stored foreign contents.
+      description: Patch catalog mirroring `OpalProfileModules`; compartment values use each module's patch namespace where
+        supplied fields merge field-wise over the stored compartment. Supplying any compartment key other than the receiving
+        module's own is rejected with 422 Unprocessable Entity.
     OpalProfilePatch:
       type: object
+      minProperties: 1
       properties:
         name:
           type: string
@@ -3578,93 +3701,154 @@ components:
           - type: 'null'
         is_active:
           type: boolean
-          description: Setting true activates this profile and deactivates all others.
+          description: Setting true activates this profile locally and deactivates all others. Setting false leaves the local
+            selection unchanged; it never produces a no-active-profile state by itself.
+        shared:
+          $ref: '#/components/schemas/OpalProfileShared'
+        modules:
+          $ref: '#/components/schemas/OpalProfileModulesPatch'
+      additionalProperties: false
+      description: 'Partial profile update: only supplied fields change; omitted properties stay unchanged. A supplied compartment
+        merges field-wise over the stored compartment - sibling fields and every other compartment are preserved. Arrays replace
+        as whole values. Explicit JSON `null` on a compartment field removes that override and restores inheritance; `null`
+        is rejected where a field is not nullable and compartments themselves must remain objects. `modules` may contain only
+        the receiving service''s own compartment key - edits to another module''s compartment are rejected with 422 and preserved
+        untouched. Patches are atomic. Closed envelope.'
+      example:
+        modules:
+          opal-say:
+            speed: 1.25
+            voice_id: null
+    OpalPersonaRead:
+      type: object
+      required:
+      - persona_id
+      - name
+      - enabled
+      - created_at
+      - updated_at
+      properties:
+        persona_id:
+          type: string
+          description: Globally unique OPAL persona identifier.
+          example: amy
+        name:
+          type: string
+          example: Amy
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
         voice_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Optional OPAL Say voice identifier associated with this persona.
+        enabled:
+          type: boolean
+        origin:
+          type: string
+          enum:
+          - local
+          - owner
+          default: local
+          description: 'Provenance: `local` (authored here, standalone) or `owner` (synced from the authoritative registry
+            at OPAL Think). Optional and additive; absent means `local`.'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    OpalPersonaCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - persona_id
+      - name
+      properties:
+        persona_id:
           type: string
           minLength: 1
-        speed:
-          type: number
-          format: float
-          minimum: 0.25
-          maximum: 4.0
-        volume:
-          type: number
-          format: float
-          minimum: 0.0
-          maximum: 2.0
-        output_format:
-          type: string
-          description: Audio output format; values are service-defined (e.g. 'wav', 'pcm').
-        sample_rate:
-          anyOf:
-          - type: integer
-            minimum: 8000
-            maximum: 192000
-          - type: 'null'
-        engine_options:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
-        wakeword_names:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Wakeword Names
-        confidence_thresholds:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
-          title: Confidence Thresholds
-        vad_settings:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
-          title: Vad Settings
-        enabled_intents:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Enabled Intents
-        enabled_slots:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Enabled Slots
-        model_paths:
-          anyOf:
-          - additionalProperties:
-              type: string
-            type: object
-          - type: 'null'
-          title: Model Paths
-        pipeline_id:
+          maxLength: 200
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
+          description: Globally unique OPAL persona identifier.
+          example: amy
+        name:
           type: string
           minLength: 1
-          maxLength: 128
-        inference:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
-        retention:
-          type: object
-          additionalProperties: true
-          description: Service-defined section.
-      required: []
-      additionalProperties: true
-      description: Partial profile update; only supplied fields change.
+          maxLength: 200
+          description: Human-readable persona name.
+          example: Amy
+        description:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          description: Optional human-readable description or character notes.
+        voice_id:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          description: Optional OPAL Say voice identifier associated with this persona.
+          example: en-gb-alan-low
+        enabled:
+          type: boolean
+          default: true
+          description: Whether this persona may be selected.
+      example:
+        persona_id: amy
+        name: Amy
+        voice_id: en-gb-alan-low
+        enabled: true
+    OpalPersonaUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      description: Partial update to a persona.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+        voice_id:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          description: Rebind the persona to a different OPAL Say voice identifier.
+        enabled:
+          type: boolean
     OpalSettingsMap:
       type: object
       additionalProperties: true
-      description: 'The complete portable settings map: dotted keys to native JSON values. Secret material is never included.
-        `pending_restart_fields` is a reserved key naming settings that require a restart to take effect.'
+      description: 'The complete portable settings map: flat map of registered setting keys to effective native JSON values.
+        Secret material is never included. Lifecycle metadata such as `pending_restart_fields` is never mixed into this map.'
+    OpalValidationIssue:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable issue or warning code.
+        path:
+          type: string
+          description: Field or resource path the issue applies to (e.g. `settings.vad.threshold`, `resources.profiles[2].id`);
+            empty string for whole-snapshot issues.
+        message:
+          type: string
+          description: Human-readable description of the issue.
+      required:
+      - code
+      - path
+      - message
+      additionalProperties: true
+      description: One structured validation issue or warning.
     SettingRead:
       type: object
       properties:
@@ -3676,22 +3860,56 @@ components:
           type: string
         value:
           title: Value
-          description: Native JSON setting value.
+          description: Effective native JSON value after environment and .env overlays.
+        configured_value:
+          title: Configured Value
+          description: Persistent desired value before environment/.env overlays; equals the registered default when no override
+            exists.
         updated_at:
           format: date-time
           title: Updated At
           type: string
         default:
-          description: Default native JSON value, when safe to expose.
+          description: Registered default native JSON value, when safe to expose.
+        has_override:
+          type: boolean
+          description: True when a persistent user override exists for this key.
         is_default:
           type: boolean
+          description: True when the effective value comes from the registered default (provenance, not value equality).
+        source:
+          type: string
+          enum:
+          - default
+          - persisted
+          - dotenv
+          - environment
+          description: 'Provenance of the effective value. Precedence, highest first: environment, dotenv, persisted, default.'
+        restart_required:
+          type: boolean
+          description: True when changing this setting requires a service restart to take effect.
         pending_restart:
           type: boolean
+          description: For restart-only settings, true when the desired effective value diverges from the currently running
+            value. An environment-masked persistent edit reports masked (via `source`/`configured_value`), not pending_restart.
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpalValidationIssue'
+          description: Structured warnings, e.g. an environment overlay masking the persisted value.
       required:
       - key
       - value
+      - configured_value
+      - default
+      - has_override
+      - is_default
+      - source
+      - restart_required
+      - pending_restart
       additionalProperties: true
-      description: One setting key/value pair with optional lifecycle metadata.
+      description: One setting record with effective/configured/default values and provenance metadata. Lifecycle metadata
+        such as `pending_restart_fields` never appears inside the settings map itself.
     SettingUpdate:
       type: object
       properties:
@@ -3701,43 +3919,177 @@ components:
       - value
       additionalProperties: false
       description: Replacement value for a single setting key.
+    OpalConfigSaveRequest:
+      type: object
+      properties:
+        destination:
+          type: string
+          enum:
+          - managed
+          - response
+          default: managed
+          description: '`managed` atomically creates or replaces the module''s default managed snapshot; `response` returns
+            the snapshot in the body for the caller to store (CLI `config save --out` maps here) and never replaces the managed
+            snapshot.'
+      additionalProperties: false
+    OpalConfigSnapshot:
+      type: object
+      properties:
+        format_version:
+          type: string
+          description: Snapshot envelope format version. This contract accepts `1.0.0` only; other versions are rejected explicitly.
+        module:
+          type: string
+          minLength: 1
+          description: Canonical module identity (e.g. `opal-listen`). Snapshots for a different module are rejected before
+            application.
+        created_at:
+          type: string
+          format: date-time
+        settings:
+          type: object
+          additionalProperties: true
+          description: Flat map of registered setting-key overrides to native JSON values (booleans, numbers, arrays and objects
+            are never stringified). Unknown setting keys are rejected explicitly.
+        resources:
+          type: object
+          additionalProperties: true
+          description: Module-owned declarative configuration sections (e.g. profiles, personas, engine configurations, voices,
+            wakewords, intents, slots, rules, actions, device definitions, peers, groups, sharing policies, orchestrator service
+            definitions). `profiles` carries complete namespaced profile documents - every stored module compartment and the
+            local `is_active` selection - and foreign compartments are preserved verbatim through save/load. Each module declares
+            its sections via `x-opal-snapshot.resources`; unknown sections are rejected explicitly.
+      required:
+      - format_version
+      - module
+      - created_at
+      - settings
+      - resources
+      additionalProperties: false
+      description: 'Versioned portable configuration snapshot. Closed envelope: `settings` and `resources` are the only variable
+        slots. Contains persistent desired configuration only: credential references but never secret values; never history,
+        sessions, tasks, streams, generated media, model binaries, hardware-discovery caches, database files, runtime IDs,
+        or synchronization status.'
+    OpalConfigSaveResult:
+      type: object
+      properties:
+        snapshot:
+          $ref: '#/components/schemas/OpalConfigSnapshot'
+        managed:
+          type: boolean
+          description: True when the default managed snapshot was written.
+      required:
+      - snapshot
+      - managed
+      additionalProperties: true
+    OpalConfigLoadRequest:
+      type: object
+      properties:
+        snapshot:
+          $ref: '#/components/schemas/OpalConfigSnapshot'
+          description: Candidate snapshot. Omit or send `{}` to load the managed snapshot; an explicit null is invalid.
+      additionalProperties: false
+    OpalConfigLoadResult:
+      type: object
+      properties:
+        applied:
+          type: boolean
+          const: true
+          description: 'Always true on HTTP 200; failed loads use the shared error envelope, never `applied: false`.'
+        pending_restart_fields:
+          type: array
+          items:
+            type: string
+          description: Setting keys whose new values require a service restart to take effect.
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpalValidationIssue'
+      required:
+      - applied
+      additionalProperties: true
+    OpalConfigValidateRequest:
+      type: object
+      properties:
+        snapshot:
+          type: object
+          description: Candidate snapshot to validate. Typed loosely as a JSON object so malformed envelopes are reported
+            as structured issues rather than rejected as a malformed request; an explicit null is invalid. Omit to validate
+            the current live configuration.
+      additionalProperties: false
+    OpalConfigValidation:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: True exactly when `errors` is empty.
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpalValidationIssue'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpalValidationIssue'
+      required:
+      - valid
+      - errors
+      - warnings
+      additionalProperties: true
+      description: Non-mutating configuration validation result. Load performs equivalent checks internally; a prior successful
+        validate call never bypasses load checks.
     OpalHealthReport:
       type: object
       properties:
+        name:
+          type: string
+          description: Service implementation name.
+          example: opal-say-svc
+        version:
+          type: string
+          description: Service implementation (package) version.
+          example: 1.0.0
+        api_version:
+          type: string
+          description: OPAL API contract version.
+          example: v1
         status:
           type: string
           enum:
           - ok
           - degraded
           - error
-          - warning
-          - healthy
-          - unhealthy
-          - unavailable
-          description: Overall state. Canonical values are ok/degraded/error; other values are accepted for backward compatibility
-            with per-service vocabularies.
-        version:
-          type: string
-          example: 1.0.0
-        active_profile_id:
-          anyOf:
-          - type: integer
-            minimum: 1
-          - type: 'null'
-        engines:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
+          description: Overall state using the canonical vocabulary. `degraded` and `error` reports still return HTTP 200
+            whenever the report itself can be produced.
+        live:
+          type: boolean
+          description: True while the service process is alive. Carries the information the retired `GET /api/v1/info/ping`
+            route and `info ping`/`info live` commands used to report.
+        ready:
+          type: boolean
+          description: True when the service can perform useful work. May be false while `live` stays true; the report still
+            returns HTTP 200 whenever it is available.
         details:
           type: object
           additionalProperties: true
-          description: Optional non-portable diagnostic information.
-        broker_running:
-          type: boolean
-        database_ready:
-          type: boolean
+          description: 'Module-defined diagnostics, always present (empty object when a module reports no extra diagnostics).
+            Each module declares its known members via its `x-opal-health-details` extension: `stats` carries opal-event''s
+            event and execution counters; `audio_devices` carries opal-listen''s host input device list. Diagnostics that
+            older revisions returned at the top level (`engines`, `checks`, `components`, `metrics`, `models_available`, `broker_running`,
+            `database_ready`, `event`, `active_tasks`) now live under this object with their existing meaning and access requirements.'
+        active_profile_id:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          description: Locally active profile id, or null when no profile is active.
+        checked_at:
+          type: string
+          format: date-time
+          description: Time this report was assembled.
+        uptime_seconds:
+          type: number
+          minimum: 0
         pending_restart:
           anyOf:
           - type: boolean
@@ -3746,268 +4098,22 @@ components:
               type: string
           description: Restart-pending indicator (boolean) or list of pending fields (array); `pending_restart_fields` is
             the canonical list form.
-        checks:
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-          type: array
-          title: Checks
-        checked_at:
-          type: string
-          format: date-time
-          title: Checked At
-        ready:
-          type: boolean
-          description: True when the service can perform useful work; probes use it as readiness.
-        uptime_seconds:
-          type: number
-          minimum: 0
-        components:
-          type: object
-          additionalProperties:
-            type: object
-            properties:
-              state:
-                type: string
-              detail:
-                type: string
-            additionalProperties: false
-            required:
-            - state
-        metrics:
-          type: object
-          additionalProperties:
-            type: number
-        models_available:
-          type: integer
-          minimum: 0
-        event:
-          type: string
-          enum:
-          - available
-          - degraded
-          - unavailable
-          - not_configured
-        active_tasks:
-          type: integer
-          minimum: 0
         pending_restart_fields:
           type: array
           items:
             type: string
       required:
-      - status
-      additionalProperties: true
-      description: Aggregate service health report. `status` is the only required field; all other sections are service-defined.
-    OpalBackupInfo:
-      type: object
-      properties:
-        filename:
-          type: string
-          title: Filename
-        size_bytes:
-          type: integer
-          title: Size Bytes
-        created_at:
-          type: string
-          format: date-time
-          title: Created At
-      required:
-      - created_at
-      - filename
-      - size_bytes
-      additionalProperties: true
-      description: Metadata for one service-managed backup archive.
-    OpalBackupCreateResponse:
-      type: object
-      properties:
-        filename:
-          type: string
-        message:
-          type: string
-      required:
-      - filename
-      additionalProperties: true
-    OpalImportResult:
-      type: object
-      properties:
-        success:
-          type: boolean
-        validation:
-          $ref: '#/components/schemas/OpalValidationReport'
-        message:
-          anyOf:
-          - type: string
-          - type: 'null'
-        status:
-          type: string
-          const: imported
-          title: Status
-        backup_filename:
-          type: string
-          title: Backup Filename
-        counts:
-          additionalProperties:
-            type: integer
-          type: object
-          title: Counts
-        warnings:
-          type: array
-          items:
-            anyOf:
-            - type: string
-            - type: object
-          description: Diagnostic entries (warnings); string or structured object per service.
-        revision:
-          type: string
-        pending_restart:
-          type: boolean
-      required: []
-      additionalProperties: true
-      description: Result of a configuration import/restore. Outcome fields are service-defined (`success`, `status` and `revision`
-        variants exist); no field is suite-standard.
-    OpalConfigExport:
-      type: object
-      properties:
-        format_version:
-          anyOf:
-          - type: string
-          - type: integer
-          description: Bundle format version; canonical form is a string such as "1.0.0".
-        exported_at:
-          type: string
-          format: date-time
-        engines:
-          type: array
-          items:
-            $ref: '#/components/schemas/OpalEngine'
-        voices:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-        profiles:
-          type: array
-          items:
-            $ref: '#/components/schemas/OpalProfile'
-        settings:
-          type: object
-          additionalProperties: true
-        wakewords:
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-          type: array
-          title: Wakewords
-          default: []
-        stt:
-          additionalProperties:
-            anyOf:
-            - type: string
-            - type: integer
-            - type: number
-            - type: boolean
-          type: object
-          title: Stt
-          default: {}
-        intents:
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-          type: array
-          title: Intents
-          default: []
-        slots:
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-          type: array
-          title: Slots
-          default: []
-        models:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-        sources:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-        pipelines:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-        zones:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-        rules:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-        monitors:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-        actions:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-            description: Service-defined section.
-      required:
-      - format_version
-      - settings
-      additionalProperties: true
-      description: Portable logical configuration bundle. `format_version` and `settings` are the only suite-standard members;
-        all other sections are service-defined. Secrets and history are never included.
-    ServiceInfo:
-      type: object
-      required:
       - name
       - version
       - api_version
-      properties:
-        name:
-          type: string
-          description: Service implementation name.
-          example: opal-say-svc
-        version:
-          type: string
-          description: Package version.
-          example: 1.0.0
-        api_version:
-          type: string
-          description: OPAL API contract version.
-          example: v1
-        description:
-          type: string
-    LivenessRead:
-      type: object
-      required:
       - status
-      properties:
-        status:
-          type: string
-          enum:
-          - ok
-          example: ok
+      - live
+      - ready
+      - details
+      additionalProperties: true
+      description: Aggregate service health report - the single source for service identity, liveness, readiness and diagnostics.
+        Replaces the retired `GET /api/v1/info/` and `GET /api/v1/info/ping` reports; module-defined diagnostics live under
+        `details`.
     OpalHealthProbe:
       type: object
       required:
@@ -4081,8 +4187,13 @@ components:
           description: Trailing log lines, oldest first; at most `lines` entries.
       additionalProperties: true
       description: Trailing lines of the service log file.
+    OpalPersonaRef:
+      type: string
+      minLength: 1
+      maxLength: 200
+      pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
 x-opal-context-standard:
-  version: '1.2'
+  version: 2.0.0
   headers:
     metadata_schema_version: '1.0'
   pagination:
@@ -4112,3 +4223,29 @@ x-opal-authorization:
     privileged_operations: authorization required for configuration mutations
     credentials: correlation headers are transport context, never authorization credentials
     secrets: secret values must not appear in responses, exports, or error details
+x-opal-profile-namespace:
+  compartment: opal-say
+  schema: ./shared/opal_kernel.yaml#/components/schemas/OpalSayProfileNamespace
+  patch_schema: ./shared/opal_kernel.yaml#/components/schemas/OpalSayProfileNamespacePatch
+  description: Declares this module's compartment key in namespaced profiles and the schemas that validate it. Profile defaults
+    migrated from the v2 flat fields voice_id, speed, volume, output_format, sample_rate, engine_options; see docs/PROFILE_MIGRATION.md.
+x-opal-health-details:
+  version: '1.0'
+  description: Module-defined members of OpalHealthReport.details. Say declares no health-specific diagnostics today; `details`
+    may still carry implementation-defined members that consumers must treat as optional.
+  members: {}
+x-opal-snapshot:
+  version: '1.0'
+  module: opal-say
+  format_versions:
+  - 1.0.0
+  resources:
+  - profiles
+  - personas
+  - voices
+  - engines
+  description: 'Declares the canonical module identity and resource sections carried in this module''s configuration snapshots.
+    `config load`/`config validate` validate `snapshot` against the shared `OpalConfigSnapshot` envelope and the declared
+    `module` identity and resource sections; wrong-module, unsupported-version, and unknown-section snapshots are rejected.
+    Snapshots carry persistent desired configuration only: profiles, personas, voices, engines; never runtime history, sessions,
+    streams, binaries, or secrets.'

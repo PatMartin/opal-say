@@ -121,6 +121,24 @@ class TestPiperRelease:
                                json={"text": "Post update.", "voice_id": "p", "output_format": "pcm"})
             assert resp.status_code == 200 and len(resp.content) > 0
 
+    def test_snapshot_load_reconfigures_real_adapter(self, client, app):
+        voice = client.get("/api/v1/voice/").json()[0]
+        engine_id = voice["engine_id"]
+        snapshot = client.post("/api/v1/config/save", json={"destination": "response"}).json()["snapshot"]
+        for row in snapshot["resources"]["engines"]:
+            if row["engine_id"] == engine_id:
+                row["options"].update({"cache_size": 1} if engine_id == "piper" else {"default_lang": "en-gb"})
+        previous = app.state.services.runtime.get(engine_id)
+        assert client.post("/api/v1/config/validate", json={"snapshot": snapshot}).json()["valid"] is True
+        assert app.state.services.runtime.get(engine_id) is previous
+        revision = client.get("/api/v1/setting/").headers["etag"]
+        response = client.post("/api/v1/config/load", json={"snapshot": snapshot}, headers={"If-Match": revision})
+        assert response.status_code == 200, response.text
+        assert response.headers["etag"] != revision
+        assert app.state.services.runtime.get(engine_id) is not previous
+        generated = client.post("/api/v1/generate", json={"text": "Snapshot loaded.", "voice_id": voice["voice_id"]})
+        assert generated.status_code == 200 and generated.content.startswith(b"RIFF")
+
     def test_performance_measurements(self, client):
         status, _, arrivals, nbytes, peak = _measure(client, "p")
         assert status == 200 and nbytes > 0 and arrivals
@@ -183,6 +201,24 @@ class TestKokoroRelease:
         resp = client.post("/api/v1/generate",
                            json={"text": "Post update.", "voice_id": "k", "output_format": "pcm"})
         assert resp.status_code == 200 and len(resp.content) > 0
+
+    def test_snapshot_load_reconfigures_real_adapter(self, client, app):
+        voice = client.get("/api/v1/voice/").json()[0]
+        engine_id = voice["engine_id"]
+        snapshot = client.post("/api/v1/config/save", json={"destination": "response"}).json()["snapshot"]
+        for row in snapshot["resources"]["engines"]:
+            if row["engine_id"] == engine_id:
+                row["options"].update({"cache_size": 1} if engine_id == "piper" else {"default_lang": "en-gb"})
+        previous = app.state.services.runtime.get(engine_id)
+        assert client.post("/api/v1/config/validate", json={"snapshot": snapshot}).json()["valid"] is True
+        assert app.state.services.runtime.get(engine_id) is previous
+        revision = client.get("/api/v1/setting/").headers["etag"]
+        response = client.post("/api/v1/config/load", json={"snapshot": snapshot}, headers={"If-Match": revision})
+        assert response.status_code == 200, response.text
+        assert response.headers["etag"] != revision
+        assert app.state.services.runtime.get(engine_id) is not previous
+        generated = client.post("/api/v1/generate", json={"text": "Snapshot loaded.", "voice_id": voice["voice_id"]})
+        assert generated.status_code == 200 and generated.content.startswith(b"RIFF")
 
     def test_performance_measurements(self, client):
         status, _, arrivals, nbytes, peak = _measure(client, "k")

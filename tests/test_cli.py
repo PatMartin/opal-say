@@ -76,23 +76,30 @@ def test_full_cli_workflow(run, http, tmp_path, config):
         assert w.getframerate() == 16000
     assert "voice=v1" in result.stderr
 
-    p = json.loads(run("profile add main --voice v1 --active --speed 1.5 --format pcm").stdout)
-    assert p["is_active"] and p["output_format"] == "pcm"
-    p2 = json.loads(run("profile add other --voice v2 --options-json '{\"pitch\": 600}'").stdout)
+    module = tmp_path / "module.json"
+    module.write_text(json.dumps({"voice_id": "v1", "speed": 1.5, "output_format": "pcm"}))
+    p = json.loads(run(f"profile add --name main --module {module.as_posix()} --is-active").stdout)
+    assert p["is_active"] and p["modules"]["opal-say"]["output_format"] == "pcm"
+    module.write_text(json.dumps({"voice_id": "v2", "engine_options": {"pitch": 600}}))
+    p2 = json.loads(run(f"profile add --name other --module {module.as_posix()}").stdout)
     assert "main" in run("profile list").stdout
-    assert json.loads(run(f"profile get {p['id']}").stdout)["speed"] == 1.5
-    assert json.loads(run(f"profile update {p2['id']} --volume 0.5 --native-rate").stdout)["volume"] == 0.5
+    assert json.loads(run(f"profile show {p['id']}").stdout)["modules"]["opal-say"]["speed"] == 1.5
+    module.write_text(json.dumps({"volume": 0.5, "sample_rate": None}))
+    updated = json.loads(run(f"profile update {p2['id']} --module {module.as_posix()}").stdout)
+    assert updated["modules"]["opal-say"]["volume"] == 0.5
     assert json.loads(run(f"profile activate {p2['id']}").stdout)["is_active"] is True
     run(f"profile remove {p['id']}")
 
-    run('persona add amy --name "Amy" --voice v1')
+    run('persona add --persona-id amy --name "Amy" --voice-id v1')
     assert "amy" in run("persona list").stdout
-    assert json.loads(run("persona get amy").stdout)["voice_id"] == "v1"
+    assert json.loads(run("persona show amy").stdout)["voice_id"] == "v1"
     assert json.loads(run("persona update amy --description warm").stdout)["description"] == "warm"
     assert "valid" in run("persona validate amy").stdout
     persona_wav = tmp_path / "persona.wav"
-    run(f'generate "as Amy" --persona amy -o {persona_wav.as_posix()}')
+    run(f'generate "as Amy" --persona-id amy -o {persona_wav.as_posix()}')
     assert persona_wav.stat().st_size > 0
+    run(f'generate "alias" --persona amy -o {persona_wav.as_posix()}')
+    run(f'generate "conflict" --persona-id amy --persona other -o {persona_wav.as_posix()}', code=2)
     run("persona remove amy")
 
     pcm = tmp_path / "out.pcm"
@@ -111,42 +118,38 @@ def test_full_cli_workflow(run, http, tmp_path, config):
         stdin='{"voice_id": "v1"}\n{"text": "From stdin.", "flush": true}\n{"done": true}\n')
     assert inc2.stat().st_size > 0
 
-    run("config setting set chunk_max_chars 200")
-    assert json.loads(run("config setting list").stdout) == {"chunk_max_chars": 200}
-    assert json.loads(run("config setting show chunk_max_chars").stdout)["value"] == 200
-    assert json.loads(run("setting get chunk_max_chars").stdout)["value"] == 200  # declared alias
-    run("config setting remove chunk_max_chars")
-    assert json.loads(run("config setting update --json '{\"greeting\": \"hi\"}'").stdout)["greeting"] == "hi"
-    run("setting delete greeting")  # declared alias
-    run("config setting patch --json '{\"greeting\": \"hi\"}'")  # declared alias of `update`
-    run("config setting update --json '{\"greeting\": null}'")
+    run("config setting set --name chunk_max_chars --value 200")
+    assert json.loads(run("config setting list").stdout)["chunk_max_chars"] == 200
+    assert json.loads(run("config setting show --name chunk_max_chars").stdout)["value"] == 200
+    run("setting get chunk_max_chars", code=2)  # retired alias
+    run("config setting remove --name chunk_max_chars")
+    run("config setting set --name default_speed --value 1.25")
+    run("setting delete greeting", code=2)  # retired alias
+    run("config setting patch --json '{}'", code=2)  # retired alias of `update`
+    run("config setting remove --name default_speed")
 
     assert "status:" in run("info health").stdout
-    assert json.loads(run("--json info live").stdout)["ready"] is True
-    assert json.loads(run("--json info ready").stdout)["ready"] is True
-    assert json.loads(run("info version").stdout)["name"] == "opal-say-svc"
-    assert run("info ping").stdout.strip() == "ok"
+    assert json.loads(run("--json info health").stdout)["ready"] is True
+    for retired in ("info live", "info ready", "info version", "info ping"):
+        run(retired, code=2)
 
     assert json.loads(run("--json service start").stdout)["state"] == "running"
     assert "ready" in run("service log").stdout
     assert json.loads(run("--json service log --lines 1").stdout)["lines"] == ["ready"]
     assert json.loads(run("--json service stop").stdout)["state"] == "stopped"
 
-    filename = json.loads(run("backup create").stdout)["filename"]
-    assert filename in run("backup list").stdout
-    target = tmp_path / "b.tar.gz"
-    run(f"backup download {filename} -o {target.as_posix()}")
-    assert target.stat().st_size > 0
-    assert json.loads(run(f"backup restore {filename}").stdout)["success"] is True
-    export = tmp_path / "export.json"
-    run(f"backup export -o {export.as_posix()}")
-    assert json.loads(export.read_text())["voices"][0]["voice_id"] == "v1"
-    run("backup validate")
-    run(f"backup validate --payload {export.as_posix()}")
-    config.config_dir.mkdir(parents=True, exist_ok=True)
-    (config.config_dir / "settings.yaml").write_text("settings:\n  default_volume: 0.9\n")
-    assert json.loads(run("backup import").stdout)["success"] is True
-    run(f"backup delete {filename}")
+    assert json.loads(run("config save").stdout)["managed"] is True
+    target = tmp_path / "snapshot.json"
+    run(f"config save --out {target.as_posix()}")
+    assert json.loads(target.read_text())["resources"]["voices"][0]["voice_id"] == "v1"
+    assert json.loads(run("config load").stdout)["applied"] is True
+    run(f"config validate --in {target.as_posix()}")
+    run("config validate")
+    assert json.loads(run(f"config load --in {target.as_posix()}").stdout)["applied"] is True
+    yaml_target = tmp_path / "snapshot.yaml"
+    run(f"config save --out {yaml_target.as_posix()}")
+    run(f"config validate --in {yaml_target.as_posix()}")
+    run("backup create", code=2)
     run("voice remove v1")
     result = run("voice remove v2", code=1)  # still referenced by profile 'other'
     assert "voice_in_use" in result.stderr
@@ -155,7 +158,7 @@ def test_full_cli_workflow(run, http, tmp_path, config):
 def test_every_operation_is_reachable_from_cli(run, http, tmp_path, config):
     """Parity: each contract operation is invoked by its mapped CLI command."""
     test_full_cli_workflow(run, http, tmp_path, config)
-    missing = set(contract_operations()) - set(http.ops)
+    missing = set(contract_operations()) - {"opal_health_live_get", "opal_health_ready_get"} - set(http.ops)
     assert not missing, f"CLI never called: {sorted(missing)}"
 
 
@@ -182,7 +185,7 @@ def test_invalid_validation_result_exits_nonzero(run):
 
 def test_unreachable_server(monkeypatch):
     monkeypatch.setattr(cli, "client_factory", lambda url, timeout: ApiClient("http://127.0.0.1:9", 1))
-    result = CliRunner().invoke(cli.app, ["say", "info", "ping"])
+    result = CliRunner().invoke(cli.app, ["say", "info", "health"])
     assert result.exit_code == 2 and "cannot reach" in result.stderr
 
 
@@ -190,13 +193,13 @@ def test_tree_command_prints_command_surface():
     result = CliRunner().invoke(cli.app, ["say", "tree"])
     assert result.exit_code == 0
     out = result.stdout
-    for cmd in ("generate", "engine", "voice", "profile", "setting", "backup", "health"):
+    for cmd in ("generate", "engine", "voice", "profile", "setting", "config", "health"):
         assert cmd in out
     assert "speak" not in out  # hidden default command
     # Required args/options are bare; optional ones are bracketed.
     assert "generate TEXT [-o/--output" in out
     assert "get ENGINE_ID" in out
-    assert "set KEY VALUE" in out
+    assert "--name STR" in out and "--value STR" in out
     assert "[--stream]" in out and "[--enable/--disable]" in out
     assert "│   ├──" in out and "└──" in out
 
@@ -205,7 +208,7 @@ def test_tree_ascii_flag_prints_plain_ascii():
     result = CliRunner().invoke(cli.app, ["say", "tree", "--ascii"])
     assert result.exit_code == 0
     out = result.stdout
-    for cmd in ("generate", "engine", "voice", "profile", "setting", "backup", "health"):
+    for cmd in ("generate", "engine", "voice", "profile", "setting", "config", "health"):
         assert cmd in out
     assert "generate TEXT [-o/--output" in out
     assert "+-- " in out or "`-- " in out

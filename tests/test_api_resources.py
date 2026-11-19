@@ -140,13 +140,14 @@ class TestProfiles:
         make_voice(client, "v1")
         p1 = make_profile(client, "p1", "v1", is_active=True)
         assert p1 | {"created_at": None, "updated_at": None} == {
-            "id": p1["id"], "name": "p1", "description": None, "is_active": True, "voice_id": "v1", "speed": 1.0,
-            "volume": 1.0, "output_format": "wav", "sample_rate": None, "engine_options": {},
+            "id": p1["id"], "name": "p1", "description": None, "is_active": True,
+            "shared": {}, "modules": {"opal-say": {"voice_id": "v1"}},
             "created_at": None, "updated_at": None,
         }
         p2 = make_profile(client, "p2", "v1", is_active=True, speed=2.0, sample_rate=8000)
         assert client.get(f"/api/v1/profile/{p1['id']}").json()["is_active"] is False
-        resp = client.patch(f"/api/v1/profile/{p1['id']}", json={"is_active": True, "sample_rate": None})
+        resp = client.patch(f"/api/v1/profile/{p1['id']}",
+                            json={"is_active": True, "modules": {"opal-say": {"sample_rate": None}}})
         assert resp.json()["is_active"] is True
         assert client.get(f"/api/v1/profile/{p2['id']}").json()["is_active"] is False
         actives = [p for p in client.get("/api/v1/profile/").json() if p["is_active"]]
@@ -158,23 +159,27 @@ class TestProfiles:
         make_voice(client, "v1")
         make_voice(client, "v2", enabled=False)
         p1 = make_profile(client, "p1", "v1", is_active=True)
-        assert client.post("/api/v1/profile/", json={"name": "x", "voice_id": "nope"}).status_code == 404
-        assert client.post("/api/v1/profile/", json={"name": "p1", "voice_id": "v1"}).status_code == 409
-        assert client.post("/api/v1/profile/", json={"name": "x", "voice_id": "v1", "speed": 9}).status_code == 422
-        assert client.post("/api/v1/profile/", json={"name": "x", "voice_id": "v1",
-                                                       "output_format": "mp3"}).status_code == 422
-        resp = client.post("/api/v1/profile/", json={"name": "x", "voice_id": "v1", "engine_options": {"q": 1}})
+        assert client.post("/api/v1/profile/", json={
+            "name": "x", "modules": {"opal-say": {"voice_id": "nope"}}}).status_code == 404
+        assert client.post("/api/v1/profile/", json={
+            "name": "p1", "modules": {"opal-say": {"voice_id": "v1"}}}).status_code == 409
+        assert client.post("/api/v1/profile/", json={
+            "name": "x", "modules": {"opal-say": {"voice_id": "v1", "speed": 9}}}).status_code == 422
+        assert client.post("/api/v1/profile/", json={
+            "name": "x", "modules": {"opal-say": {"voice_id": "v1", "output_format": "mp3"}}}).status_code == 422
+        resp = client.post("/api/v1/profile/", json={
+            "name": "x", "modules": {"opal-say": {"voice_id": "v1", "engine_options": {"q": 1}}}})
         assert resp.status_code == 422
-        resp = client.post("/api/v1/profile/", json={"name": "x", "voice_id": "v2", "is_active": True})
+        resp = client.post("/api/v1/profile/", json={"name": "x", "modules": {"opal-say": {"voice_id": "v2"}}, "is_active": True})
         assert resp.status_code == 409 and resp.json()["error"]["code"] == "voice_disabled"
         p2 = make_profile(client, "p2", "v2")
         assert client.post(f"/api/v1/profile/{p2['id']}/activate").status_code == 409
         assert client.delete(f"/api/v1/profile/{p1['id']}").json()["error"]["code"] == "profile_active"
         assert client.patch(f"/api/v1/profile/{p2['id']}", json={"name": "p1"}).status_code == 409
-        assert client.patch(f"/api/v1/profile/{p2['id']}", json={"voice_id": "zz"}).status_code == 404
+        assert client.patch(f"/api/v1/profile/{p2['id']}", json={"modules": {"opal-say": {"voice_id": "zz"}}}).status_code == 404
         assert client.patch(f"/api/v1/profile/{p2['id']}", json={}).status_code == 422
-        assert client.get("/api/v1/profile/0").status_code == 422
-        assert client.get("/api/v1/profile/abc").status_code == 422
+        assert client.get("/api/v1/profile/0").status_code == 404
+        assert client.get("/api/v1/profile/abc").status_code == 404
         assert client.get("/api/v1/profile/999").status_code == 404
         assert client.delete("/api/v1/profile/999").status_code == 404
         assert client.post("/api/v1/profile/999/activate").status_code == 404
@@ -191,15 +196,16 @@ class TestProfiles:
 
 class TestSettings:
     def test_crud(self, client):
-        assert client.get("/api/v1/setting/").json() == {}
+        assert client.get("/api/v1/setting/").json()["default_speed"] == 1.0
         assert client.get("/api/v1/setting/foo").status_code == 404
-        setting = client.put("/api/v1/setting/foo", json={"value": "bar"}).json()
-        assert setting["key"] == "foo" and setting["value"] == "bar"
-        updated = client.put("/api/v1/setting/foo", json={"value": "baz"}).json()
-        assert updated["id"] == setting["id"] and updated["value"] == "baz"
-        assert client.get("/api/v1/setting/").json() == {"foo": "baz"}
-        assert client.delete("/api/v1/setting/foo").status_code == 204
-        assert client.delete("/api/v1/setting/foo").status_code == 404
+        setting = client.put("/api/v1/setting/default_speed", json={"value": 1.25}).json()
+        assert setting["key"] == "default_speed" and setting["value"] == 1.25
+        updated = client.put("/api/v1/setting/default_speed", json={"value": 1.5}).json()
+        assert updated["id"] == setting["id"] and updated["value"] == 1.5
+        assert client.get("/api/v1/setting/").json()["default_speed"] == 1.5
+        assert client.delete("/api/v1/setting/default_speed").status_code == 204
+        assert client.delete("/api/v1/setting/default_speed").status_code == 204
+        assert client.get("/api/v1/setting/default_speed").json()["source"] == "default"
 
     def test_known_settings_are_validated(self, client):
         assert client.put("/api/v1/setting/max_text_chars", json={"value": "abc"}).status_code == 422
@@ -208,15 +214,12 @@ class TestSettings:
         assert client.put("/api/v1/setting/x", json={}).status_code == 422
 
     def test_settings_round_trip_native_json(self, client):
-        """Setting values are native JSON: unknown keys keep their submitted type."""
-        cases = {
-            "an_int": 42, "a_float": 1.5, "a_bool": True,
-            "a_dict": {"nested": [1, 2]}, "a_list": [1, "two"], "a_str": "plain",
-        }
+        """Registered setting values retain their native JSON type."""
+        cases = {"chunk_max_chars": 250, "default_speed": 1.5, "default_output_format": "pcm"}
         for key, value in cases.items():
             assert client.put(f"/api/v1/setting/{key}", json={"value": value}).status_code == 200
             assert client.get(f"/api/v1/setting/{key}").json()["value"] == value
-        assert client.get("/api/v1/setting/").json() == cases
+        assert cases.items() <= client.get("/api/v1/setting/").json().items()
 
     def test_known_settings_accept_typed_and_parseable_values(self, client):
         """Known keys take typed values and still accept strings that parse."""
@@ -228,12 +231,12 @@ class TestSettings:
         assert client.put("/api/v1/setting/default_output_format", json={"value": 9}).status_code == 422
 
     def test_string_value_round_trips_for_unknown_keys(self, client):
-        """Strings that look like JSON scalars stay strings for unknown keys."""
-        client.put("/api/v1/setting/looks_numeric", json={"value": "5"})
-        client.put("/api/v1/setting/looks_bool", json={"value": "true"})
-        got = client.get("/api/v1/setting/").json()
-        assert got["looks_numeric"] == "5"
-        assert got["looks_bool"] == "true"
+        """Unregistered setting writes are rejected rather than becoming configuration."""
+        before = client.get("/api/v1/setting/")
+        assert client.put("/api/v1/setting/looks_numeric", json={"value": "5"}).status_code == 404
+        assert client.put("/api/v1/setting/looks_bool", json={"value": "true"}).status_code == 404
+        after = client.get("/api/v1/setting/")
+        assert after.json() == before.json() and after.headers["etag"] == before.headers["etag"]
 
 
 class TestHealth:
@@ -244,7 +247,7 @@ class TestHealth:
         client.patch("/api/v1/engine/fake", json={"enabled": False})
         health = client.get("/api/v1/health/").json()
         assert health["status"] == "error"
-        assert {e["engine_id"]: e["available"] for e in health["engines"]} == {"alt": False, "fake": True}
+        assert {e["engine_id"]: e["available"] for e in health["details"]["engines"]} == {"alt": False, "fake": True}
 
     def test_unknown_route_uses_error_shape(self, client):
         resp = client.get("/api/v1/nothing")

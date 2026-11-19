@@ -184,7 +184,7 @@ class VoiceService:
 
         if changes.get("enabled") is False:
             active = self.store.active_profile()
-            if active and active["voice_id"] == voice_id:
+            if active and active.get("modules", {}).get("opal-say", {}).get("voice_id") == voice_id:
                 raise Conflict(
                     f"voice '{voice_id}' is used by the active profile '{active['name']}'",
                     "voice_in_use",
@@ -250,7 +250,7 @@ class ProfileService:
     def list(self) -> list[dict[str, Any]]:
         return self.store.list_profiles()
 
-    def get(self, profile_id: int) -> dict[str, Any]:
+    def get(self, profile_id: str) -> dict[str, Any]:
         profile = self.store.get_profile(profile_id)
         if profile is None:
             raise NotFound(f"profile {profile_id} not found", "profile_not_found", {"profile_id": profile_id})
@@ -277,35 +277,54 @@ class ProfileService:
         if problem:
             raise Conflict(problem[1], problem[0], {"engine_id": voice["engine_id"]})
 
-    def _check_name(self, name: str, profile_id: int | None = None) -> None:
+    def _check_name(self, name: str, profile_id: str | None = None) -> None:
         existing = self.store.get_profile_by_name(name)
         if existing and existing["id"] != profile_id:
             raise Conflict(f"profile name '{name}' already exists", "profile_name_exists", {"profile_id": existing["id"]})
 
+    def _check_compartment(self, modules: dict[str, Any], active: bool) -> None:
+        own = modules.get("opal-say", {})
+        if "output_format" in own and own["output_format"] not in {"wav", "pcm"}:
+            raise InvalidRequest.single(["body", "modules", "opal-say", "output_format"], "must be wav or pcm")
+        if own.get("voice_id"):
+            voice = self._voice(own["voice_id"])
+            self._check_options(voice, own.get("engine_options", {}))
+            if active:
+                self._check_activatable(voice)
+
     def create(self, body: ProfileCreate) -> dict[str, Any]:
-        voice = self._voice(body.voice_id)
         self._check_name(body.name)
-        self._check_options(voice, body.engine_options)
-        if body.is_active:
-            self._check_activatable(voice)
+        if body.id and self.store.get_profile(body.id):
+            raise Conflict("profile identifier already exists", "profile_exists")
+        self._check_compartment(body.modules, body.is_active)
         stamp = now_iso()
-        new_id = self.store.insert_profile({**body.model_dump(), "created_at": stamp, "updated_at": stamp})
+        new_id = self.store.insert_profile({**body.model_dump(exclude_none=True),
+                                            "description": body.description, "created_at": stamp, "updated_at": stamp})
         return self.get(new_id)
 
-    def update(self, profile_id: int, body: ProfileUpdate) -> dict[str, Any]:
+    def update(self, profile_id: str, body: ProfileUpdate) -> dict[str, Any]:
         profile = self.get(profile_id)
         changes = body.changes()
-        voice = self._voice(changes.get("voice_id", profile["voice_id"]))
         if "name" in changes:
             self._check_name(changes["name"], profile_id)
-        self._check_options(voice, changes.get("engine_options", profile["engine_options"]))
-        becomes_active = changes.get("is_active", profile["is_active"])
-        if becomes_active and ({"is_active", "voice_id"} & changes.keys()):
-            self._check_activatable(voice)
+        if "modules" in changes:
+            if set(changes["modules"]) - {"opal-say"}:
+                raise InvalidRequest.single(["body", "modules"], "only the opal-say compartment may be patched")
+            own = dict(profile["modules"].get("opal-say", {}))
+            for key, value in changes["modules"].get("opal-say", {}).items():
+                if value is None and key != "sample_rate":
+                    own.pop(key, None)
+                else:
+                    own[key] = value
+            changes["modules"] = {**profile["modules"], "opal-say": own}
+        if changes.get("is_active") is False:
+            changes.pop("is_active")
+        self._check_compartment(changes.get("modules", profile["modules"]),
+                                changes.get("is_active", profile["is_active"]))
         self.store.update_profile(profile_id, {**changes, "updated_at": now_iso()})
         return self.get(profile_id)
 
-    def delete(self, profile_id: int) -> None:
+    def delete(self, profile_id: str) -> None:
         profile = self.get(profile_id)
         if profile["is_active"]:
             raise Conflict(
@@ -315,9 +334,9 @@ class ProfileService:
             )
         self.store.delete_profile(profile_id)
 
-    def activate(self, profile_id: int) -> dict[str, Any]:
+    def activate(self, profile_id: str) -> dict[str, Any]:
         profile = self.get(profile_id)
-        self._check_activatable(self._voice(profile["voice_id"]))
+        self._check_compartment(profile["modules"], True)
         self.store.update_profile(profile_id, {"is_active": True, "updated_at": now_iso()})
         return self.get(profile_id)
 
@@ -347,7 +366,8 @@ class PersonaService:
             raise Conflict(
                 f"persona '{body.persona_id}' is already registered", "persona_exists", {"persona_id": body.persona_id}
             )
-        self._voice(body.voice_id)
+        if body.voice_id is not None:
+            self._voice(body.voice_id)
         stamp = now_iso()
         self.store.insert_persona(
             {
@@ -365,7 +385,7 @@ class PersonaService:
     def update(self, persona_id: str, body: PersonaUpdate) -> dict[str, Any]:
         self.get(persona_id)
         changes = body.changes()
-        if "voice_id" in changes:
+        if changes.get("voice_id") is not None:
             self._voice(changes["voice_id"])
         changes["updated_at"] = now_iso()
         self.store.update_persona(persona_id, changes)
@@ -377,6 +397,8 @@ class PersonaService:
 
     def validate(self, persona_id: str) -> Report:
         persona = self.get(persona_id)
+        if persona["voice_id"] is None:
+            return Report(warnings=[Issue("persona_unbound", "persona has no voice binding", "voice_id")])
         if self.store.get_voice(persona["voice_id"]) is None:
             return Report(errors=[Issue("voice_not_found",
                                         f"voice '{persona['voice_id']}' is not registered", "voice_id")])

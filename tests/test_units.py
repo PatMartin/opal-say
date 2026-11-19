@@ -148,24 +148,26 @@ class TestSettingsPatch:
         return SettingsService(Store(tmp_path / "db.sqlite"))
 
     def test_patch_sets_and_returns_full_map(self, svc):
-        out = svc.patch({"chunk_max_chars": "200", "custom": "x"})
-        assert out == {"chunk_max_chars": 200, "custom": "x"}
+        out = svc.patch({"chunk_max_chars": "200", "default_output_format": "pcm"})
+        assert out["chunk_max_chars"] == 200 and out["default_output_format"] == "pcm"
         assert svc.all() == out
 
     def test_null_deletes(self, svc):
-        svc.patch({"chunk_max_chars": "200", "other": "1"})
-        assert svc.patch({"chunk_max_chars": None}) == {"other": "1"}
+        svc.patch({"chunk_max_chars": "200", "default_volume": "1.5"})
+        result = svc.patch({"chunk_max_chars": None})
+        assert result["chunk_max_chars"] == 400 and result["default_volume"] == 1.5
 
     def test_values_returned_as_native_json(self, svc):
-        assert svc.patch({"chunk_max_chars": 200, "flag": True}) == {"chunk_max_chars": 200, "flag": True}
+        result = svc.patch({"chunk_max_chars": 200, "default_speed": 1.5})
+        assert result["chunk_max_chars"] == 200 and result["default_speed"] == 1.5
 
     def test_known_key_validated_and_atomic(self, svc):
         svc.patch({"chunk_max_chars": "300"})
         with pytest.raises(Exception) as exc_info:
-            svc.patch({"chunk_max_chars": "not-a-number", "good": "1"})
+            svc.patch({"chunk_max_chars": "not-a-number", "default_volume": "1.5"})
         assert "must be" in str(exc_info.value)
         # the valid key in the same patch must not have been applied either
-        assert svc.all() == {"chunk_max_chars": 300}
+        assert svc.all()["chunk_max_chars"] == 300 and svc.all()["default_volume"] == 1.0
 
     def test_multiple_errors_reported(self, svc):
         with pytest.raises(Exception) as exc_info:
@@ -174,7 +176,7 @@ class TestSettingsPatch:
 
     def test_patch_bumps_revision_once(self, svc, tmp_path):
         before = svc.store.config_revision()
-        svc.patch({"a": "1", "b": "2", "c": "3"})
+        svc.patch({"default_speed": "1.25", "default_volume": "0.5", "chunk_max_chars": "200"})
         assert svc.store.config_revision() == before + 1
 
     def test_effective_unaffected(self, svc):

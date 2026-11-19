@@ -8,8 +8,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
+DOTENV_VALUES: dict[str, str] = {}
 ENV_FILE_VAR = "OPAL_DOTENV_FILE"
 NO_ENV_FILE_VAR = "OPAL_NO_DOTENV"
 _SECRET_NAME = re.compile(r"(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY)", re.IGNORECASE)
@@ -120,6 +121,7 @@ def prepare(
                 os.environ.pop(NO_ENV_FILE_VAR, None)
                 return DotenvResult(path=path, loaded=loaded, created=False, disabled=False)
 
+    DOTENV_VALUES.update({k: v for k, v in dotenv_values(path).items() if v is not None and k not in os.environ})
     loaded = load_dotenv(path, override=False)
     os.environ[ENV_FILE_VAR] = str(path)
     os.environ.pop(NO_ENV_FILE_VAR, None)

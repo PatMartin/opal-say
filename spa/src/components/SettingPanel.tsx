@@ -51,16 +51,9 @@ export function SettingPanel() {
         <button
           onClick={() =>
             void action.run(async () => {
-              await call('opal_setting_patch', {
-                body: {
-                  max_text_chars: 20000,
-                  max_audio_bytes: 134217728,
-                  chunk_max_chars: 400,
-                  default_speed: 1,
-                  default_volume: 1,
-                  default_output_format: 'wav',
-                },
-              })
+              for (const key of Object.keys(setting.data)) {
+                await call('opal_setting_delete', { path: { key } })
+              }
               await setting.reload()
             })
           }
@@ -94,7 +87,7 @@ export function SettingPanel() {
       <ErrorBanner error={action.error} />
       {detail && (
         <p className="muted" data-testid="setting-detail">
-          #{detail.id} {detail.key} = {formatValue(detail.value)} (updated {detail.updated_at})
+          {detail.key} = {formatValue(detail.value)} (configured {formatValue(detail.configured_value)}, source {detail.source})
         </p>
       )}
       <form onSubmit={save} className="row">

@@ -22,7 +22,7 @@ def test_zero_voices_is_unavailable(client):
     speech = body["details"]["speech"]
     assert speech["ok"] is False and speech["code"] == "no_voice"
     # Engine states remain independently visible even while the service is unready.
-    assert {e["engine_id"]: e["available"] for e in body["engines"]} == {"alt": True, "fake": True}
+    assert {e["engine_id"]: e["available"] for e in body["details"]["engines"]} == {"alt": True, "fake": True}
 
 
 def test_no_active_profile_is_unavailable(client):

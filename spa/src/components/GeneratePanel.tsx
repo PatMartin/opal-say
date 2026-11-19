@@ -7,7 +7,7 @@ import { AudioResult, ErrorBanner, OptionsField, parseOptions, useAction, useLoa
 /** Completed (/generate) and streamed (/generate/stream) speech generation. */
 export function GeneratePanel() {
   const profile = useLoad(() => call<Profile[]>('opal_profile_list'), [])
-  const voice = useLoad(() => call<Voice[]>('opal_voice_list', { query: { enabled: true } }), [])
+  const voice = useLoad(() => call<Voice[]>('list_voices', { query: { enabled: true } }), [])
   const engine = useLoad(() => call<Engine[]>('opal_engine_list'), [])
   const persona = useLoad(() => call<Persona[]>('opal_persona_list', { query: { enabled: true } }), [])
 
@@ -33,8 +33,8 @@ export function GeneratePanel() {
       setClip(null)
       setReceived(null)
       const body: Record<string, unknown> = { text }
-      if (profileId) body.profile_id = Number(profileId)
-      if (personaId) body.persona = personaId
+      if (profileId) body.profile_id = profileId
+      if (personaId) body.persona_id = personaId
       if (voiceId) body.voice_id = voiceId
       if (engineId) body.engine_id = engineId
       if (speed) body.speed = Number(speed)
@@ -45,7 +45,7 @@ export function GeneratePanel() {
 
       if (!stream) {
         if (format) body.output_format = format
-        const resp = await callRaw('opal_generate', { body })
+        const resp = await callRaw('generate_speech', { body })
         const meta = audioMeta(resp)
         const raw = new Uint8Array(await resp.arrayBuffer())
         const blob = meta.format === 'pcm' ? pcmToWav(raw, meta.sampleRate) : new Blob([raw], { type: 'audio/wav' })
@@ -54,7 +54,7 @@ export function GeneratePanel() {
       }
 
       const resp = incremental
-        ? await callRaw('opal_generate_stream_incremental', {
+        ? await callRaw('stream_speech_incremental', {
             body: [
               JSON.stringify(Object.fromEntries(Object.entries(body).filter(([k]) => k !== 'text'))),
               JSON.stringify({ text, flush: true }),
@@ -62,7 +62,7 @@ export function GeneratePanel() {
             ].join('\n') + '\n',
             contentType: 'application/x-ndjson',
           })
-        : await callRaw('opal_generate_stream', { body })
+        : await callRaw('stream_speech', { body })
       const meta = audioMeta(resp)
       const chunks: Uint8Array[] = []
       let total = 0

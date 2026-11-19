@@ -3,6 +3,12 @@ import operations from './operations.json'
 /** REST operationId (from opal_say.yaml). The SPA talks to the service only through these. */
 export type OpId = keyof typeof operations
 
+let bearerToken = ''
+
+export function setBearerToken(token: string): void {
+  bearerToken = token
+}
+
 export interface ErrorResponse {
   code: string
   message: string
@@ -74,9 +80,9 @@ export function buildUrl(op: OpId, opts: CallOptions = {}): string {
 /** Mutations on logical configuration carrying the mandatory If-Match precondition. */
 const PRECONDITION_OPS = new Set<OpId>([
   'opal_engine_patch',
-  'opal_voice_create',
-  'opal_voice_patch',
-  'opal_voice_delete',
+  'create_voice',
+  'update_voice',
+  'remove_voice',
   'opal_persona_create',
   'opal_persona_patch',
   'opal_persona_delete',
@@ -84,16 +90,15 @@ const PRECONDITION_OPS = new Set<OpId>([
   'opal_profile_delete',
   'opal_setting_put',
   'opal_setting_delete',
-  'opal_setting_patch',
   'opal_profile_create',
   'opal_profile_activate',
-  'opal_backup_restore',
-  'opal_backup_import',
+  'opal_config_load',
 ])
 
 async function send(op: OpId, opts: CallOptions, ifMatch: string | null): Promise<Response> {
   const headers: Record<string, string> = {}
   if (ifMatch) headers['If-Match'] = ifMatch
+  if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`
   const init: RequestInit = { method: operations[op].method, signal: opts.signal, headers }
   if (opts.body !== undefined) {
     if (opts.contentType) {
@@ -108,7 +113,7 @@ async function send(op: OpId, opts: CallOptions, ifMatch: string | null): Promis
 }
 
 async function configEtag(): Promise<string> {
-  const resp = await send('opal_setting_list', {}, null)
+  const resp = await callRaw('opal_setting_list')
   return resp.headers.get('ETag') ?? ''
 }
 

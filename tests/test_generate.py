@@ -127,7 +127,7 @@ def test_engine_override_mismatch(client, setup):
     [
         ({"text": "x"}, 409, "no_voice"),
         ({"text": "x", "voice_id": "ghost"}, 409, "voice_not_found"),
-        ({"text": "x", "profile_id": 999}, 409, "profile_not_found"),
+        ({"text": "x", "profile_id": "missing"}, 409, "profile_not_found"),
         ({"text": "x", "voice_id": "va", "speed": 3.0}, 409, "unsupported_speed"),
     ],
 )

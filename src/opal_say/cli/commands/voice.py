@@ -31,7 +31,7 @@ def voice_list(
     language: str = typer.Option(None, "--language", help="Filter by language/locale prefix (en, en_US, ...)"),
 ) -> None:
     """List registered voice."""
-    resp = _call(ctx, "opal_voice_list", params={"engine_id": engine,
+    resp = _call(ctx, "list_voices", params={"engine_id": engine,
                                                                  "enabled": None if enabled is None else str(enabled).lower(),
                                                                  "language": language})
     _emit(ctx, resp.json(), VOICE_COLUMNS)
@@ -57,13 +57,13 @@ def voice_add(
         body["description"] = description
     if language is not None:
         body["language"] = language
-    _emit(ctx, _call(ctx, "opal_voice_create", json=body).json())
+    _emit(ctx, _call(ctx, "create_voice", json=body).json())
 
 
 @voice_app.command("get")
 def voice_get(ctx: typer.Context, voice_id: str) -> None:
     """Show one voice."""
-    _emit(ctx, _call(ctx, "opal_voice_get", path_params={"voice_id": voice_id}).json())
+    _emit(ctx, _call(ctx, "show_voice", path_params={"voice_id": voice_id}).json())
 
 
 @voice_app.command("update")
@@ -96,14 +96,14 @@ def voice_update(
         body["engine_options"] = options
     if not body:
         raise typer.BadParameter("nothing to update")
-    resp = _call(ctx, "opal_voice_patch", path_params={"voice_id": voice_id}, json=body)
+    resp = _call(ctx, "update_voice", path_params={"voice_id": voice_id}, json=body)
     _emit(ctx, resp.json())
 
 
 @voice_app.command("remove")
 def voice_remove(ctx: typer.Context, voice_id: str) -> None:
     """Unregister a voice (host model files are never touched)."""
-    _call(ctx, "opal_voice_delete", path_params={"voice_id": voice_id})
+    _call(ctx, "remove_voice", path_params={"voice_id": voice_id})
     typer.echo(f"voice '{voice_id}' unregistered")
 
 
@@ -111,7 +111,7 @@ def voice_remove(ctx: typer.Context, voice_id: str) -> None:
 def voice_validate(ctx: typer.Context, voice_id: str) -> None:
     """Validate that a voice registration resolves and is usable."""
     _validation(
-        ctx, _call(ctx, "opal_voice_validate", path_params={"voice_id": voice_id})
+        ctx, _call(ctx, "validate_voice", path_params={"voice_id": voice_id})
     )
 
 
@@ -142,7 +142,7 @@ def voice_test(
     options = _parse_options(option, options_json)
     if options is not None:
         body["engine_options"] = options
-    resp = _call(ctx, "opal_voice_test", path_params={"voice_id": voice_id},
+    resp = _call(ctx, "test_voice", path_params={"voice_id": voice_id},
                  json=body or None)
     size = _write_audio(resp, output) if output is not None else 0
     if play:

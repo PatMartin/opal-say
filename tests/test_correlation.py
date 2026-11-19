@@ -27,14 +27,14 @@ IDS = {
 
 
 def test_valid_supplied_ids_are_preserved_and_echoed(client):
-    resp = client.get("/api/v1/info/ping", headers=IDS)
+    resp = client.get("/api/v1/health/live", headers=IDS)
     assert resp.status_code == 200
     for name, value in IDS.items():
         assert resp.headers[name] == value
 
 
 def test_missing_transaction_and_request_ids_are_generated(client):
-    resp = client.get("/api/v1/info/ping")
+    resp = client.get("/api/v1/health/live")
     assert resp.status_code == 200
     assert resp.headers["X-Opal-Transaction-Id"]
     assert resp.headers["X-Opal-Request-Id"]
@@ -44,7 +44,7 @@ def test_missing_transaction_and_request_ids_are_generated(client):
 
 
 def test_partial_supplied_ids_keep_client_values(client):
-    resp = client.get("/api/v1/info/ping", headers={"X-Opal-Session-Id": "sess-1", "X-Opal-Causation-Id": "cause-1"})
+    resp = client.get("/api/v1/health/live", headers={"X-Opal-Session-Id": "sess-1", "X-Opal-Causation-Id": "cause-1"})
     assert resp.headers["X-Opal-Session-Id"] == "sess-1"
     assert resp.headers["X-Opal-Causation-Id"] == "cause-1"
     assert resp.headers["X-Opal-Transaction-Id"]
@@ -52,7 +52,7 @@ def test_partial_supplied_ids_keep_client_values(client):
 
 
 def test_generated_request_ids_are_unique_per_request(client):
-    a, b = client.get("/api/v1/info/ping"), client.get("/api/v1/info/ping")
+    a, b = client.get("/api/v1/health/live"), client.get("/api/v1/health/live")
     assert a.headers["X-Opal-Request-Id"] != b.headers["X-Opal-Request-Id"]
 
 
@@ -60,7 +60,7 @@ def test_generated_request_ids_are_unique_per_request(client):
 def test_invalid_identifiers_are_rejected_with_422(client, bad):
     client.skip_contract = True  # the v1.0 contract does not document these 422s
     for name in CORRELATION_HEADERS:
-        resp = client.get("/api/v1/info/ping", headers={name: bad})
+        resp = client.get("/api/v1/health/live", headers={name: bad})
         assert resp.status_code == 422, (name, bad, resp.text)
         assert resp.json()["error"]["details"]["errors"], resp.text
         # Correlation headers are stamped even on the rejection, but an invalid
@@ -72,7 +72,7 @@ def test_invalid_identifiers_are_rejected_with_422(client, bad):
 
 def test_every_invalid_identifier_is_reported(client):
     client.skip_contract = True
-    resp = client.get("/api/v1/info/ping", headers={"X-Opal-Session-Id": "bad id", "X-Opal-Request-Id": "also bad"})
+    resp = client.get("/api/v1/health/live", headers={"X-Opal-Session-Id": "bad id", "X-Opal-Request-Id": "also bad"})
     assert resp.status_code == 422
     locs = {tuple(e["loc"]) for e in resp.json()["error"]["details"]["errors"]}
     assert locs == {("header", "X-Opal-Session-Id"), ("header", "X-Opal-Request-Id")}

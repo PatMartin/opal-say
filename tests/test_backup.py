@@ -1,211 +1,266 @@
-"""Backup, restore, import, export and configuration validation."""
+"""Kernel config/save, config/load and config/validate replace the retired backup interfaces."""
 
 from __future__ import annotations
 
-import io
+import copy
 import json
-import tarfile
 
 import pytest
+import yaml
+from fastapi.testclient import TestClient
 
-from conftest import make_profile, make_voice
+from conftest import FakeEngine, make_profile, make_voice
+from opal_say.api.app import create_app
+from opal_say.persistence.store import Store
 
 
 @pytest.fixture
 def populated(client):
     make_voice(client, "v1", engine_options={"pitch": 200})
     make_voice(client, "v2", ref="tone-b", description="second")
-    make_profile(client, "main", "v1", is_active=True, speed=1.5, engine_options={"pitch": 220})
-    client.put("/api/v1/setting/chunk_max_chars", json={"value": "120"})
-    client.patch("/api/v1/engine/alt", json={"enabled": False})
+    profile = make_profile(client, "main", "v1", is_active=True, speed=1.5, engine_options={"pitch": 220})
+    assert client.post("/api/v1/persona/", json={"persona_id": "speaker", "name": "Speaker", "voice_id": "v2"}).status_code == 201
+    client.put("/api/v1/setting/chunk_max_chars", json={"value": 120})
+    assert client.patch(f"/api/v1/profile/{profile['id']}", json={"modules": {"opal-say": {"volume": 0.5}}}).status_code == 200
+    response = client.post("/api/v1/config/save", json={"destination": "response"})
+    assert response.status_code == 200, response.text
+    return response.json()["snapshot"]
 
 
-def write_config(config, files: dict[str, str]) -> None:
-    config.config_dir.mkdir(parents=True, exist_ok=True)
-    for name, text in files.items():
-        (config.config_dir / name).write_text(text)
+@pytest.fixture
+def seed_files(config):
+    files = {
+        "engines.yaml": {"engines": {"fake": {"enabled": True, "options": {"available": True}}}},
+        "voices.yaml": {"voices": [{"voice_id": "tone", "name": "Tone", "engine_id": "fake", "engine_voice_ref": "tone-a"}]},
+        "profiles.yaml": {"profiles": [{"id": "seed-default", "name": "Default", "is_active": True,
+                           "modules": {"opal-say": {"voice_id": "tone", "speed": 1.5},
+                                       "future-peer": {"values": [True, 2, None]}}}]},
+        "settings.yaml": {"settings": {"chunk_max_chars": 250}},
+    }
+    config.config_dir.mkdir(parents=True)
+    for name, document in files.items():
+        (config.config_dir / name).write_text(yaml.safe_dump(document), encoding="utf-8")
+    return files
 
 
-def test_export_contains_full_configuration(client, populated):
-    data = client.get("/api/v1/backup/export").json()
-    assert [v["voice_id"] for v in data["voices"]] == ["v1", "v2"]
-    assert data["profiles"][0]["name"] == "main"
-    assert data["settings"] == {"chunk_max_chars": 120}
-    assert {e["engine_id"]: e["enabled"] for e in data["engines"]} == {"alt": False, "fake": True}
+def test_fresh_namespaced_seed_and_reopen_preserve_standalone_generation(config, seed_files):
+    for attempt in range(2):
+        app = create_app(config, engines=[FakeEngine()])
+        try:
+            with TestClient(app) as client:
+                profile = client.get("/api/v1/profile/seed-default").json()
+                assert profile["modules"]["future-peer"] == {"values": [True, 2, None]}
+                assert client.get("/api/v1/setting/chunk_max_chars").json()["value"] == (250 if attempt == 0 else 300)
+                generated = client.post("/api/v1/generate", json={"text": "Seeded offline speech."})
+                assert generated.status_code == 200 and generated.content.startswith(b"RIFF")
+                if attempt == 0:
+                    revision = client.get("/api/v1/setting/").headers["etag"]
+                    assert client.put("/api/v1/setting/chunk_max_chars", json={"value": 300},
+                                      headers={"If-Match": revision}).status_code == 200
+        finally:
+            app.state.services.close()
 
 
-def test_backup_create_returns_201_and_location(client, populated):
-    resp = client.post("/api/v1/backup/create")
-    assert resp.status_code == 201
-    filename = resp.json()["filename"]
-    assert resp.headers["Location"] == f"/api/v1/backup/download/{filename}"
-    assert client.get(resp.headers["Location"]).status_code == 200
+@pytest.mark.parametrize("filename,document", [
+    ("engines.yaml", {"engines": []}),
+    ("engines.yaml", {"engines": {"fake": {"enabled": "yes"}}}),
+    ("voices.yaml", {"voices": {"not": "an array"}}),
+    ("voices.yaml", {"voices": [{"name": "missing fields"}]}),
+    ("profiles.yaml", {"profiles": [{"name": "bad", "modules": {"opal-say": {"voice_id": "missing"}}}]}),
+    ("settings.yaml", {"settings": [1, 2]}),
+    ("settings.yaml", {"settings": {"default_speed": 99}}),
+])
+def test_invalid_bootstrap_applies_nothing_and_preserves_existing_database(config, seed_files, filename, document):
+    path = config.config_dir / filename
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    app = create_app(config, engines=[FakeEngine()])
+    try:
+        with TestClient(app) as client:
+            assert client.get("/api/v1/voice/").json() == []
+            assert client.get("/api/v1/profile/").json() == []
+            assert app.state.services.store.list_settings() == []
+    finally:
+        app.state.services.close()
+    path.write_text(yaml.safe_dump(seed_files[filename]), encoding="utf-8")
+    app = create_app(config, engines=[FakeEngine()])
+    try:
+        with TestClient(app) as client:
+            assert client.get("/api/v1/profile/").json() == []
+            assert client.get("/api/v1/voice/").json() == []
+            revision = client.get("/api/v1/setting/").headers["etag"]
+            response = client.post("/api/v1/voice/", json=seed_files["voices.yaml"]["voices"][0],
+                                   headers={"If-Match": revision})
+            assert response.status_code == 201, response.text
+            assert client.post("/api/v1/generate", json={"text": "Recovered catalog.", "voice_id": "tone"}).status_code == 200
+    finally:
+        app.state.services.close()
 
 
-def test_backup_roundtrip_restores_exact_state(client, populated):
-    before = client.get("/api/v1/backup/export").json()
-    filename = client.post("/api/v1/backup/create").json()["filename"]
-    assert filename.startswith("opal-say-") and filename.endswith(".tar.gz")
-
-    client.post("/api/v1/profile/", json={"name": "extra", "voice_id": "v2"})
-    client.delete("/api/v1/setting/chunk_max_chars")
-    client.patch("/api/v1/engine/alt", json={"enabled": True})
-    client.patch("/api/v1/voice/v2", json={"name": "renamed"})
-
-    result = client.post(f"/api/v1/backup/restore/{filename}").json()
-    assert result["success"] is True
-    after = client.get("/api/v1/backup/export").json()
-    for key in ("engines", "voices", "profiles", "settings"):
-        assert after[key] == before[key], key
+def state(client):
+    response = client.post("/api/v1/config/save", json={"destination": "response"})
+    assert response.status_code == 200, response.text
+    snapshot = response.json()["snapshot"]
+    snapshot.pop("created_at")
+    return snapshot, response.headers["etag"]
 
 
-def test_backup_archive_contents(client, populated):
-    filename = client.post("/api/v1/backup/create").json()["filename"]
-    resp = client.get(f"/api/v1/backup/download/{filename}")
-    assert resp.headers["content-type"] == "application/octet-stream"
-    assert filename in resp.headers["content-disposition"]
-    with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
-        assert tar.getnames() == ["opal-say-config.json"]
-        payload = json.loads(tar.extractfile("opal-say-config.json").read())
-    assert payload["voices"][0]["voice_id"] == "v1"
-    listing = client.get("/api/v1/backup/list").json()
-    assert listing[0]["filename"] == filename and listing[0]["size_bytes"] == len(resp.content)
+def test_save_is_desired_configuration_without_revision_change(client, populated, app):
+    before = client.get("/api/v1/setting/").headers["etag"]
+    response = client.post("/api/v1/config/save", json={"destination": "response"})
+    assert response.status_code == 200 and response.headers["etag"] == before
+    assert response.json()["managed"] is False
+    snapshot = response.json()["snapshot"]
+    assert snapshot["format_version"] == "1.0.0" and snapshot["module"] == "opal-say"
+    assert snapshot["settings"] == {"chunk_max_chars": 120}
+    assert set(snapshot["resources"]) == {"profiles", "voices", "personas", "engines"}
+    assert all(set(engine) == {"engine_id", "enabled", "options"} for engine in snapshot["resources"]["engines"])
+    assert "metadata" not in snapshot["resources"]["voices"][0]
+    assert "owner_checked_at" not in snapshot["resources"]["personas"][0]
+    assert not app.state.services.config_ops.snapshot_path.exists()
 
 
-def test_multiple_backups_get_unique_names(client):
-    names = {client.post("/api/v1/backup/create").json()["filename"] for _ in range(3)}
-    assert len(names) == 3
+def test_managed_roundtrip_and_response_does_not_replace_it(client, populated, app):
+    saved = client.post("/api/v1/config/save")
+    assert saved.status_code == 200 and saved.json()["managed"] is True
+    path = app.state.services.config_ops.snapshot_path
+    managed = path.read_bytes()
+    original, old = state(client)
+    client.put("/api/v1/setting/default_speed", json={"value": 2.0})
+    client.patch("/api/v1/persona/speaker", json={"name": "Changed"})
+    assert client.post("/api/v1/config/save", json={"destination": "response"}).status_code == 200
+    assert path.read_bytes() == managed
+    loaded = client.post("/api/v1/config/load")
+    assert loaded.status_code == 200, loaded.text
+    assert loaded.json()["applied"] is True
+    assert loaded.headers["etag"] != old
+    assert state(client)[0] == original
+    assert path.read_bytes() == managed
+    assert client.post("/api/v1/generate", json={"text": "Restored speech."}).status_code == 200
 
 
-@pytest.mark.parametrize("name", ["..", "a..b.tar.gz", "..%5Cetc", "x\\y"])
-def test_traversal_is_rejected(client, name):
-    for method, url in (("GET", f"/api/v1/backup/download/{name}"), ("POST", f"/api/v1/backup/restore/{name}"),
-                        ("DELETE", f"/api/v1/backup/{name}")):
-        resp = client.request(method, url)
-        assert resp.status_code in (404, 422), (method, url, resp.status_code)
-        assert resp.status_code != 200
+@pytest.mark.parametrize("mutation,code", [
+    (lambda s: s.update(module="other"), "wrong_module"),
+    (lambda s: s.update(format_version="99"), "unsupported_version"),
+    (lambda s: s["resources"].update(history=[]), "unknown_section"),
+    (lambda s: s["settings"].update(unknown=True), "unknown_setting"),
+    (lambda s: s["settings"].update(default_speed=99), "invalid_setting"),
+    (lambda s: s["resources"]["profiles"][0]["modules"]["opal-say"].update(voice_id="missing"), "voice_not_found"),
+    (lambda s: s["resources"]["personas"][0].update(voice_id="missing"), "voice_not_found"),
+    (lambda s: s["resources"]["profiles"].append(copy.deepcopy(s["resources"]["profiles"][0])), "duplicate_resource"),
+    (lambda s: s["resources"].update(profiles={}), "schema_invalid"),
+    (lambda s: s["resources"]["engines"][0]["options"].update(max_concurrent_inferences=0), "invalid_option"),
+])
+def test_invalid_candidate_never_changes_state(client, populated, mutation, code):
+    before = state(client)
+    candidate = copy.deepcopy(populated)
+    mutation(candidate)
+    response = client.post("/api/v1/config/validate", json={"snapshot": candidate})
+    assert response.status_code == 200, response.text
+    report = response.json()
+    assert report["valid"] is False
+    assert code in {error["code"] for error in report["errors"]}
+    assert state(client) == before
+    assert client.post("/api/v1/config/load", json={"snapshot": candidate}).status_code == 422
+    assert state(client) == before
 
 
-def test_unknown_backup_is_404(client):
-    assert client.get("/api/v1/backup/download/opal-say-2020-01-01T000000Z.tar.gz").status_code == 404
-    assert client.post("/api/v1/backup/restore/nothing.tar.gz").status_code == 404
-    assert client.delete("/api/v1/backup/nothing.tar.gz").status_code == 404
+def test_validate_live_not_managed_and_no_runtime_effects(client, populated, app, monkeypatch):
+    svc = app.state.services
+    svc.config_ops.snapshot_path.write_text("{}", encoding="utf-8")
+    before = state(client)
+    runtime = [(id(engine), engine.options) for engine in svc.runtime.all()]
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("validation must not configure adapters")
+
+    monkeypatch.setattr(svc.runtime, "prepare_configurations", forbidden)
+    report = client.post("/api/v1/config/validate").json()
+    assert report["valid"] is True, report
+    assert [(id(engine), engine.options) for engine in svc.runtime.all()] == runtime
+    assert svc.config_ops.snapshot_path.read_text(encoding="utf-8") == "{}"
+    assert state(client) == before
+    assert client.post("/api/v1/config/validate", json={"snapshot": {}}).json()["valid"] is False
 
 
-def test_corrupt_backup_restore_is_conflict_and_changes_nothing(client, populated, config):
-    before = client.get("/api/v1/backup/export").json()
-    bad = config.backup_dir / "opal-say-2020-01-01T000000Z.tar.gz"
-    config.backup_dir.mkdir(parents=True, exist_ok=True)
-    bad.write_bytes(b"not a tarball")
-    resp = client.post(f"/api/v1/backup/restore/{bad.name}")
-    assert resp.status_code == 409 and resp.json()["error"]["code"] == "invalid_backup"
-    assert client.get("/api/v1/backup/export").json()["voices"] == before["voices"]
+def test_load_is_full_replacement_and_preserves_foreign_compartments(client, populated):
+    populated["resources"]["profiles"][0]["modules"]["future-service"] = {"items": [1, 2], "nullable": None}
+    response = client.post("/api/v1/config/load", json={"snapshot": populated})
+    assert response.status_code == 200, response.text
+    assert response.json()["warnings"][0]["code"] == "unknown_namespace"
+    assert state(client)[0]["resources"]["profiles"][0]["modules"]["future-service"] == {"items": [1, 2], "nullable": None}
+    empty = {"format_version": "1.0.0", "module": "opal-say", "created_at": populated["created_at"],
+             "settings": {}, "resources": {}}
+    assert client.post("/api/v1/config/load", json={"snapshot": empty}).status_code == 200
+    assert client.get("/api/v1/voice/").json() == []
+    assert client.get("/api/v1/profile/").json() == []
+    assert client.get("/api/v1/persona/").json() == []
+    assert client.get("/api/v1/setting/chunk_max_chars").json()["value"] == 400
 
 
-def test_invalid_backup_content_is_rejected_atomically(client, populated, config):
-    export = client.get("/api/v1/backup/export").json()
-    export["profiles"][0]["voice_id"] = "ghost"
-    payload = json.dumps(export).encode()
-    path = config.backup_dir / "opal-say-2020-01-02T000000Z.tar.gz"
-    config.backup_dir.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(path, "w:gz") as tar:
-        info = tarfile.TarInfo("opal-say-config.json")
-        info.size = len(payload)
-        tar.addfile(info, io.BytesIO(payload))
-    client.post("/api/v1/profile/", json={"name": "keep-me", "voice_id": "v2"})
-    resp = client.post(f"/api/v1/backup/restore/{path.name}")
-    assert resp.status_code == 409 and resp.json()["error"]["code"] == "backup_invalid"
-    assert "keep-me" in [p["name"] for p in client.get("/api/v1/profile/").json()]
+def test_load_preconditions_and_missing_managed(client, populated):
+    before = state(client)
+    assert client.post("/api/v1/config/load").status_code == 404
+    client.skip_if_match = True
+    assert client.post("/api/v1/config/load", json={"snapshot": populated}).status_code == 428
+    assert client.post("/api/v1/config/load", json={"snapshot": populated}, headers={"If-Match": '"stale"'}).status_code == 412
+    assert state(client) == before
 
 
-def test_delete_backup(client):
-    filename = client.post("/api/v1/backup/create").json()["filename"]
-    assert client.delete(f"/api/v1/backup/{filename}").status_code == 204
-    assert client.get("/api/v1/backup/list").json() == []
+def test_failed_managed_save_keeps_previous_snapshot(client, populated, app, monkeypatch):
+    assert client.post("/api/v1/config/save").status_code == 200
+    path = app.state.services.config_ops.snapshot_path
+    previous = path.read_bytes()
+    before = state(client)
+
+    def fail(*args):
+        raise OSError("injected write failure")
+
+    monkeypatch.setattr("opal_say.service.config_ops.os.replace", fail)
+    assert client.post("/api/v1/config/save").status_code == 500
+    assert path.read_bytes() == previous and state(client) == before
+    assert not list(path.parent.glob(".snapshot-*.tmp"))
 
 
-def test_import_from_config_dir(client, config):
-    write_config(config, {
-        "engines.yaml": "version: 1\nengines:\n  alt:\n    enabled: false\n  ghost:\n    enabled: true\n",
-        "voices.yaml": "version: 1\nvoices:\n  - {voice_id: a, name: A, engine_id: fake, engine_voice_ref: tone-a}\n"
-                       "  - {voice_id: b, name: B, engine_id: fake, engine_voice_ref: tone-b, enabled: false}\n",
-        "profiles.yaml": "version: 1\nprofiles:\n  - {name: one, voice_id: a, is_active: true, speed: 1.25}\n"
-                         "  - {name: two, voice_id: b, output_format: pcm}\n",
-        "settings.yaml": "version: 1\nsettings:\n  chunk_max_chars: 250\n  flag: true\n",
-    })
-    result = client.post("/api/v1/backup/import").json()
-    assert result["success"] is True, result
-    assert [w["code"] for w in result["validation"]["warnings"]] == ["engine_not_installed"]
-    assert [v["voice_id"] for v in client.get("/api/v1/voice/").json()] == ["a", "b"]
-    assert client.get("/api/v1/voice/a").json()["native_sample_rate"] == 22050
-    profiles = client.get("/api/v1/profile/").json()
-    assert [(p["id"], p["name"], p["is_active"]) for p in profiles] == [(1, "one", True), (2, "two", False)]
-    assert client.get("/api/v1/setting/").json() == {"chunk_max_chars": 250, "flag": True}
-    assert client.get("/api/v1/engine/alt").json()["enabled"] is False
-    assert client.post("/api/v1/generate", json={"text": "hi"}).headers["x-opal-voice-id"] == "a"
+def test_failed_load_rolls_back_database_revision_and_runtime(client, populated, app, monkeypatch):
+    before = state(client)
+    runtime = [(id(engine), engine.options) for engine in app.state.services.runtime.all()]
+    candidate = copy.deepcopy(populated)
+    for engine in candidate["resources"]["engines"]:
+        if engine["engine_id"] == "fake":
+            engine["options"]["available"] = False
+    original = Store._insert
+
+    def fail(connection, table, row):
+        if table == "personas":
+            raise OSError("injected database failure")
+        return original(connection, table, row)
+
+    monkeypatch.setattr(Store, "_insert", staticmethod(fail))
+    assert client.post("/api/v1/config/load", json={"snapshot": candidate}).status_code == 500
+    assert state(client) == before
+    assert [(id(engine), engine.options) for engine in app.state.services.runtime.all()] == runtime
 
 
-def test_import_only_replaces_present_sections(client, config, populated):
-    write_config(config, {"settings.yaml": "version: 1\nsettings:\n  default_volume: 0.5\n"})
-    assert client.post("/api/v1/backup/import").json()["success"] is True
-    assert [v["voice_id"] for v in client.get("/api/v1/voice/").json()] == ["v1", "v2"]
-    assert client.get("/api/v1/setting/").json() == {"default_volume": 0.5}
+def test_null_candidates_rejected_and_secrets_not_exported(client, populated):
+    for operation in ("load", "validate"):
+        assert client.post(f"/api/v1/config/{operation}", json={"snapshot": None}).status_code == 422
+    for operation in ("save", "load", "validate"):
+        assert client.post(f"/api/v1/config/{operation}", content="null",
+                           headers={"Content-Type": "application/json"}).status_code == 422
+    populated["resources"]["profiles"][0]["modules"]["future-service"] = {"token": "fixture-not-a-real-secret"}
+    report = client.post("/api/v1/config/validate", json={"snapshot": populated}).json()
+    assert report["valid"] is False
+    assert report["errors"][0]["code"] == "secret_value"
+    assert "fixture-not-a-real-secret" not in json.dumps(report)
 
 
-@pytest.mark.parametrize(
-    "files,code",
-    [
-        ({"profiles.yaml": "profiles:\n  - {name: x, voice_id: ghost}\n"}, "voice_not_found"),
-        ({"profiles.yaml": "profiles:\n  - {name: x, voice_id: v1, is_active: true}\n"
-                           "  - {name: y, voice_id: v1, is_active: true}\n"}, "multiple_active_profiles"),
-        ({"profiles.yaml": "profiles:\n  - {name: x, voice_id: v1}\n  - {name: x, voice_id: v1}\n"}, "duplicate_profile"),
-        ({"voices.yaml": "voices:\n  - {voice_id: q, name: Q, engine_id: nope, engine_voice_ref: r}\n"},
-         "engine_not_found"),
-        ({"voices.yaml": "voices:\n  - {voice_id: q, name: Q, engine_id: fake}\n"}, "schema_invalid"),
-        ({"settings.yaml": "settings:\n  max_text_chars: lots\n"}, "invalid_setting"),
-        ({"engines.yaml": "engines:\n  fake:\n    options: {bogus: 1}\n"}, "unsupported_option"),
-        ({"voices.yaml": "voices: [\n"}, "yaml_invalid"),
-    ],
-)
-def test_invalid_import_applies_nothing(client, config, populated, files, code):
-    before = client.get("/api/v1/backup/export").json()
-    write_config(config, files)
-    result = client.post("/api/v1/backup/import").json()
-    assert result["success"] is False
-    assert code in [e["code"] for e in result["validation"]["errors"]]
-    after = client.get("/api/v1/backup/export").json()
-    for key in ("engines", "voices", "profiles", "settings"):
-        assert after[key] == before[key]
-
-
-def test_import_without_config_files_is_conflict(client):
-    resp = client.post("/api/v1/backup/import")
-    assert resp.status_code == 409 and resp.json()["error"]["code"] == "config_not_found"
-
-
-def test_import_unresolvable_resource_is_warning(client, config):
-    write_config(config, {"voices.yaml": "voices:\n  - {voice_id: q, name: Q, engine_id: fake, engine_voice_ref: gone}\n"})
-    result = client.post("/api/v1/backup/import").json()
-    assert result["success"] is True
-    assert [w["code"] for w in result["validation"]["warnings"]] == ["model_not_found"]
-    live = client.get("/api/v1/backup/validate").json()
-    assert live["valid"] is False and live["errors"][0]["field"] == "voices.q.engine_voice_ref"
-
-
-def test_validate_current_config(client, populated):
-    result = client.get("/api/v1/backup/validate").json()
-    assert result["valid"] is True
-    assert result["details"] == {"engines": 2, "voices": 2, "profiles": 1, "settings": 1}
-
-
-def test_first_start_seeds_from_config_dir(config, engines):
-    from fastapi.testclient import TestClient
-
-    from opal_say.api.app import create_app
-
-    write_config(config, {"voices.yaml": "voices:\n  - {voice_id: seeded, name: S, engine_id: fake, "
-                                         "engine_voice_ref: tone-a}\n"})
-    app = create_app(config, engines=engines)
-    with TestClient(app) as c:
-        assert [v["voice_id"] for v in c.get("/api/v1/voice/").json()] == ["seeded"]
-    app.state.services.close()
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/api/v1/backup/list"), ("POST", "/api/v1/backup/create"),
+    ("GET", "/api/v1/backup/download/file.tar.gz"), ("POST", "/api/v1/backup/restore/file.tar.gz"),
+    ("GET", "/api/v1/backup/export"), ("POST", "/api/v1/backup/import"),
+    ("GET", "/api/v1/backup/validate"), ("POST", "/api/v1/backup/validate"),
+    ("DELETE", "/api/v1/backup/file.tar.gz"),
+])
+def test_backup_interfaces_are_retired(client, method, path):
+    client.skip_contract = True
+    assert client.request(method, path).status_code == 404

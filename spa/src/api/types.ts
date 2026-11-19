@@ -27,17 +27,22 @@ export interface Voice {
   updated_at: string
 }
 
+export interface SayDefaults {
+  voice_id?: string
+  speed?: number
+  volume?: number
+  output_format?: AudioFormat
+  sample_rate?: number | null
+  engine_options?: Options
+}
+
 export interface Profile {
-  id: number
+  id: string
   name: string
   description?: string | null
   is_active: boolean
-  voice_id: string
-  speed: number
-  volume: number
-  output_format: AudioFormat
-  sample_rate?: number | null
-  engine_options: Options
+  shared: Record<string, never>
+  modules: Record<string, unknown> & { 'opal-say'?: SayDefaults }
   created_at: string
   updated_at: string
 }
@@ -46,7 +51,8 @@ export interface Persona {
   persona_id: string
   name: string
   description?: string | null
-  voice_id: string
+  voice_id?: string | null
+  origin?: 'local' | 'owner'
   enabled: boolean
   created_at: string
   updated_at: string
@@ -66,18 +72,28 @@ export interface ValidationResult {
 }
 
 export interface Setting {
-  id: number
+  id?: number | null
   key: string
   value: unknown
-  updated_at: string
+  configured_value: unknown
+  default: unknown
+  has_override: boolean
+  is_default: boolean
+  source: 'default' | 'persisted' | 'dotenv' | 'environment'
+  restart_required: boolean
+  pending_restart: boolean
+  updated_at?: string | null
 }
 
 export interface Health {
+  name: string
+  api_version: string
+  live: boolean
+  ready: boolean
   status: 'ok' | 'degraded' | 'error'
   version: string
-  active_profile_id?: number | null
-  engines: { engine_id: string; enabled: boolean; available: boolean; message?: string | null }[]
-  details?: Options
+  active_profile_id?: string | null
+  details: { engines: { engine_id: string; enabled: boolean; available: boolean; message?: string | null }[] }
 }
 
 export interface Backup {

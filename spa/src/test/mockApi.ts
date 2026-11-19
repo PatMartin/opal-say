@@ -5,6 +5,7 @@ export interface RecordedCall {
   path: string
   query: URLSearchParams
   body: unknown
+  headers: Headers
 }
 
 type Handler = (call: RecordedCall) => Response | Promise<Response>
@@ -12,7 +13,7 @@ type Handler = (call: RecordedCall) => Response | Promise<Response>
 export function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(status === 204 ? null : JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json', ETag: '"r1"', ...headers },
   })
 }
 
@@ -31,6 +32,7 @@ export function mockApi(routes: Record<string, Handler | unknown>) {
       path: url.pathname,
       query: url.searchParams,
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      headers: new Headers(init?.headers),
     }
     calls.push(call)
     const route = routes[`${method} ${url.pathname}`]
@@ -76,16 +78,12 @@ export const ENGINE = {
 }
 
 export const PROFILE = {
-  id: 1,
+  id: '1',
   name: 'default',
   description: null,
   is_active: false,
-  voice_id: 'amy',
-  speed: 1,
-  volume: 1,
-  output_format: 'wav',
-  sample_rate: null,
-  engine_options: {},
+  shared: {},
+  modules: { 'opal-say': { voice_id: 'amy', speed: 1, volume: 1, output_format: 'wav', sample_rate: null, engine_options: {} } },
   created_at: '2026-10-04T00:00:00Z',
   updated_at: '2026-10-04T00:00:00Z',
 }

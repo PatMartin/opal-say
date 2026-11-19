@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { call } from './api/client'
+import { call, setBearerToken } from './api/client'
 import type { ServiceInfo } from './api/types'
-import { BackupPanel } from './components/BackupPanel'
+import { ConfigPanel } from './components/BackupPanel'
 import { useLoad } from './components/common'
 import { EnginePanel } from './components/EnginePanel'
 import { GeneratePanel } from './components/GeneratePanel'
@@ -19,7 +19,7 @@ const TABS = {
   Persona: PersonaPanel,
   Engine: EnginePanel,
   Setting: SettingPanel,
-  Backup: BackupPanel,
+  Configuration: ConfigPanel,
   Health: HealthPanel,
   Service: ServicePanel,
 } as const
@@ -27,8 +27,9 @@ type Tab = keyof typeof TABS
 
 export function App() {
   const [tab, setTab] = useState<Tab>('Generate')
-  const info = useLoad(() => call<ServiceInfo | null>('opal_info_get'), null)
-  const live = useLoad(() => call<{ status: string } | null>('opal_info_ping'), null)
+  const [authRevision, setAuthRevision] = useState(0)
+  const info = useLoad(() => call<ServiceInfo | null>('opal_health_get'), null)
+  const live = useLoad(() => call<{ status: string } | null>('opal_health_live_get'), null)
   const Panel = TABS[tab]
   return (
     <div className="app">
@@ -39,6 +40,18 @@ export function App() {
         </span>
         <span className={live.data?.status === 'ok' ? 'pill ok' : 'pill error'}>{live.data?.status === 'ok' ? 'online' : 'offline'}</span>
       </header>
+      <form className="row" onSubmit={(event) => {
+        event.preventDefault()
+        const form = event.currentTarget
+        setBearerToken(String(new FormData(form).get('credential') ?? ''))
+        form.reset()
+        setAuthRevision((revision) => revision + 1)
+        void info.reload()
+        void live.reload()
+      }}>
+        <label>Bearer credential <input name="credential" type="password" autoComplete="off" /></label>
+        <button type="submit">Use credential</button>
+      </form>
       <nav>
         {(Object.keys(TABS) as Tab[]).map((t) => (
           <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
@@ -47,7 +60,7 @@ export function App() {
         ))}
       </nav>
       <main>
-        <Panel />
+        <Panel key={authRevision} />
       </main>
     </div>
   )

@@ -26,7 +26,7 @@ export function EnginePanel() {
 
   const validate = (id: string) =>
     action.run(async () => {
-      setValidation(await call<ValidationResult>('opal_engine_validate', { path: { engine_id: id } }))
+      setValidation(await call<ValidationResult>('validate_engine', { path: { engine_id: id } }))
     })
 
   return (

@@ -137,12 +137,12 @@ opal say voice test kokoro-af-heart --text "The sky is clear and the journey beg
 
 ## 10. Define a focused profile for announcements
 
-Profiles package a voice and delivery settings under a numerical ID. Create one, note the
+Profiles package namespaced voice/delivery defaults under an opaque string ID. Create one, note the
 ID printed by the command, then select it explicitly in future generation.
 
 ```bash
-opal say profile add announcements \
-  --voice en-us-amy-low --speed 1.1 --volume 1.2 --sample-rate 16000
+printf '%s\n' '{"voice_id":"en-us-amy-low","speed":1.1,"volume":1.2,"sample_rate":16000}' > announcements.json
+opal say profile add --name announcements --module announcements.json
 opal say profile list
 ```
 
@@ -221,8 +221,8 @@ Smaller chunks can start the first stream sooner. This is a service-wide trade-o
 inspect the existing setting and choose a value appropriate to your hardware.
 
 ```bash
-opal say config setting show chunk_max_chars
-opal say config setting set chunk_max_chars 200
+opal say config setting show --name chunk_max_chars
+opal say config setting set --name chunk_max_chars --value 200
 ```
 
 ## 18. Give a large deployment a consistent default speaking pace
@@ -231,8 +231,8 @@ Service settings are fallbacks only: an explicit profile or generation option st
 This is a good way to adjust behavior of simple callers without editing each caller.
 
 ```bash
-opal say config setting set default_speed 1.08
-opal say config setting set default_volume 0.9
+opal say config setting set --name default_speed --value 1.08
+opal say config setting set --name default_volume --value 0.9
 ```
 
 ## 19. Export configuration for review or version control
@@ -241,20 +241,20 @@ Exports contain voice registrations, profiles, engine options, and settings—no
 weights or generated audio. Review the resulting JSON before sharing it.
 
 ```bash
-opal say backup export -o say-configuration.json
-opal say backup validate --payload say-configuration.json
+opal say config save --out say-configuration.json
+opal say config validate --in say-configuration.json
 ```
 
 ## 20. Take a recoverable configuration snapshot before an upgrade
 
-Create the server-side archive, list it to capture its generated filename, then download a
-copy to the current machine. Restore requires the backup to remain on the service host.
+Save a managed snapshot and a separate portable client-side file. Loading that file fully replaces
+live desired configuration without changing the managed snapshot; install models separately.
 
 ```bash
-opal say backup create
-opal say backup list
-# Copy the filename shown above into the next command.
-opal say backup download opal-say-2026-10-12T162205Z.tar.gz -o before-upgrade.tar.gz
+opal say config save
+opal say config save --out before-upgrade.json
+# Validate a copy before applying it.
+opal say config validate --in before-upgrade.json
 ```
 
 ## 21. Give a recurring character a stable identity with a persona
@@ -263,7 +263,7 @@ A persona binds a friendly name to a registered voice so scripts and other OPAL 
 consistent character without remembering `voice_id`s. Register once, then select it with `--persona`.
 
 ```bash
-opal say persona add amy --name "Amy" --voice en-us-amy-low \
+opal say persona add --persona-id amy --name "Amy" --voice-id en-us-amy-low \
   --description "Warm receptionist voice"
 opal say persona list
 opal say generate "Welcome home." --persona amy --play
@@ -490,9 +490,9 @@ Before an Event-driven deployment change, snapshot Say's routing configuration; 
 validate that the voices and profiles supporting Listen, Look, and Think responses remain usable.
 
 ```bash
-opal-say backup create
-opal-say backup validate
-opal-say info ready
+opal-say config save
+opal-say config validate
+curl -f http://127.0.0.1:8001/api/v1/health/ready
 ```
 
 ## Operational notes
@@ -504,5 +504,5 @@ opal-say info ready
   vision, or language-model output.
 - Use a profile for persistent contexts (telephony, emergency alerts, intercom) and request options
   for one-off changes.
-- Before restoring or importing configuration, create a backup. A restore replaces the complete
-  configuration and does not create a safety backup automatically.
+- Before loading configuration, save a separate snapshot. Load fully replaces desired configuration
+  and does not create a safety copy or change the managed snapshot automatically.

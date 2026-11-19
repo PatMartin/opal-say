@@ -1,7 +1,7 @@
 {
   "name": "opal-say-spa",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "gen-ops": "node scripts/gen-operations.mjs",

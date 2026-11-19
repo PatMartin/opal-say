@@ -3,6 +3,8 @@
 # OPAL Say
 ### Turn ordinary text into a voice your projects can actually use.
 
+Contract **0.1.0**, API prefix **`/api/v1`**. See the [current CLI reference](docs/CLI.md) and [user guide](docs/USER_GUIDE.md) for namespaced profiles, registered settings, authorization and configuration snapshots.
+
 **Your camera sees someone at the door. Your assistant knows what to say. Now it needs a voice.**
 
 OPAL Say is the **text-to-speech engine of [OPAL](https://github.com/PatMartin/opal)**: send text to a small REST service, choose a voice, and get real audio back—either a ready-to-use WAV file or **progressive PCM audio** that starts arriving while the rest of the sentence is still being synthesized.
@@ -151,8 +153,6 @@ The default address is **`http://127.0.0.1:8001`**. Keep the service terminal ru
 ~~~bash
 source .venv/bin/activate
 
-opal say info ping
-opal say info
 opal say info health
 opal say engine list
 opal say voice list
@@ -167,7 +167,7 @@ Useful URLs:
 | OpenAPI contract | `http://127.0.0.1:8001/openapi.json` |
 | Web console | `http://127.0.0.1:8001/ui/` **after building the SPA** |
 
-On a fresh database, the service attempts to seed engines, voices, profiles, and settings from `config/*.yaml`. If those seed resources are invalid or model files are missing, the service may start without importing the entire seed catalog. Use `engine validate`, `voice list`, and `backup validate` to diagnose this before attempting generation.
+On a fresh database, the service attempts to seed engines, voices, profiles, and settings from `config/*.yaml`. If those seed resources are invalid or model files are missing, the service may start without importing the entire seed catalog. Use `engine validate`, `voice list`, and `config validate` to diagnose this before attempting generation.
 
 ### 4. Make it say something
 
@@ -198,7 +198,7 @@ npm run build
 cd ..
 ~~~
 
-Restart the service if needed and open `http://127.0.0.1:8001/ui/`. The React/Vite SPA offers engine and voice management, profiles, personas, generation and playback, settings, health, and backups—all through the REST API.
+Restart the service if needed and open `http://127.0.0.1:8001/ui/`. The React/Vite SPA offers engine and voice management, profiles, personas, generation and playback, settings, health, and configuration snapshots—all through the REST API.
 
 For frontend development:
 
@@ -222,12 +222,8 @@ opal
     │  --json                                   raw JSON output
     │  --timeout SECONDS                        default: 120
     │
-    ├── info                                    (bare: same as info version)
-    │   ├── version
-    │   ├── health
-    │   ├── live
-    │   ├── ready
-    │   └── ping
+    ├── info
+    │   └── health
     ├── tree                                    prints this command tree
     │
     ├── engine
@@ -267,41 +263,33 @@ opal
     │
     ├── profile
     │   ├── list
-    │   ├── get PROFILE_ID
-    │   ├── add NAME                             --voice VOICE_ID [--active]
-    │   │                                       [--description TEXT]
-    │   │                                       [--speed FLOAT] [--volume FLOAT]
-    │   │                                       [--format wav|pcm] [--sample-rate HZ]
-    │   │                                       [-O KEY=VALUE]...
-    │   │                                       [--options-json JSON]
-    │   ├── update PROFILE_ID                    [--name NAME] [--voice VOICE_ID]
-    │   │                                       [--description TEXT | --clear-description]
-    │   │                                       [--speed FLOAT] [--volume FLOAT]
-    │   │                                       [--format wav|pcm] [--sample-rate HZ]
-    │   │                                       [--native-rate]
-    │   │                                       [--active/--inactive]
-    │   │                                       [-O KEY=VALUE]...
-    │   │                                       [--options-json JSON]
+    │   ├── show PROFILE_ID
+    │   ├── add                                 --in FILE or --name NAME
+    │   │                                       [--shared FILE] [--module FILE]
+    │   │                                       [--description TEXT] [--is-active/--no-is-active]
+    │   ├── update PROFILE_ID                    [--in FILE] or field options
+    │   │                                       [--name NAME] [--shared FILE] [--module FILE]
+    │   │                                       [--description TEXT] [--is-active/--no-is-active]
     │   ├── activate PROFILE_ID
     │   └── remove PROFILE_ID
     │
     ├── persona
-    │   ├── list                                [--enabled/--disabled]
-    │   ├── add PERSONA_ID                       --name NAME --voice VOICE_ID
-    │   │                                       [--description TEXT]
-    │   │                                       [--enabled/--disabled]
-    │   ├── get PERSONA_ID
-    │   ├── update PERSONA_ID                    [--name NAME] [--voice VOICE_ID]
+    │   ├── list                                [--enabled/--no-enabled]
+    │   ├── add                                 --persona-id ID --name NAME
+    │   │                                       [--voice-id VOICE_ID] [--description TEXT]
+    │   │                                       [--enabled/--no-enabled] [--if-match ETAG]
+    │   ├── show PERSONA_ID
+    │   ├── update PERSONA_ID                    [--name NAME] [--voice-id VOICE_ID]
     │   │                                       [--description TEXT | --clear-description]
-    │   │                                       [--enabled/--disabled]
+    │   │                                       [--clear-voice-id] [--enabled/--no-enabled] [--if-match ETAG]
     │   ├── validate PERSONA_ID
-    │   └── remove PERSONA_ID
+    │   └── remove PERSONA_ID                    [--if-match ETAG]
     │
     ├── TEXT                                    speaks aloud (generate + play)
     ├── generate TEXT                           [-o OUTPUT] [--play] [--stream]
     │                                           [--incremental]
     │                                           [--profile PROFILE_ID]
-    │                                           [--voice VOICE_ID] [--persona PERSONA_ID]
+    │                                           [--voice VOICE_ID] [--persona-id PERSONA_ID | --persona PERSONA_ID]
     │                                           [--engine ENGINE_ID]
     │                                           [--speed FLOAT] [--volume FLOAT]
     │                                           [--format wav|pcm]
@@ -310,32 +298,19 @@ opal
     │                                           [--options-json JSON]
     │
     ├── config
+    │   ├── save                                [--out FILE]
+    │   ├── load                                [--in FILE]
+    │   ├── validate                            [--in FILE]
     │   └── setting
     │       ├── list
-    │       ├── show KEY                        (alias: setting get)
-    │       ├── set KEY VALUE
-    │       ├── update                          --json JSON
-    │       │                                   (alias: config setting update)
-    │       └── remove KEY                      (alias: setting delete)
+    │       ├── show                            --name NAME
+    │       ├── set                             --name NAME --value VALUE
+    │       └── remove                          --name NAME
     │
-    ├── service                                 managed server process
+    └── service                                 managed server process
     │   ├── start                               [--append]
     │   ├── stop
     │   └── log                                 [--lines N]
-    │
-    ├── setting                                 declared aliases only
-    │   ├── get KEY
-    │   └── delete KEY
-    │
-    └── backup
-        ├── list
-        ├── create
-        ├── download FILENAME                   [-o OUTPUT]
-        ├── restore FILENAME
-        ├── delete FILENAME
-        ├── export                              [-o OUTPUT]
-        ├── import
-        └── validate                            [--payload JSON_FILE]
 ~~~
 
 `opal say tree` (or `opal-say tree`) prints this tree live — generated by introspecting the Typer app, so it always reflects the installed version. The full Typer help is always available:
@@ -350,7 +325,7 @@ opal say profile update --help
 opal-say --help
 ~~~
 
-**Global options belong immediately after `say`:** `opal say --json voice list` is correct; `opal say voice list --json` is not. The root `--json` controls **output formatting**, while `config setting update --json` carries a JSON **input payload**.
+**Global options belong immediately after `say`:** `opal say --json voice list` is correct; `opal say voice list --json` is not. The root `--json` controls **output formatting**. Settings use named `--name`/`--value` options; atomic multi-setting replacement uses a validated configuration snapshot.
 
 ## In-depth CLI guide: from first voice to real use cases
 
@@ -366,7 +341,7 @@ opal-say --help
 | **Generation** | Turn text into a finished or streaming audio body | `generate "Hello" -o hello.wav` |
 | **Engine option** | A control relevant to a particular TTS runtime | `noise_scale`, `lang` |
 | **Setting** | A stored service-wide default or limit | `chunk_max_chars` |
-| **Backup** | Logical configuration archive; not the model files | `opal-say-...tar.gz` |
+| **Snapshot** | Portable desired configuration; not credentials, model files or history | `config save --out say-config.json` |
 
 The important boundary is **engine versus voice versus profile**. The engine knows *how* to synthesize; the voice tells it *which resources* to use; the profile says *how you want the result delivered*.
 
@@ -386,7 +361,7 @@ opal say voice list --engine piper
 opal say voice list --engine kokoro
 ~~~
 
-An engine has both `enabled` (your administrative setting) and `available` (the runtime and its required files can be used). A Piper adapter with no voice models or a Kokoro adapter with a missing ONNX file isn't ready simply because the package installed. The service goes further: `health/ready` only returns `200` when the **default speech path actually works** — an active profile (or explicit voice) resolving to an enabled voice whose model file is on disk and whose engine is usable. See `docs/USER_GUIDE.md` §5.10 for the failure codes it reports.
+An engine has both `enabled` (your administrative setting) and `available` (the runtime and its required files can be used). A Piper adapter with no voice models or a Kokoro adapter with a missing ONNX file isn't ready simply because the package installed. The service goes further: `health/ready` only returns `200` when the **default speech path actually works** — an active profile (or explicit voice) resolving to an enabled voice whose model file is on disk and whose engine is usable. See the health report and probes section in `docs/USER_GUIDE.md` for the readiness semantics.
 
 Check each registered voice independently:
 
@@ -432,10 +407,9 @@ opal say voice validate en-us-amy-low
 Create and activate a profile using the registered voice:
 
 ~~~bash
-opal say profile add my-assistant \
-  --voice en-us-amy-low \
-  --description "Default local assistant voice" \
-  --speed 1.0 --volume 0.9 --active
+printf '%s\n' '{"voice_id":"en-us-amy-low","speed":1.0,"volume":0.9}' > assistant-defaults.json
+opal say profile add --name my-assistant --module assistant-defaults.json \
+  --description "Default local assistant voice" --is-active
 
 opal say profile list
 opal say generate "Welcome home." -o welcome.wav
@@ -486,12 +460,11 @@ Profiles are reusable output recipes. You might use a friendly voice for an assi
 opal say profile list
 
 # Make a narrator without changing the active profile:
-opal say profile add narrator \
-  --voice kokoro-bm-george \
-  --description "Longer narration with a deliberate pace" \
-  --speed 0.9 --volume 1.0 --format wav
+printf '%s\n' '{"voice_id":"kokoro-bm-george","speed":0.9,"volume":1.0,"output_format":"wav"}' > narrator-defaults.json
+opal say profile add --name narrator --module narrator-defaults.json \
+  --description "Longer narration with a deliberate pace"
 
-# Capture the numeric profile ID from the response or from the list.
+# Capture the opaque string profile ID from the response or from the list.
 opal say profile list
 
 # Use it for a specific utterance, without switching the default.
@@ -499,20 +472,21 @@ opal say generate "Chapter one. A new beginning." \
   --voice kokoro-bm-george --speed 0.9 -o chapter-opening.wav
 ~~~
 
-For an existing numeric `PROFILE_ID`:
+For an existing opaque string `PROFILE_ID`:
 
 ~~~bash
-opal say profile get PROFILE_ID
+opal say profile show PROFILE_ID
 opal say profile activate PROFILE_ID
 
 # Now the active profile supplies defaults:
 opal say generate "Your assistant is online." -o ready.wav
 
 # Change this profile without changing other profile.
-opal say profile update PROFILE_ID --volume 0.8 --speed 1.1
+printf '%s\n' '{"volume":0.8,"speed":1.1}' > delivery.json
+opal say profile update PROFILE_ID --module delivery.json
 ~~~
 
-Replace `PROFILE_ID` with the integer displayed by `profile list`. A profile **must reference a registered voice**. Only one profile can be active; deleting an active profile is rejected. Switching to another profile before removal is the safe approach.
+Use the opaque string ID displayed by `profile list`. Say defaults live in `modules.opal-say`; shared/foreign compartments are preserved, not editable here. A profile can omit a voice and inherit one from a request/persona. Only one profile can be active; deleting it is rejected until another is activated.
 
 Request-level `--voice`, `--speed`, `--volume`, `--format`, and `--sample-rate` override the profile's settings for that generation. This means you can have stable defaults without giving up flexibility.
 
@@ -568,8 +542,8 @@ To influence how quickly the first chunk becomes available:
 
 ~~~bash
 # Smaller chunks often improve first-audio latency at the cost of more overhead.
-opal say config setting show chunk_max_chars
-opal say config setting set chunk_max_chars 200
+opal say config setting show --name chunk_max_chars
+opal say config setting set --name chunk_max_chars --value 200
 ~~~
 
 Text is chunked internally at sentence boundaries. It is **not** one independent audio file per sentence, and smaller chunks are not a guarantee of a particular latency. Model load, hardware, and engine affect first audio too.
@@ -593,7 +567,7 @@ The configured `max_text_chars` limits accepted text (default: 20,000). You can 
 
 ~~~bash
 opal say config setting list
-opal say config setting set max_text_chars 50000
+opal say config setting set --name max_text_chars --value 50000
 ~~~
 
 The limit guards the service from unexpectedly large synthesis requests. For a full book, consider dividing it into chapters with one output file per chapter rather than one giant generation call.
@@ -605,7 +579,7 @@ OPAL Say can output at a chosen sample rate instead of leaving conversion to eve
 ~~~bash
 opal say profile list
 
-# The fresh seed includes a profile named "telephony"; use its numeric ID.
+# The fresh seed includes a profile named "telephony"; use its opaque string ID.
 # It normally supplies raw PCM at 8000 Hz.
 opal say generate "Your call is important to us." \
   --voice en-us-amy-low --format pcm --sample-rate 8000 \
@@ -782,78 +756,56 @@ with httpx.Client(base_url="http://127.0.0.1:8001", timeout=120) as client:
 
 The service returns audio metadata in headers including `X-Opal-Audio-Format`, `X-Opal-Sample-Rate`, `X-Opal-Channels`, `X-Opal-Engine-Id`, and `X-Opal-Voice-Id`. Use those values when you write a player or converter rather than assuming every engine has the same native rate.
 
-### Use case 13: Back up your favorite voice and profile
+### Use case 13: Save and validate portable configuration
 
-A working voice catalog is worth keeping. Take a snapshot before importing configuration or experimenting with engine settings:
-
-~~~bash
-opal say backup validate
-opal say backup create
-opal say backup list
-
-# Save a human-readable logical config export locally:
-opal say backup export -o say-config.json
-
-# Check a saved export/backup payload:
-opal say backup validate --payload say-config.json
-~~~
-
-Backups are created **on the service host** and can be downloaded by the filename returned from `backup list`:
+Snapshots capture desired settings overrides, profiles, personas, voice registrations and engine configuration, but never credentials, model/media binaries, history or runtime caches.
 
 ~~~bash
-opal say backup download FILENAME -o ./my-say-backup.tar.gz
+opal say config validate
+opal say config save
+
+# Save a client-side snapshot without changing the managed one:
+opal say config save --out say-config.json
+opal say config save --out say-config.yaml
+
+# Check a supplied candidate without changing live state:
+opal say config validate --in say-config.json
+
+# Replace the complete live configuration from a client-side file:
+opal say config load --in say-config.json
+
+# Or apply the service-managed snapshot:
+opal say config load
 ~~~
 
-For an existing server backup filename:
+Save does not change live state or its revision. Validation without `--in` checks live state, not the managed snapshot. Load requires the current whole-configuration ETag (fetched automatically by the CLI), is atomic and is a **full replacement**, not a merge. Omitted resources and overrides are cleared. Failed/stale loads retain the previous state, and loading never rewrites the managed snapshot.
 
-~~~bash
-# This replaces the service configuration immediately.
-opal say backup restore FILENAME
-~~~
-
-A backup captures logical configuration, **not** Piper/Kokoro model binaries. To migrate to another computer, you must install the needed voice/model files there too.
-
-Want your YAML files to be the source of truth?
-
-~~~bash
-# On the server, edit config/engine.yaml, voice.yaml,
-# profile.yaml, or setting.yaml, then validate and back up.
-opal say backup validate
-opal say backup create
-
-# Re-import server-side YAML:
-opal say backup import
-opal say backup validate
-~~~
-
-**Caution:** `backup import` reads the **server's** configured YAML directory; it does **not** upload a JSON export from the client's filesystem. It applies present sections as replacements and doesn't automatically create a safety backup first. Back up explicitly before importing. Restore also changes the live configuration without a confirmation prompt.
+**Caution:** CLI load does not prompt or create a safety copy. Save a separate snapshot before replacement. Bootstrap YAML is read only for a fresh database; the old backup/import/export/restore interfaces are retired without shims. Install referenced model files separately when moving a snapshot to another host.
 
 ### Use case 14: Know what broke before users hear silence
 
 ~~~bash
-opal say info ping
-opal say info
 opal say info health
-opal say info live
-opal say info ready
+curl -f http://127.0.0.1:8001/api/v1/health/live
+curl -f http://127.0.0.1:8001/api/v1/health/ready
 
 opal say engine list
 opal say engine validate piper
 opal say voice validate en-us-amy-low
-opal say backup validate
+opal say config validate
 ~~~
 
 If your pipeline can't speak, troubleshoot from the bottom up:
 
 | Symptom | First place to look |
 | --- | --- |
-| Can't reach the service | `opal say info ping`, URL, port, process |
+| Can't reach the service | `opal say info health`, URL, port, process |
 | Engine reports unavailable | `engine validate`, installed Python extra, model paths |
 | Voice doesn't synthesize | `voice validate`, voice ref and model config |
 | No active default voice | `profile list`, active profile or explicit `--voice` |
 | Voice works but a pipe sounds like noise | Raw PCM sample rate, sample format, channels |
 | Stream starts then cuts off | Engine logs and incomplete-read error |
-| Changes to config YAML seem ignored | `backup import` or persisted engine/settings state |
+| Changes to config YAML seem ignored | `config load --in FILE` or persisted engine/settings state |
 | Restore broke generation | Model files may be missing from the new host |
 
 Remember: **the first request may load a model**. A quick warmup can help measure steady-state performance:
@@ -870,15 +822,16 @@ Service-wide defaults can be set individually:
 
 ~~~bash
 opal say config setting list
-opal say config setting show chunk_max_chars
-opal say config setting set chunk_max_chars 200
-opal say config setting set default_speed 1.1
+opal say config setting show --name chunk_max_chars
+opal say config setting set --name chunk_max_chars --value 200
+opal say config setting set --name default_speed --value 1.1
 
 # Remove a stored override; fall back to the built-in behavior.
-opal say config setting remove default_speed
+opal say config setting remove --name default_speed
 
-# Atomic multi-key merge patch, when desired:
-opal say config setting update --json '{"default_volume":0.85,"chunk_max_chars":250}'
+# For atomic multi-key replacement, save, edit and validate a complete snapshot:
+opal say config save --out say-config.json
+opal say config validate --in say-config.json
 ~~~
 
 | Key | Built-in default | Purpose |
@@ -890,9 +843,9 @@ opal say config setting update --json '{"default_volume":0.85,"chunk_max_chars":
 | `default_volume` | 1.0 | Service-wide fallback gain |
 | `default_output_format` | `wav` | Service-wide fallback output |
 
-`config setting list` returns **stored** settings, not every built-in default. A missing `config setting show KEY` result doesn't mean the default doesn't exist. Streaming responses are governed by text and runtime resource limits, not `max_audio_bytes`.
+`config setting list` returns typed effective values for all registered settings, including defaults. Item reads show configured/effective values, provenance, override/restart flags and environment-masking warnings. Removing an override is idempotent; unknown setting writes are rejected. Streaming responses use text/runtime limits, not `max_audio_bytes`.
 
-For a generation request, the precedence is: **explicit request → selected/active profile → service setting → built-in default**. The voice usually determines the engine and its native sample rate.
+For a generation request, the precedence is: **explicit request → selected persona voice → selected/active namespaced profile → service setting → built-in default**. The voice usually determines the engine and its native sample rate.
 
 ### Audio output cheatsheet
 

@@ -1,12 +1,13 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from '../App'
 import { pcmToWav } from '../audio'
 import { AUDIO_HEADERS, ENGINE, PROFILE, VOICE, audio, json, mockApi } from './mockApi'
 
 const BASE_ROUTES = {
-  'GET /api/v1/info/': { name: 'opal-say-svc', version: '1.4.0', api_version: 'v1' },
-  'GET /api/v1/info/ping': { status: 'ok' },
+  'GET /api/v1/health/': { name: 'opal-say-svc', version: '0.1.0', api_version: 'v1', live: true, ready: true, details: { engines: [] } },
+  'GET /api/v1/health/live': { status: 'ok' },
+  'GET /api/v1/setting/': { chunk_max_chars: 400 },
   'GET /api/v1/profile/': [PROFILE],
   'GET /api/v1/voice/': [VOICE],
   'GET /api/v1/engine/': [ENGINE],
@@ -20,7 +21,7 @@ describe('App shell', () => {
   it('shows service identity and liveness', async () => {
     mockApi(BASE_ROUTES)
     render(<App />)
-    expect(await screen.findByText('opal-say-svc 1.4.0 (API v1)')).toBeInTheDocument()
+    expect(await screen.findByText('opal-say-svc 0.1.0 (API v1)')).toBeInTheDocument()
     expect(screen.getByText('online')).toBeInTheDocument()
   })
 })
@@ -186,7 +187,7 @@ describe('Profile', () => {
   it('creates and activates profile', async () => {
     const calls = mockApi({
       ...BASE_ROUTES,
-      'POST /api/v1/profile/': () => json({ ...PROFILE, id: 2, name: 'fast' }, 201),
+      'POST /api/v1/profile/': () => json({ ...PROFILE, id: 'fast', name: 'fast' }, 201),
       'POST /api/v1/profile/1/activate': { ...PROFILE, is_active: true },
     })
     render(<App />)
@@ -203,11 +204,7 @@ describe('Profile', () => {
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/profile/')).toBe(true))
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/profile/')!.body).toMatchObject({
       name: 'fast',
-      voice_id: 'amy',
-      speed: 1.5,
-      volume: 1,
-      output_format: 'wav',
-      sample_rate: null,
+      modules: { 'opal-say': { voice_id: 'amy', speed: 1.5, volume: 1, output_format: 'wav', sample_rate: null } },
       is_active: false,
     })
   })
@@ -247,7 +244,7 @@ describe('Setting and backup', () => {
     const calls = mockApi({
       ...BASE_ROUTES,
       'GET /api/v1/setting/': {},
-      'PUT /api/v1/setting/chunk_max_chars': { id: 1, key: 'chunk_max_chars', value: 200, updated_at: 'now' },
+      'PUT /api/v1/setting/chunk_max_chars': { key: 'chunk_max_chars', value: 200, configured_value: 200, default: 400, source: 'persisted', has_override: true, is_default: false, restart_required: false, pending_restart: false },
     })
     render(<App />)
     await openTab('Setting')
@@ -258,28 +255,73 @@ describe('Setting and backup', () => {
     expect(calls.find((c) => c.method === 'PUT')!.body).toEqual({ value: 200 })
   })
 
-  it('creates backups and imports configuration', async () => {
-    mockApi({
+  it('saves snapshots and validates live configuration', async () => {
+    const calls = mockApi({
       ...BASE_ROUTES,
-      'GET /api/v1/backup/list': [{ filename: 'opal-say-2026-10-04T230000Z.tar.gz', created_at: 'now', size_bytes: 10 }],
-      'POST /api/v1/backup/create': () => json(
-        { filename: 'opal-say-2026-10-04T230000Z.tar.gz', message: 'Backup created successfully.' },
-        201, { Location: '/api/v1/backup/download/opal-say-2026-10-04T230000Z.tar.gz' },
-      ),
-      'POST /api/v1/backup/import': {
-        success: false,
-        validation: { valid: false, errors: [{ code: 'voice_not_found', message: 'bad ref', field: 'profile.x.voice_id' }], warnings: [], details: {} },
-        message: 'Configuration is invalid; nothing was applied.',
+      'POST /api/v1/config/save': { managed: true, snapshot: { module: 'opal-say', format_version: '1.0.0' } },
+      'POST /api/v1/config/validate': {
+        valid: false, errors: [{ code: 'voice_not_found', path: 'resources.profiles', message: 'bad ref' }], warnings: [],
       },
     })
     render(<App />)
-    await openTab('Backup')
-    const link = await screen.findByRole('link', { name: 'Download' })
-    expect(link.getAttribute('href')).toContain('/api/v1/backup/download/opal-say-2026-10-04T230000Z.tar.gz')
-    await userEvent.click(screen.getByRole('button', { name: 'Create backup' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Backup created successfully.')
-    await userEvent.click(screen.getByRole('button', { name: 'Import ./config' }))
-    expect(await screen.findByTestId('validation')).toHaveTextContent('voice_not_found')
+    await openTab('Configuration')
+    await userEvent.click(screen.getByRole('button', { name: 'Save managed snapshot' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Managed snapshot saved.')
+    expect(calls.find((call) => call.path === '/api/v1/config/save')?.body).toEqual({ destination: 'managed' })
+    await userEvent.click(screen.getByRole('button', { name: 'Validate live configuration' }))
+    expect(await screen.findByTestId('snapshot-validation')).toHaveTextContent('voice_not_found')
+  })
+})
+
+describe('Snapshot clients and authorization', () => {
+  it('validates and loads a candidate, then loads the managed snapshot with a strong tag', async () => {
+    const calls = mockApi({ ...BASE_ROUTES,
+      'POST /api/v1/config/validate': { valid: true, errors: [], warnings: [] },
+      'POST /api/v1/config/load': { applied: true, pending_restart_fields: [], warnings: [] },
+    })
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const snapshot = { format_version: '1.0.0', module: 'opal-say', settings: {}, resources: {} }
+    render(<App />)
+    await openTab('Configuration')
+    fireEvent.change(screen.getByLabelText('Candidate snapshot (JSON)'), { target: { value: JSON.stringify(snapshot) } })
+    await userEvent.click(screen.getByRole('button', { name: 'Validate candidate' }))
+    expect(await screen.findByTestId('snapshot-validation')).toHaveTextContent('true')
+    expect(calls.find((call) => call.path === '/api/v1/config/validate')?.body).toEqual({ snapshot })
+    await userEvent.click(screen.getByRole('button', { name: 'Load candidate' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Configuration loaded.')
+    const load = calls.find((call) => call.path === '/api/v1/config/load')!
+    expect(load.body).toEqual({ snapshot })
+    expect(load.headers.get('If-Match')).toBe('"r1"')
+    await userEvent.click(screen.getByRole('button', { name: 'Load managed snapshot' }))
+    await waitFor(() => expect(calls.filter((call) => call.path === '/api/v1/config/load')).toHaveLength(2))
+    expect(calls.filter((call) => call.path === '/api/v1/config/load')[1].body).toEqual({})
+    expect(confirmation).toHaveBeenCalledTimes(2)
+  })
+
+  it('downloads a response snapshot without requesting a managed save', async () => {
+    const calls = mockApi({ ...BASE_ROUTES,
+      'POST /api/v1/config/save': { managed: false, snapshot: { module: 'opal-say' } },
+    })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    URL.revokeObjectURL = vi.fn()
+    render(<App />)
+    await openTab('Configuration')
+    await userEvent.click(screen.getByRole('button', { name: 'Download snapshot' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('managed snapshot unchanged')
+    expect(calls.find((call) => call.path === '/api/v1/config/save')?.body).toEqual({ destination: 'response' })
+    expect(URL.revokeObjectURL).toHaveBeenCalled()
+  })
+
+  it('uses an in-memory bearer credential and clears the password field', async () => {
+    const calls = mockApi(BASE_ROUTES)
+    render(<App />)
+    const field = screen.getByLabelText('Bearer credential')
+    await userEvent.type(field, 'fixture-token')
+    await userEvent.click(screen.getByRole('button', { name: 'Use credential' }))
+    await waitFor(() => expect(calls.some((call) => call.headers.get('Authorization') === 'Bearer fixture-token')).toBe(true))
+    expect(field).toHaveValue('')
+    expect(localStorage.length).toBe(0)
+    expect(sessionStorage.length).toBe(0)
   })
 })
 

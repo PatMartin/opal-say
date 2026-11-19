@@ -48,7 +48,7 @@ def engine_update(
 def engine_validate(ctx: typer.Context, engine_id: str) -> None:
     """Validate an engine's runtime and configuration."""
     _validation(
-        ctx, _call(ctx, "opal_engine_validate", path_params={"engine_id": engine_id})
+        ctx, _call(ctx, "validate_engine", path_params={"engine_id": engine_id})
     )
 
 

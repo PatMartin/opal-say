@@ -339,6 +339,34 @@ class EngineRuntimeManager:
                     superseded.ready.set()
             self._records[engine_id] = new
 
+    def prepare_configurations(self, configurations: dict[str, dict[str, Any]]) -> dict[str, _RuntimeRecord]:
+        prepared = {}
+        for engine_id in self.ids():
+            old = self._record(engine_id)
+            options = configurations.get(engine_id, {}).get("options", old.engine.default_options())
+            if options == old.options:
+                continue
+            replacement = type(old.engine)()
+            replacement.engine_id = engine_id
+            replacement.configure(split_runtime_options(options)[0])
+            permits = self._limit(replacement, options)
+            record = _RuntimeRecord(engine=replacement, generation=old.generation + 1, options=dict(options),
+                                    sem=threading.BoundedSemaphore(permits), permits=permits)
+            record.ready.set()
+            prepared[engine_id] = record
+        return prepared
+
+    @contextmanager
+    def configuration_batch(self, prepared: dict[str, _RuntimeRecord]) -> Iterator[None]:
+        with self._guard:
+            previous = self._records
+            self._records = {**previous, **prepared}
+            try:
+                yield
+            except BaseException:
+                self._records = previous
+                raise
+
     def configure(self, engine_id: str, options: dict[str, Any]) -> None:
         """Lifecycle shorthand: install a new configuration generation (no-op for
         unknown ids)."""
