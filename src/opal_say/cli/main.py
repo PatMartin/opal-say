@@ -40,7 +40,7 @@ COMMANDS: dict[str, str] = {
     "opal_setting_get": "config setting show",
     "opal_setting_put": "config setting set",
     "opal_setting_delete": "config setting remove",
-    "opal_health_get": "info health",
+    "opal_health_get": "service health",
     "opal_config_save": "config save",
     "opal_config_load": "config load",
     "opal_config_validate": "config validate",

@@ -112,7 +112,7 @@ def test_operation_ids_are_unique():
 
 
 PATH_PARAM = re.compile(r"\{([^{}]+)\}")
-PATH_ITEM_KEYS = frozenset((*METHODS, "parameters", "summary", "description", "servers", "x-opal-cli"))
+PATH_ITEM_KEYS = frozenset((*METHODS, "parameters", "summary", "description", "servers"))
 
 
 def test_paths_are_valid_templates_with_declared_params():

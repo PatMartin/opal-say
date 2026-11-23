@@ -10,15 +10,14 @@ Start OPAL Say, install an engine and at least one voice model, register that mo
 voice, and make sure its health check succeeds. The examples use the seeded
 `en-us-amy-low` Piper voice and `kokoro-af-heart` Kokoro voice; substitute IDs from
 `opal say voice list` when your installation differs. If `voice list` prints `(none)`,
-generation cannot work yet: follow [PIPER_INSTALL.md](PIPER_INSTALL.md) or
-[KOKORO_INSTALL.md](KOKORO_INSTALL.md), then register and validate a voice before using
-the recipes.
+generation cannot work yet: install an engine adapter and model, then register and
+validate a voice before using the recipes.
 
 ```bash
 opal-say-svc
 
 # Run these in another shell after activating the project's virtual environment.
-opal say info health
+opal say service health
 opal say voice list
 opal say voice validate en-us-amy-low
 ```

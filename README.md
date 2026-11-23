@@ -3,7 +3,7 @@
 # OPAL Say
 ### Turn ordinary text into a voice your projects can actually use.
 
-Contract **0.1.0**, API prefix **`/api/v1`**. See the [current CLI reference](docs/CLI.md) and [user guide](docs/USER_GUIDE.md) for namespaced profiles, registered settings, authorization and configuration snapshots.
+Contract **0.5.0**, API prefix **`/api/v1`**. See the [current CLI reference](docs/CLI.md) and [user guide](docs/USER_GUIDE.md) for namespaced profiles, registered settings, authorization and configuration snapshots.
 
 **Your camera sees someone at the door. Your assistant knows what to say. Now it needs a voice.**
 
@@ -153,7 +153,7 @@ The default address is **`http://127.0.0.1:8001`**. Keep the service terminal ru
 ~~~bash
 source .venv/bin/activate
 
-opal say info health
+opal say service health
 opal say engine list
 opal say voice list
 ~~~
@@ -785,7 +785,7 @@ Save does not change live state or its revision. Validation without `--in` check
 ### Use case 14: Know what broke before users hear silence
 
 ~~~bash
-opal say info health
+opal say service health
 curl -f http://127.0.0.1:8001/api/v1/health/live
 curl -f http://127.0.0.1:8001/api/v1/health/ready
 
@@ -799,7 +799,7 @@ If your pipeline can't speak, troubleshoot from the bottom up:
 
 | Symptom | First place to look |
 | --- | --- |
-| Can't reach the service | `opal say info health`, URL, port, process |
+| Can't reach the service | `opal say service health`, URL, port, process |
 | Engine reports unavailable | `engine validate`, installed Python extra, model paths |
 | Voice doesn't synthesize | `voice validate`, voice ref and model config |
 | No active default voice | `profile list`, active profile or explicit `--voice` |
@@ -859,7 +859,7 @@ For low-latency pipelines, set `--sample-rate` to a known value, especially when
 
 ### Configuration and API philosophy
 
-The implemented API is **v1.7.1**. The contract's source of truth is decomposed under [`openapi/`](openapi/): [`opal_say_v1.7.1.yaml`](openapi/opal_say_v1.7.1.yaml) holds the Say-specific surface, and [`shared/opal_kernel.yaml`](openapi/shared/opal_kernel.yaml) holds the OPAL suite-standard operations shared across services. `tools/bundle_contract.py` flattens the two into the packaged document `src/opal_say/contract/opal_say.yaml`, which is loaded by `opal_say.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. A test enforces that the packaged copy never drifts from a fresh bundle of the source. Interpretations of under-specified details are recorded in [docs/CONTRACT_NOTES.md](docs/CONTRACT_NOTES.md).
+The implemented API contract is **0.5.0**. The contract's source of truth is decomposed under [`openapi/`](openapi/): [`opal_say_v0.5.0.yaml`](openapi/opal_say_v0.5.0.yaml) holds the Say-specific surface, and [`shared/opal_kernel.yaml`](openapi/shared/opal_kernel.yaml) holds the OPAL suite-standard operations shared across services. `tools/bundle_contract.py` flattens the two into the packaged document `src/opal_say/contract/opal_say.yaml`, which is loaded by `opal_say.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. A test enforces that the packaged copy never drifts from a fresh bundle of the source.
 
 The full service is **API-first**:
 
@@ -899,7 +899,7 @@ make test-spa       # React/Vitest and frontend type checking
 make spa-dev        # Vite development server
 ~~~
 
-Real-engine tests require installed model files — they look for `~/piper/voices/en_US-amy-low.onnx` and `~/kokoro/` (override with `OPAL_SAY_TEST_PIPER_MODEL` / `OPAL_SAY_TEST_KOKORO_DIR`) — and skip cleanly when the resources aren't available. Standard CI runs `make test-fast`; real-engine validation is a manual-dispatch job only, so no model downloads ever happen on push or PR. The test suite checks OpenAPI route alignment, CLI/SPA operation parity, output formats, error handling, and streaming behavior. See [docs/RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md) for the real-engine release checklist.
+Real-engine tests require installed model files — they look for `~/piper/voices/en_US-amy-low.onnx` and `~/kokoro/` (override with `OPAL_SAY_TEST_PIPER_MODEL` / `OPAL_SAY_TEST_KOKORO_DIR`) — and skip cleanly when the resources aren't available. Standard CI runs `make test-fast`; real-engine validation is a manual-dispatch job only, so no model downloads ever happen on push or PR. The test suite checks OpenAPI route alignment, CLI/SPA operation parity, output formats, error handling, and streaming behavior.
 
 ### Find your way around
 
@@ -908,7 +908,7 @@ opal-say/
 ├── opal-say.png                       project artwork
 ├── README.md                           this guide
 ├── openapi/
-│   ├── opal_say_v1.7.1.yaml            Say-specific OpenAPI contract (v1.7.1)
+│   ├── opal_say_v0.5.0.yaml            Say-specific OpenAPI contract (0.5.0)
 │   └── shared/opal_kernel.yaml         OPAL suite-standard contract components
 ├── tools/bundle_contract.py            flattens openapi/ into the packaged contract
 ├── pyproject.toml                      packaging and entry points
@@ -930,14 +930,11 @@ opal-say/
 ├── docs/
 │   ├── CLI.md                          exhaustive command reference
 │   ├── USER_GUIDE.md                   detailed operating manual
-│   ├── CONTRACT_NOTES.md               contract interpretation notes
-│   ├── PIPER_INSTALL.md                Piper engine installation guide
-│   ├── KOKORO_INSTALL.md               Kokoro engine installation guide
-│   └── RELEASE_VALIDATION.md           real-engine release checklist
+│   └── COOKBOOK.md                     integration patterns
 └── tests/                              Python and contract tests
 ~~~
 
-For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs/USER_GUIDE.md), [Contract Notes](docs/CONTRACT_NOTES.md), [Piper](docs/PIPER_INSTALL.md) and [Kokoro](docs/KOKORO_INSTALL.md) install guides, and [Release Validation](docs/RELEASE_VALIDATION.md).
+For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs/USER_GUIDE.md), and [Cookbook](docs/COOKBOOK.md).
 
 ---
 
@@ -945,6 +942,3 @@ For the deeper material, see the [CLI Reference](docs/CLI.md), [User Guide](docs
 
 [Explore OPAL](https://github.com/PatMartin/opal) · [OPAL Listen](https://github.com/PatMartin/opal-listen) · [OPAL Event](https://github.com/PatMartin/opal-event) · [OPAL Look](https://github.com/PatMartin/opal-look) · [OPAL Think](https://github.com/PatMartin/opal-think)
 
-## Dotenv configuration
-
-See [docs/DOTENV.md](docs/DOTENV.md) for `.env` loading, initialization, precedence, and `--env-file` / `--no-env-file` behavior.

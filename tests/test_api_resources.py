@@ -184,6 +184,22 @@ class TestProfiles:
         assert client.delete("/api/v1/profile/999").status_code == 404
         assert client.post("/api/v1/profile/999/activate").status_code == 404
 
+    def test_module_compartments_follow_contract_catalog(self, client):
+        """Declared compartments validate strictly; foreign ones round-trip verbatim."""
+        make_voice(client, "v1")
+        # opal-bus is a declared (empty, closed) compartment since contract 0.5.0.
+        ok = client.post("/api/v1/profile/", json={
+            "name": "bus", "modules": {"opal-bus": {}, "opal-say": {"voice_id": "v1"}}})
+        assert ok.status_code == 201
+        assert ok.json()["modules"]["opal-bus"] == {}
+        assert client.post("/api/v1/profile/", json={
+            "name": "bad", "modules": {"opal-bus": {"any_member": 1}}}).status_code == 422
+        # opal-event is no longer declared: it round-trips as a foreign compartment.
+        resp = client.post("/api/v1/profile/", json={
+            "name": "legacy", "modules": {"opal-event": {"anything": [1, 2]}}})
+        assert resp.status_code == 201
+        assert resp.json()["modules"]["opal-event"] == {"anything": [1, 2]}
+
     def test_activation_requires_usable_engine(self, client):
         make_voice(client, "v1")
         p = make_profile(client, "p1", "v1")

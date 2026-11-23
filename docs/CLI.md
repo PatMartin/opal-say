@@ -1,20 +1,20 @@
 # `opal say` CLI reference
 
-Contract **0.1.0**, API prefix **`/api/v1`**. The CLI is a REST client, not a second database or synthesis implementation. Start `opal-say-svc` first. `opal-say ...` is the standalone equivalent of `opal say ...` and avoids entry-point conflicts with sibling OPAL installations.
+Contract **0.5.0**, API prefix **`/api/v1`**. The CLI is a REST client, not a second database or synthesis implementation. Start `opal-say-svc` first. `opal-say ...` is the standalone equivalent of `opal say ...` and avoids entry-point conflicts with sibling OPAL installations.
 
 ## Connection, credentials and output
 
 ```bash
 opal say --help
 opal say tree --ascii
-opal say --api-url http://127.0.0.1:8001 --json info health
+opal say --api-url http://127.0.0.1:8001 --json service health
 ```
 
 Global options precede the group: `--api-url` (also `OPAL_SAY_API_URL`), `--timeout`, `--json`, `--env-file`, and `--no-env-file`. `OPAL_SAY_TOKEN` supplies the bearer credential when authentication is enabled. Keep credentials in environment variables, not command arguments, profile files or snapshots.
 
 Configuration writers fetch a strong whole-configuration ETag and send `If-Match`. Persona mutations also accept `--if-match ETAG`; an explicitly supplied stale tag is not refreshed or retried. HTTP failures exit 1; connection or argument failures exit 2. Invalid validation reports exit 1. Audio goes to the selected output; diagnostics go to stderr.
 
-`info health` is the human status command. Machine callers use `GET /api/v1/health/live` and `GET /api/v1/health/ready` directly; these probes deliberately have no CLI binding.
+`service health` is the human status command (`info health` remains as an alias). Machine callers use `GET /api/v1/health/live` and `GET /api/v1/health/ready` directly; these probes deliberately have no CLI binding.
 
 ## Engines
 
@@ -27,7 +27,7 @@ opal say engine update piper --enable
 opal say engine validate piper
 ```
 
-Engine IDs refer to installed adapters. `update` accepts `--enable/--disable`, repeated `-O KEY=VALUE`, and `--options-json JSON`. Engine option updates are shallow patches; a null value removes an override. Runtime availability and administrative enablement are separate. See [Piper installation](PIPER_INSTALL.md) and [Kokoro installation](KOKORO_INSTALL.md).
+Engine IDs refer to installed adapters. `update` accepts `--enable/--disable`, repeated `-O KEY=VALUE`, and `--options-json JSON`. Engine option updates are shallow patches; a null value removes an override. Runtime availability and administrative enablement are separate.
 
 ## Voices
 
@@ -167,6 +167,7 @@ Snapshots contain desired settings overrides, profiles, personas, voice registra
 ```bash
 opal say service start
 opal say service start --append
+opal say service health
 opal say service log --lines 20
 opal say service stop
 ```
@@ -175,4 +176,4 @@ These control the tracked server process; the API must be reachable. Starting fr
 
 ## Retired callers
 
-The old backup/import/export/restore APIs and CLI group, `info version/ping/live/ready`, flat profile flags, collection settings PATCH and flat `setting` aliases are not compatibility shims. Use `config save/load/validate`, `info health`, named setting options and namespaced profile files instead. Existing numeric database profile IDs upgrade to their string representation; callers must stop coercing IDs to integers.
+The old backup/import/export/restore APIs and CLI group, `info version/ping/live/ready`, flat profile flags, collection settings PATCH and flat `setting` aliases are not compatibility shims. Use `config save/load/validate`, `service health`, named setting options and namespaced profile files instead. Existing numeric database profile IDs upgrade to their string representation; callers must stop coercing IDs to integers.

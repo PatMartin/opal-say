@@ -158,7 +158,8 @@ class ConfigService:
             profile_names.add(row["name"])
             active += bool(row.get("is_active"))
             own = row.get("modules", {}).get("opal-say", {})
-            for namespace in row.get("modules", {}).keys() - {"opal-say", "opal-listen", "opal-think"}:
+            declared = set(load_contract()["components"]["schemas"]["OpalProfileModules"]["properties"])
+            for namespace in row.get("modules", {}).keys() - declared:
                 issue(warnings, "unknown_namespace", f"{path}.modules.{namespace}",
                       "foreign compartment preserved without interpretation")
             if own.get("voice_id") and own["voice_id"] not in voices:

@@ -1,8 +1,8 @@
 """Release validation against real Piper and Kokoro engines.
 
-Skipped cleanly unless the runtime packages and model files are installed —
-see docs/RELEASE_VALIDATION.md for required env vars and per-platform commands.
-Nothing here runs in standard CI (`-m "not piper and not kokoro"`).
+Skipped cleanly unless the runtime packages and model files are installed
+(`OPAL_SAY_TEST_PIPER_MODEL` / `OPAL_SAY_TEST_KOKORO_DIR` override the default
+locations). Nothing here runs in standard CI (`-m "not piper and not kokoro"`).
 """
 
 from __future__ import annotations

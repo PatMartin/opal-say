@@ -74,11 +74,11 @@ def _health(ctx: typer.Context) -> None:
 
 
 def register(say_app: typer.Typer) -> None:
-    info_app = typer.Typer(help="Service health and identity; use info health.", no_args_is_help=True)
+    info_app = typer.Typer(help="Service health and identity; use service health.", no_args_is_help=True)
 
     @info_app.command("health")
     def info_health(ctx: typer.Context) -> None:
-        """Service readiness and engine state."""
+        """Service readiness and engine state (alias of `service health`)."""
         _health(ctx)
 
     say_app.add_typer(info_app, name="info")

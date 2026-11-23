@@ -1,6 +1,6 @@
 # OPAL Say user guide
 
-OPAL Say is a standalone local text-to-speech service with a REST API, a Typer CLI and a React console. Contract **0.1.0** keeps the URL prefix **`/api/v1`**. The packaged, self-contained contract served at `/openapi.json` is the authoritative operation/schema reference; `/docs` provides interactive exploration.
+OPAL Say is a standalone local text-to-speech service with a REST API, a Typer CLI and a React console. Contract **0.5.0** keeps the URL prefix **`/api/v1`**. The packaged, self-contained contract served at `/openapi.json` is the authoritative operation/schema reference; `/docs` provides interactive exploration.
 
 The server generates audio; playback happens on the client. Piper and Kokoro run locally when their optional dependencies and model files are installed. OPAL Think is optional, and standalone generation does not require an event service or event publication.
 
@@ -15,12 +15,12 @@ pip install -e '.[engines,dev]'
 opal-say-svc --host 127.0.0.1 --port 8001
 ```
 
-Use `.[piper]`, `.[kokoro]` or the core package when only selected adapters are needed. Model binaries are separate from Python packages and must be installed on the **service host**. Follow [Piper installation](PIPER_INSTALL.md), [Kokoro installation](KOKORO_INSTALL.md), and the license notes in the [README](../README.md).
+Use `.[piper]`, `.[kokoro]` or the core package when only selected adapters are needed. Model binaries are separate from Python packages and must be installed on the **service host**. See the license notes in the [README](../README.md).
 
 From another terminal:
 
 ```bash
-opal say info health
+opal say service health
 opal say engine list
 opal say voice list
 opal say voice validate en-us-amy-low
@@ -102,7 +102,7 @@ When authentication is enabled, supply a bearer credential to **both** the read 
 | Personas (6) | GET/POST `/persona/`; GET/PATCH/DELETE `/persona/{persona_id}`; POST `/persona/{persona_id}/validate` | `persona list/add/show/update/remove/validate` |
 | Speech (3) | POST `/generate`, `/generate/stream`, `/generate/stream/incremental` | `generate`, `--stream`, `--incremental` |
 | Settings (4) | GET `/setting/`; GET/PUT/DELETE `/setting/{key}` | `config setting list/show/set/remove` |
-| Health (3) | GET `/health/`, `/health/live`, `/health/ready` | `info health`; no CLI bindings for probes |
+| Health (3) | GET `/health/`, `/health/live`, `/health/ready` | `service health` (alias `info health`); no CLI bindings for probes |
 | Snapshots (3) | POST `/config/save`, `/config/load`, `/config/validate` | `config save/load/validate` |
 | Lifecycle (3) | POST `/service/start`, `/service/stop`; GET `/service/log` | `service start/stop/log` |
 
@@ -189,7 +189,7 @@ npm --prefix spa run typecheck
 npm --prefix spa run build
 ```
 
-Optional real-adapter tests skip when their runtime/models are absent. Deterministic adapters cover service/HTTP/SQLite semantics; they are not audible-playback evidence. See the [cookbook](COOKBOOK.md) for integration patterns and the [contract notes](CONTRACT_NOTES.md) for contract publication.
+Optional real-adapter tests skip when their runtime/models are absent. Deterministic adapters cover service/HTTP/SQLite semantics; they are not audible-playback evidence. See the [cookbook](COOKBOOK.md) for integration patterns.
 
 ## Caller cutover
 

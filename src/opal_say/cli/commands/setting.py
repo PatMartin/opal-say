@@ -1,9 +1,4 @@
-"""`opal say config setting ...` — service-wide key/value setting.
-
-Canonical spellings come from the contract's x-opal-cli bindings:
-`config setting list|show|set|update|remove`, with `config setting patch`
-(alias of `update`) and flat `setting get`/`setting delete` as declared aliases.
-"""
+"""`opal say config setting ...` — service-wide key/value setting."""
 
 from __future__ import annotations
 
@@ -16,11 +11,6 @@ from opal_say.cli.common import _call, _emit
 
 config_app = typer.Typer(help="Configuration resources.", no_args_is_help=True)
 config_setting_app = typer.Typer(help="Service-wide key/value setting.", no_args_is_help=True)
-# Flat `setting` group: only the two spellings the contract declares as aliases.
-setting_app = typer.Typer(
-    help="Service-wide key/value setting (aliases for `config setting ...`).",
-    no_args_is_help=True,
-)
 
 
 def _list(ctx: typer.Context) -> None:
@@ -45,13 +35,6 @@ def _set(ctx: typer.Context, key: str = typer.Option(..., "--name"),
                      json={"value": parsed}).json())
 
 
-def _update(ctx: typer.Context, payload: str = typer.Option(
-    ..., "--json", help='JSON object of changes, e.g. \'{"default_speed": 1.2}\' (null deletes a key).'
-)) -> None:
-    """Atomically merge-patch the whole setting document."""
-    _emit(ctx, _call(ctx, "opal_setting_patch", json=json.loads(payload)).json())
-
-
 def _remove(ctx: typer.Context, key: str = typer.Option(..., "--name")) -> None:
     """Delete a setting so the default applies."""
     _call(ctx, "opal_setting_delete", path_params={"key": key})
@@ -62,13 +45,8 @@ def _remove(ctx: typer.Context, key: str = typer.Option(..., "--name")) -> None:
 config_setting_app.command("list")(_list)
 config_setting_app.command("show")(_show)
 config_setting_app.command("set")(_set)
-# declared alias of `update`
 config_setting_app.command("remove")(_remove)
 config_app.add_typer(config_setting_app, name="setting")
-
-# Declared flat aliases: `setting get` and `setting delete`.
-setting_app.command("get")(_show)
-setting_app.command("delete")(_remove)
 
 
 def register(say_app: typer.Typer) -> None:

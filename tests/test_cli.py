@@ -128,8 +128,9 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     run("config setting patch --json '{}'", code=2)  # retired alias of `update`
     run("config setting remove --name default_speed")
 
-    assert "status:" in run("info health").stdout
-    assert json.loads(run("--json info health").stdout)["ready"] is True
+    assert "status:" in run("service health").stdout
+    assert json.loads(run("--json service health").stdout)["ready"] is True
+    assert "status:" in run("info health").stdout  # retained alias
     for retired in ("info live", "info ready", "info version", "info ping"):
         run(retired, code=2)
 
@@ -185,7 +186,7 @@ def test_invalid_validation_result_exits_nonzero(run):
 
 def test_unreachable_server(monkeypatch):
     monkeypatch.setattr(cli, "client_factory", lambda url, timeout: ApiClient("http://127.0.0.1:9", 1))
-    result = CliRunner().invoke(cli.app, ["say", "info", "health"])
+    result = CliRunner().invoke(cli.app, ["say", "service", "health"])
     assert result.exit_code == 2 and "cannot reach" in result.stderr
 
 

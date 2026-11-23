@@ -65,6 +65,14 @@ def service_stop(ctx: typer.Context) -> None:
         typer.echo(f"server stopped (pid {status['previous_pid']})")
 
 
+@service_app.command("health")
+def service_health(ctx: typer.Context) -> None:
+    """Service readiness and engine state."""
+    from opal_say.cli.commands.root import _health
+
+    _health(ctx)
+
+
 @service_app.command("log")
 def service_log(ctx: typer.Context, lines: int = typer.Option(10, "--lines", "-n", min=1, max=1000)) -> None:
     """Tail the service log file (default: last 10 lines)."""
