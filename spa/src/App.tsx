@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { call, setBearerToken } from './api/client'
-import type { ServiceInfo } from './api/types'
+import type { Health } from './api/types'
 import { ConfigPanel } from './components/BackupPanel'
 import { useLoad } from './components/common'
 import { EnginePanel } from './components/EnginePanel'
@@ -28,15 +28,15 @@ type Tab = keyof typeof TABS
 export function App() {
   const [tab, setTab] = useState<Tab>('Generate')
   const [authRevision, setAuthRevision] = useState(0)
-  const info = useLoad(() => call<ServiceInfo | null>('opal_health_get'), null)
+  const health = useLoad(() => call<Health | null>('opal_health_get'), null)
   const live = useLoad(() => call<{ status: string } | null>('opal_health_live_get'), null)
   const Panel = TABS[tab]
   return (
     <div className="app">
       <header>
         <h1>OPAL Say</h1>
-        <span className="muted" data-testid="service-info">
-          {info.data ? `${info.data.name} ${info.data.version} (API ${info.data.api_version})` : 'connecting…'}
+        <span className="muted" data-testid="service-health">
+          {health.data ? `${health.data.name} ${health.data.version} (API ${health.data.api_version})` : 'connecting…'}
         </span>
         <span className={live.data?.status === 'ok' ? 'pill ok' : 'pill error'}>{live.data?.status === 'ok' ? 'online' : 'offline'}</span>
       </header>
@@ -46,7 +46,7 @@ export function App() {
         setBearerToken(String(new FormData(form).get('credential') ?? ''))
         form.reset()
         setAuthRevision((revision) => revision + 1)
-        void info.reload()
+        void health.reload()
         void live.reload()
       }}>
         <label>Bearer credential <input name="credential" type="password" autoComplete="off" /></label>

@@ -53,7 +53,7 @@ def test_request_validation_errors_land_in_details_errors(client):
 
 def test_invalid_correlation_header_is_an_opal_error(client):
     client.skip_contract = True  # the v1.0 contract does not document this 422
-    resp = client.get("/api/v1/info/ping", headers={"X-Opal-Transaction-Id": "bad id"})
+    resp = client.get("/api/v1/health/live", headers={"X-Opal-Transaction-Id": "bad id"})
     err = assert_opal_error(resp, 422, "unprocessable_entity")
     assert err["details"]["errors"][0]["loc"] == ["header", "X-Opal-Transaction-Id"]
 

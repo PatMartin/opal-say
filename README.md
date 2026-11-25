@@ -222,8 +222,6 @@ opal
     │  --json                                   raw JSON output
     │  --timeout SECONDS                        default: 120
     │
-    ├── info
-    │   └── health
     ├── tree                                    prints this command tree
     │
     ├── engine

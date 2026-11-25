@@ -1,4 +1,4 @@
-"""Info-level commands: version, health, liveness ping and the command tree."""
+"""Top-level `say` commands (`tree`) and the shared health-report renderer."""
 
 from __future__ import annotations
 
@@ -74,15 +74,6 @@ def _health(ctx: typer.Context) -> None:
 
 
 def register(say_app: typer.Typer) -> None:
-    info_app = typer.Typer(help="Service health and identity; use service health.", no_args_is_help=True)
-
-    @info_app.command("health")
-    def info_health(ctx: typer.Context) -> None:
-        """Service readiness and engine state (alias of `service health`)."""
-        _health(ctx)
-
-    say_app.add_typer(info_app, name="info")
-
     @say_app.command("tree")
     def tree(
         ascii_output: bool = typer.Option(False, "--ascii", help="Plain ASCII tree: no box-drawing, no color."),

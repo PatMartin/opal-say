@@ -130,8 +130,7 @@ def test_full_cli_workflow(run, http, tmp_path, config):
 
     assert "status:" in run("service health").stdout
     assert json.loads(run("--json service health").stdout)["ready"] is True
-    assert "status:" in run("info health").stdout  # retained alias
-    for retired in ("info live", "info ready", "info version", "info ping"):
+    for retired in ("info", "info health", "info live", "info ready", "info version", "info ping"):
         run(retired, code=2)
 
     assert json.loads(run("--json service start").stdout)["state"] == "running"

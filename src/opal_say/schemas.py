@@ -347,14 +347,3 @@ class OperationResult(BaseModel):
     success: bool
     message: str
     details: dict[str, Any] = Field(default_factory=dict)
-
-
-class ServiceInfo(BaseModel):
-    name: str
-    version: str
-    api_version: str
-    description: str
-
-
-class LivenessRead(BaseModel):
-    status: Literal["ok"] = "ok"

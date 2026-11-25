@@ -102,7 +102,7 @@ When authentication is enabled, supply a bearer credential to **both** the read 
 | Personas (6) | GET/POST `/persona/`; GET/PATCH/DELETE `/persona/{persona_id}`; POST `/persona/{persona_id}/validate` | `persona list/add/show/update/remove/validate` |
 | Speech (3) | POST `/generate`, `/generate/stream`, `/generate/stream/incremental` | `generate`, `--stream`, `--incremental` |
 | Settings (4) | GET `/setting/`; GET/PUT/DELETE `/setting/{key}` | `config setting list/show/set/remove` |
-| Health (3) | GET `/health/`, `/health/live`, `/health/ready` | `service health` (alias `info health`); no CLI bindings for probes |
+| Health (3) | GET `/health/`, `/health/live`, `/health/ready` | `service health`; no CLI bindings for probes |
 | Snapshots (3) | POST `/config/save`, `/config/load`, `/config/validate` | `config save/load/validate` |
 | Lifecycle (3) | POST `/service/start`, `/service/stop`; GET `/service/log` | `service start/stop/log` |
 
@@ -193,4 +193,4 @@ Optional real-adapter tests skip when their runtime/models are absent. Determini
 
 ## Caller cutover
 
-Retired info routes are replaced by health reporting/probes. Retired backup/import/export/restore routes and commands are replaced by snapshot save/load/validate; no transition shim is provided. Flat profiles and integer-only callers must move to namespaced documents and string IDs. Settings collection PATCH and old flat CLI aliases are gone. Preserve the target-defined persona selector alias while migrating producers to `persona_id`.
+Retired info routes and the `info` CLI group are replaced by health reporting/probes and `service health`. Retired backup/import/export/restore routes and commands are replaced by snapshot save/load/validate; no transition shim is provided. Flat profiles and integer-only callers must move to namespaced documents and string IDs. Settings collection PATCH and old flat CLI aliases are gone. Preserve the target-defined persona selector alias while migrating producers to `persona_id`.

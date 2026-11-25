@@ -611,8 +611,7 @@ components:
             return HTTP 200 whenever the report itself can be produced.
         live:
           type: boolean
-          description: True while the service process is alive. Carries the information the retired
-            `GET /api/v1/info/ping` route and `info ping`/`info live` commands used to report.
+          description: True while the service process is alive.
         ready:
           type: boolean
           description: True when the service can perform useful work. May be false while `live` stays
@@ -662,8 +661,7 @@ components:
       - details
       additionalProperties: true
       description: Aggregate service health report - the single source for service identity, liveness,
-        readiness and diagnostics. Replaces the retired `GET /api/v1/info/` and `GET /api/v1/info/ping`
-        reports; module-defined diagnostics live under `details`.
+        readiness and diagnostics. Module-defined diagnostics live under `details`.
     SettingRead:
       type: object
       properties:
@@ -1628,9 +1626,8 @@ components:
         operationId: opal_health_get
         description: 'Aggregate health report for the service: identity (`name`, `version`, `api_version`),
           overall `status`, `live`/`ready` flags and module-defined `details`. This is the single service
-          information surface - it replaces the retired `GET /api/v1/info/` and `GET /api/v1/info/ping`
-          reports. Returns HTTP 200 whenever the report is available, including when `ready` is false;
-          503 is used only when the report itself cannot be produced.'
+          information surface. Returns HTTP 200 whenever the report is available, including when `ready`
+          is false; 503 is used only when the report itself cannot be produced.'
         responses:
           '200':
             description: Service health report.
@@ -1746,8 +1743,8 @@ components:
         summary: Liveness probe
         operationId: opal_health_live_get
         description: 'Cheap liveness check for machine callers: the process is up and its minimal runtime
-          is reachable. This is the supported machine probe - it replaces the retired `GET /api/v1/info/ping`
-          for supervisors and load balancers. No CLI binding; use `service health` for the human-readable report.'
+          is reachable. This is the supported machine probe for supervisors and load balancers. No CLI
+          binding; use `service health` for the human-readable report.'
         responses:
           '200':
             description: Health probe.

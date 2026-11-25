@@ -102,13 +102,6 @@ export interface Backup {
   size_bytes?: number | null
 }
 
-export interface ServiceInfo {
-  name: string
-  version: string
-  api_version: string
-  description?: string
-}
-
 export interface ServiceStatus {
   state: 'running' | 'stopped'
   pid?: number | null

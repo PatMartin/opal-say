@@ -14,7 +14,7 @@ Global options precede the group: `--api-url` (also `OPAL_SAY_API_URL`), `--time
 
 Configuration writers fetch a strong whole-configuration ETag and send `If-Match`. Persona mutations also accept `--if-match ETAG`; an explicitly supplied stale tag is not refreshed or retried. HTTP failures exit 1; connection or argument failures exit 2. Invalid validation reports exit 1. Audio goes to the selected output; diagnostics go to stderr.
 
-`service health` is the human status command (`info health` remains as an alias). Machine callers use `GET /api/v1/health/live` and `GET /api/v1/health/ready` directly; these probes deliberately have no CLI binding.
+`service health` is the human status command. Machine callers use `GET /api/v1/health/live` and `GET /api/v1/health/ready` directly; these probes deliberately have no CLI binding.
 
 ## Engines
 
@@ -176,4 +176,4 @@ These control the tracked server process; the API must be reachable. Starting fr
 
 ## Retired callers
 
-The old backup/import/export/restore APIs and CLI group, `info version/ping/live/ready`, flat profile flags, collection settings PATCH and flat `setting` aliases are not compatibility shims. Use `config save/load/validate`, `service health`, named setting options and namespaced profile files instead. Existing numeric database profile IDs upgrade to their string representation; callers must stop coercing IDs to integers.
+The old backup/import/export/restore APIs and CLI group, the entire `info` command group (`info health` and retired `info version/ping/live/ready`), flat profile flags, collection settings PATCH and flat `setting` aliases are not compatibility shims. Use `config save/load/validate`, `service health`, named setting options and namespaced profile files instead. Existing numeric database profile IDs upgrade to their string representation; callers must stop coercing IDs to integers.
