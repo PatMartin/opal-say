@@ -1,6 +1,6 @@
 # `opal say` CLI reference
 
-Contract **0.5.0**, API prefix **`/api/v1`**. The CLI is a REST client, not a second database or synthesis implementation. Start `opal-say-svc` first. `opal-say ...` is the standalone equivalent of `opal say ...` and avoids entry-point conflicts with sibling OPAL installations.
+Contract **0.6.0**, API prefix **`/api/v1`**. The CLI is a REST client, not a second database or synthesis implementation. Start `opal-say-svc` first. `opal-say ...` is the standalone equivalent of `opal say ...` and avoids entry-point conflicts with sibling OPAL installations.
 
 ## Connection, credentials and output
 

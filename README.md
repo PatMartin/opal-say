@@ -3,7 +3,7 @@
 # OPAL Say
 ### Turn ordinary text into a voice your projects can actually use.
 
-Contract **0.5.0**, API prefix **`/api/v1`**. See the [current CLI reference](docs/CLI.md) and [user guide](docs/USER_GUIDE.md) for namespaced profiles, registered settings, authorization and configuration snapshots.
+Contract **0.6.0**, API prefix **`/api/v1`**. See the [current CLI reference](docs/CLI.md) and [user guide](docs/USER_GUIDE.md) for namespaced profiles, registered settings, authorization and configuration snapshots.
 
 **Your camera sees someone at the door. Your assistant knows what to say. Now it needs a voice.**
 
@@ -834,7 +834,7 @@ For low-latency pipelines, set `--sample-rate` to a known value, especially when
 
 ### Configuration and API philosophy
 
-The implemented API contract is **0.5.0**. The contract's source of truth is decomposed under [`openapi/`](openapi/): [`opal_say_v0.5.0.yaml`](openapi/opal_say_v0.5.0.yaml) holds the Say-specific surface, and [`shared/opal_kernel.yaml`](openapi/shared/opal_kernel.yaml) holds the OPAL suite-standard operations shared across services. `tools/bundle_contract.py` flattens the two into the packaged document `src/opal_say/contract/opal_say.yaml`, which is loaded by `opal_say.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. A test enforces that the packaged copy never drifts from a fresh bundle of the source.
+The implemented API contract is **0.6.0**. The contract's source of truth is decomposed under [`openapi/`](openapi/): [`opal_say_v0.6.0.yaml`](openapi/opal_say_v0.6.0.yaml) holds the Say-specific surface, and [`shared/opal_kernel.yaml`](openapi/shared/opal_kernel.yaml) holds the OPAL suite-standard operations shared across services. `tools/bundle_contract.py` flattens the two into the packaged document `src/opal_say/contract/opal_say.yaml`, which is loaded by `opal_say.contract.load_contract()`, drives the server's `/openapi.json` endpoint, and validates every test-suite response. A test enforces that the packaged copy never drifts from a fresh bundle of the source.
 
 The full service is **API-first**:
 
@@ -883,7 +883,7 @@ opal-say/
 ├── opal-say.png                       project artwork
 ├── README.md                           this guide
 ├── openapi/
-│   ├── opal_say_v0.5.0.yaml            Say-specific OpenAPI contract (0.5.0)
+│   ├── opal_say_v0.6.0.yaml            Say-specific OpenAPI contract (0.6.0)
 │   └── shared/opal_kernel.yaml         OPAL suite-standard contract components
 ├── tools/bundle_contract.py            flattens openapi/ into the packaged contract
 ├── pyproject.toml                      packaging and entry points

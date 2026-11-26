@@ -1,6 +1,6 @@
 # OPAL Say user guide
 
-OPAL Say is a standalone local text-to-speech service with a REST API, a Typer CLI and a React console. Contract **0.5.0** keeps the URL prefix **`/api/v1`**. The packaged, self-contained contract served at `/openapi.json` is the authoritative operation/schema reference; `/docs` provides interactive exploration.
+OPAL Say is a standalone local text-to-speech service with a REST API, a Typer CLI and a React console. Contract **0.6.0** keeps the URL prefix **`/api/v1`**. The packaged, self-contained contract served at `/openapi.json` is the authoritative operation/schema reference; `/docs` provides interactive exploration.
 
 The server generates audio; playback happens on the client. Piper and Kokoro run locally when their optional dependencies and model files are installed. OPAL Think is optional, and standalone generation does not require an event service or event publication.
 
