@@ -6,7 +6,7 @@ import re
 
 from httpx import Response
 
-from conftest import make_voice
+from conftest import engine_update, make_voice
 
 IDS = {"X-Opal-Session-Id": "sess-e1", "X-Opal-Causation-Id": "cause-e1"}
 
@@ -25,13 +25,13 @@ def assert_opal_error(resp: Response, status: int, code: str) -> dict:
 
 
 def test_not_found_envelope(client):
-    err = assert_opal_error(client.get("/api/v1/engine/nope"), 404, "engine_not_found")
+    err = assert_opal_error(client.get("/api/v1/voice/nope"), 404, "voice_not_found")
     assert "session_id" not in err and "causation_id" not in err
 
 
 def test_not_found_echoes_context_ids(client):
-    resp = client.get("/api/v1/engine/nope", headers=IDS)
-    err = assert_opal_error(resp, 404, "engine_not_found")
+    resp = client.get("/api/v1/voice/nope", headers=IDS)
+    err = assert_opal_error(resp, 404, "voice_not_found")
     assert err["session_id"] == "sess-e1" and err["causation_id"] == "cause-e1"
 
 
@@ -60,7 +60,7 @@ def test_invalid_correlation_header_is_an_opal_error(client):
 
 def test_engine_unavailable_is_503(client):
     make_voice(client, "v1")
-    client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
+    engine_update(client, "fake", options={"available": False})
     resp = client.post("/api/v1/generate", json={"text": "x", "voice_id": "v1"})
     assert_opal_error(resp, 503, "engine_unavailable")
 
@@ -83,7 +83,7 @@ def test_invalid_request_uses_same_envelope(client):
 
 
 def test_generated_ids_appear_when_headers_absent(client):
-    resp = client.get("/api/v1/engine/nope")
+    resp = client.get("/api/v1/voice/nope")
     err = resp.json()["error"]
     assert err["request_id"] == resp.headers["X-Opal-Request-Id"]
     assert err["transaction_id"] == resp.headers["X-Opal-Transaction-Id"]

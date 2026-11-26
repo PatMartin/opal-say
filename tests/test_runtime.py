@@ -7,7 +7,8 @@ import time
 
 import pytest
 
-from conftest import FakeEngine
+from conftest import FakeEngine, engine_update
+from opal_say.service.errors import InvalidRequest
 from opal_say.tts.base import EngineUnavailableError
 from opal_say.tts.registry import EngineRegistry
 from opal_say.tts.runtime import EngineRuntime, EngineRuntimeManager
@@ -449,15 +450,12 @@ def test_runtime_option_is_not_visible_to_adapter():
 
 
 def test_engine_update_accepts_runtime_option(client):
-    resp = client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 2}})
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["options"]["max_concurrent_inferences"] == 2
+    assert engine_update(client, "fake", options={"max_concurrent_inferences": 2})["options"]["max_concurrent_inferences"] == 2
 
 
 def test_engine_update_rejects_invalid_limit(client):
-    client.skip_contract = True
-    resp = client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 0}})
-    assert resp.status_code == 422
+    with pytest.raises(InvalidRequest):
+        engine_update(client, "fake", options={"max_concurrent_inferences": 0})
 
 
 def _wait_for(predicate, timeout: float = 5.0) -> None:

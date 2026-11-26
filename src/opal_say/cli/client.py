@@ -22,7 +22,6 @@ OPERATIONS: dict[str, tuple[str, str]] = contract_operations()
 # precondition (contract 1.4.0): the client fetches the current ETag first and
 # retries once on 412.
 PRECONDITION_OPS = {
-    "opal_engine_patch",
     "create_voice",
     "update_voice",
     "remove_voice",
@@ -31,9 +30,6 @@ PRECONDITION_OPS = {
     "opal_setting_put",
     "opal_setting_delete",
     # kernel 1.5.0: creates/activations/imports/restores are also preconditioned
-    "opal_persona_create",
-    "opal_persona_patch",
-    "opal_persona_delete",
     "opal_profile_create",
     "opal_profile_activate",
     "opal_config_load",

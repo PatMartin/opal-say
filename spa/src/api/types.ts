@@ -2,16 +2,6 @@
 export type AudioFormat = 'wav' | 'pcm'
 export type Options = Record<string, unknown>
 
-export interface Engine {
-  engine_id: string
-  name: string
-  description?: string | null
-  enabled: boolean
-  available: boolean
-  options: Options
-  metadata: Options
-}
-
 export interface Voice {
   voice_id: string
   name: string
@@ -43,17 +33,6 @@ export interface Profile {
   is_active: boolean
   shared: Record<string, never>
   modules: Record<string, unknown> & { 'opal-say'?: SayDefaults }
-  created_at: string
-  updated_at: string
-}
-
-export interface Persona {
-  persona_id: string
-  name: string
-  description?: string | null
-  voice_id?: string | null
-  origin?: 'local' | 'owner'
-  enabled: boolean
   created_at: string
   updated_at: string
 }

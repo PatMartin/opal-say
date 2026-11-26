@@ -24,6 +24,7 @@ from conftest import (
     KOKORO_MODEL,
     KOKORO_VOICES,
     PIPER_MODEL,
+    engine_update,
     kokoro_ready,
     make_voice,
     piper_ready,
@@ -193,7 +194,7 @@ def test_long_text_generation(client, voices, engines, app):
 
 def test_concurrent_streams_respect_engine_capacity(live_server, client, voices, engines):
     """Parallel streams overlap up to — and never beyond — the configured permit count."""
-    client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 2}})
+    engine_update(client, "fake", options={"max_concurrent_inferences": 2})
     engine = engines[0]
     synthesize = engine.synthesize
     lock = threading.Lock()

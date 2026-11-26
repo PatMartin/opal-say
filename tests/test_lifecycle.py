@@ -10,7 +10,7 @@ import time
 import numpy as np
 import pytest
 
-from conftest import FakeEngine, make_voice
+from conftest import FakeEngine, engine_update, make_voice
 from opal_say.schemas import GenerateRequest, VoiceTestRequest
 from opal_say.service.errors import Conflict, PayloadTooLarge
 from opal_say.tts.base import AudioChunk, EngineUnavailableError, VoiceResolutionError
@@ -111,7 +111,7 @@ def _race(client, bodies: list[dict]) -> list[int]:
 def test_simultaneous_requests_same_voice(client, engines):
     make_voice(client, "v1")
     # Raise the engine's inference limit so all four may hold permits at once.
-    assert client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 4}}).status_code == 200
+    engine_update(client, "fake", options={"max_concurrent_inferences": 4})
     results = _race(client, [{"text": "x", "voice_id": "v1"} for _ in range(4)])
     assert results == [200] * 4
     assert len(engines[0].calls) == 4
@@ -120,7 +120,7 @@ def test_simultaneous_requests_same_voice(client, engines):
 def test_simultaneous_requests_different_voices(client, engines):
     make_voice(client, "v1", ref="tone-a")
     make_voice(client, "v2", ref="tone-b")
-    assert client.patch("/api/v1/engine/fake", json={"options": {"max_concurrent_inferences": 4}}).status_code == 200
+    engine_update(client, "fake", options={"max_concurrent_inferences": 4})
     results = _race(client, [{"text": "x", "voice_id": "v1"}, {"text": "y", "voice_id": "v2"}] * 2)
     assert results == [200] * 4
     assert sorted(c["ref"] for c in engines[0].calls) == ["tone-a", "tone-a", "tone-b", "tone-b"]

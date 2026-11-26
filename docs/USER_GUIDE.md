@@ -21,16 +21,14 @@ From another terminal:
 
 ```bash
 opal say service health
-opal say engine list
 opal say voice list
 opal say voice validate en-us-amy-low
 opal say generate "Hello." --voice en-us-amy-low -o hello.wav
 ```
 
-If the fresh seed catalog could not be imported because models are unavailable, configure an installed engine and register a voice explicitly:
+If the fresh seed catalog could not be imported because models are unavailable, configure an installed engine and register a voice explicitly. Engine options such as `voices_dir` are set in the `resources.engines` section of a configuration snapshot (see below) or the seed `config/*.yaml`, not a dedicated engine command:
 
 ```bash
-opal say engine update piper -O voices_dir="$HOME/piper/voices"
 opal say voice add amy --name Amy --engine piper --ref en_US-amy-low
 opal say voice validate amy
 opal say generate "Ready." --voice amy -o ready.wav
@@ -96,17 +94,15 @@ When authentication is enabled, supply a bearer credential to **both** the read 
 
 | Workflow | Methods and paths | CLI |
 | --- | --- | --- |
-| Engines (4) | GET `/engine/`; GET/PATCH `/engine/{engine_id}`; POST `/engine/{engine_id}/validate` | `engine list/get/update/validate` |
 | Voices (7) | GET/POST `/voice/`; GET/PATCH/DELETE `/voice/{voice_id}`; POST `/voice/{voice_id}/validate`; POST `/voice/{voice_id}/test` | `voice list/add/get/update/remove/validate/test` |
 | Profiles (6) | GET/POST `/profile/`; GET/PATCH/DELETE `/profile/{profile_id}`; POST `/profile/{profile_id}/activate` | `profile list/add/show/update/remove/activate` |
-| Personas (6) | GET/POST `/persona/`; GET/PATCH/DELETE `/persona/{persona_id}`; POST `/persona/{persona_id}/validate` | `persona list/add/show/update/remove/validate` |
 | Speech (3) | POST `/generate`, `/generate/stream`, `/generate/stream/incremental` | `generate`, `--stream`, `--incremental` |
 | Settings (4) | GET `/setting/`; GET/PUT/DELETE `/setting/{key}` | `config setting list/show/set/remove` |
 | Health (3) | GET `/health/`, `/health/live`, `/health/ready` | `service health`; no CLI bindings for probes |
 | Snapshots (3) | POST `/config/save`, `/config/load`, `/config/validate` | `config save/load/validate` |
 | Lifecycle (3) | POST `/service/start`, `/service/stop`; GET `/service/log` | `service start/stop/log` |
 
-These are the **39** target operations. Use [CLI reference](CLI.md) for flags and `/openapi.json` for complete schemas, operation IDs, status codes and examples.
+These are the **29** target operations. Use [CLI reference](CLI.md) for flags and `/openapi.json` for complete schemas, operation IDs, status codes and examples.
 
 ### Profiles and persistence upgrades
 
@@ -176,7 +172,7 @@ npm --prefix spa install
 npm --prefix spa run build
 ```
 
-Restart the service if necessary, then open `/ui/`. Development uses Vite on port 5173. The console exposes generation/playback, voices, engines, profiles, personas, settings, health, lifecycle and configuration snapshots. Its Configuration tab saves/downloads JSON, opens candidate JSON, validates live/candidate state and loads managed/candidate snapshots. Load asks for confirmation. Enter a bearer credential when required; it is not stored in local/session storage or snapshots.
+Restart the service if necessary, then open `/ui/`. Development uses Vite on port 5173. The console exposes generation/playback, voices, profiles, settings, health, lifecycle and configuration snapshots. Its Configuration tab saves/downloads JSON, opens candidate JSON, validates live/candidate state and loads managed/candidate snapshots. Load asks for confirmation. Enter a bearer credential when required; it is not stored in local/session storage or snapshots.
 
 ## Verification
 
@@ -193,4 +189,4 @@ Optional real-adapter tests skip when their runtime/models are absent. Determini
 
 ## Caller cutover
 
-Retired info routes and the `info` CLI group are replaced by health reporting/probes and `service health`. Retired backup/import/export/restore routes and commands are replaced by snapshot save/load/validate; no transition shim is provided. Flat profiles and integer-only callers must move to namespaced documents and string IDs. Settings collection PATCH and old flat CLI aliases are gone. Preserve the target-defined persona selector alias while migrating producers to `persona_id`.
+Retired info routes and the `info` CLI group are replaced by health reporting/probes and `service health`. Retired backup/import/export/restore routes and commands are replaced by snapshot save/load/validate; no transition shim is provided. Retired engine/persona routes and CLI groups are replaced by `resources.engines`/`resources.personas` snapshot sections and persona selection on generation requests. Flat profiles and integer-only callers must move to namespaced documents and string IDs. Settings collection PATCH and old flat CLI aliases are gone. Preserve the target-defined persona selector alias while migrating producers to `persona_id`.

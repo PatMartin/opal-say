@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { audioMeta, call, callRaw } from '../api/client'
-import type { Engine, Persona, Profile, Voice } from '../api/types'
+import type { Profile, Voice } from '../api/types'
 import { concatChunks, pcmToWav } from '../audio'
 import { AudioResult, ErrorBanner, OptionsField, parseOptions, useAction, useLoad, type AudioClip } from './common'
 
@@ -8,8 +8,6 @@ import { AudioResult, ErrorBanner, OptionsField, parseOptions, useAction, useLoa
 export function GeneratePanel() {
   const profile = useLoad(() => call<Profile[]>('opal_profile_list'), [])
   const voice = useLoad(() => call<Voice[]>('list_voices', { query: { enabled: true } }), [])
-  const engine = useLoad(() => call<Engine[]>('opal_engine_list'), [])
-  const persona = useLoad(() => call<Persona[]>('opal_persona_list', { query: { enabled: true } }), [])
 
   const [text, setText] = useState('')
   const [profileId, setProfileId] = useState('')
@@ -86,7 +84,7 @@ export function GeneratePanel() {
   return (
     <section>
       <h2>Generate</h2>
-      <ErrorBanner error={profile.error || voice.error || engine.error} />
+      <ErrorBanner error={profile.error || voice.error} />
       <form onSubmit={submit} className="grid">
         <label className="wide">
           Text
@@ -106,14 +104,7 @@ export function GeneratePanel() {
         </label>
         <label>
           Persona
-          <select value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
-            <option value="">(none)</option>
-            {persona.data.map((p) => (
-              <option key={p.persona_id} value={p.persona_id}>
-                {p.name} ({p.voice_id})
-              </option>
-            ))}
-          </select>
+          <input value={personaId} placeholder="(none)" onChange={(e) => setPersonaId(e.target.value)} />
         </label>
         <label>
           Voice
@@ -128,14 +119,7 @@ export function GeneratePanel() {
         </label>
         <label>
           Engine override
-          <select value={engineId} onChange={(e) => setEngineId(e.target.value)}>
-            <option value="">(voice engine)</option>
-            {engine.data.map((en) => (
-              <option key={en.engine_id} value={en.engine_id}>
-                {en.name}
-              </option>
-            ))}
-          </select>
+          <input value={engineId} placeholder="(voice engine)" onChange={(e) => setEngineId(e.target.value)} />
         </label>
         <label>
           Speed

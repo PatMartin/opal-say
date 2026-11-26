@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { audioMeta, call, callRaw } from '../api/client'
-import type { Engine, ValidationResult, Voice } from '../api/types'
+import type { ValidationResult, Voice } from '../api/types'
 import { pcmToWav } from '../audio'
 import { AudioResult, ErrorBanner, OptionsField, ValidationView, parseOptions, useAction, useLoad, type AudioClip } from './common'
 
@@ -25,7 +25,6 @@ export function VoicePanel() {
     () => call<Voice[]>('list_voices', { query: { engine_id: engineFilter, enabled: enabledFilter, language: languageFilter } }),
     [],
   )
-  const engines = useLoad(() => call<Engine[]>('opal_engine_list'), [])
   const { reload: reloadVoice } = voice
   useEffect(() => {
     void reloadVoice()
@@ -107,14 +106,7 @@ export function VoicePanel() {
       <div className="row">
         <label>
           Engine
-          <select value={engineFilter} onChange={(e) => setEngineFilter(e.target.value)}>
-            <option value="">all</option>
-            {engines.data.map((en) => (
-              <option key={en.engine_id} value={en.engine_id}>
-                {en.engine_id}
-              </option>
-            ))}
-          </select>
+          <input value={engineFilter} placeholder="all" onChange={(e) => setEngineFilter(e.target.value)} />
         </label>
         <label>
           State
@@ -185,14 +177,7 @@ export function VoicePanel() {
         </label>
         <label>
           Engine
-          <select required value={form.engine_id} onChange={(e) => set({ engine_id: e.target.value })}>
-            <option value="">choose…</option>
-            {engines.data.map((en) => (
-              <option key={en.engine_id} value={en.engine_id}>
-                {en.name}
-              </option>
-            ))}
-          </select>
+          <input required placeholder="engine id" value={form.engine_id} onChange={(e) => set({ engine_id: e.target.value })} />
         </label>
         <label>
           Engine voice reference

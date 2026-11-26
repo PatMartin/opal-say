@@ -67,16 +67,6 @@ export const VOICE = {
   updated_at: '2026-10-04T00:00:00Z',
 }
 
-export const ENGINE = {
-  engine_id: 'piper',
-  name: 'Piper',
-  description: null,
-  enabled: true,
-  available: true,
-  options: { voice_dir: '/v' },
-  metadata: { version: '1.8' },
-}
-
 export const PROFILE = {
   id: '1',
   name: 'default',

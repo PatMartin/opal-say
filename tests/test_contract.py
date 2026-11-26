@@ -15,7 +15,7 @@ import yaml
 from contract_check import METHODS, SPEC, _deref, check_response
 from fastapi.routing import APIRoute
 
-from conftest import ContractClient, make_profile, make_voice
+from conftest import ContractClient, make_persona, make_profile, make_voice
 from opal_say import __version__
 from opal_say.api.routes import router
 from opal_say.contract import CONTRACT_RESOURCE, contract_operations, load_contract
@@ -203,13 +203,6 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.get("/api/v1/health/live").json()["status"] == "ok"
     assert c.get("/api/v1/health/").status_code == 200
 
-    assert c.get("/api/v1/engine/").status_code == 200
-    assert c.get("/api/v1/engine/fake").status_code == 200
-    assert c.get("/api/v1/engine/nope").status_code == 404
-    assert c.patch("/api/v1/engine/fake", json={"enabled": True}).status_code == 200
-    assert c.patch("/api/v1/engine/fake", json={}).status_code == 422
-    assert c.post("/api/v1/engine/fake/validate").json()["valid"] is True
-
     make_voice(c, "v1")
     make_voice(c, "v2", ref="tone-b")
     assert c.get("/api/v1/voice/", params={"engine_id": "fake", "enabled": True}).status_code == 200
@@ -229,14 +222,8 @@ def test_walkthrough_exercises_every_operation_with_conformant_responses(recordi
     assert c.post(f"/api/v1/profile/{p2['id']}/activate").status_code == 200
     assert c.delete(f"/api/v1/profile/{p1['id']}").status_code == 204
 
-    assert c.post("/api/v1/persona/", json={"persona_id": "amy", "name": "Amy", "voice_id": "v2"}).status_code == 201
-    assert c.get("/api/v1/persona/").status_code == 200
-    assert c.get("/api/v1/persona/amy").status_code == 200
-    assert c.patch("/api/v1/persona/amy", json={"description": "warm"}).status_code == 200
-    assert c.post("/api/v1/persona/amy/validate").json()["valid"] is True
-    assert c.post("/api/v1/persona/nope/validate").status_code == 404
+    make_persona(c, "amy", name="Amy", voice_id="v2")
     assert c.post("/api/v1/generate", json={"text": "Hello there.", "persona": "amy"}).status_code == 200
-    assert c.delete("/api/v1/persona/amy").status_code == 204
 
     assert c.post("/api/v1/generate", json={"text": "Hello there."}).status_code == 200
     assert c.post("/api/v1/generate/stream", json={"text": "Hello there."}).status_code == 200

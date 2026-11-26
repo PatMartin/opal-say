@@ -79,7 +79,7 @@ def test_every_invalid_identifier_is_reported(client):
 
 
 def test_ids_echoed_on_error_responses(client):
-    resp = client.get("/api/v1/engine/nope", headers=IDS)
+    resp = client.get("/api/v1/voice/nope", headers=IDS)
     assert resp.status_code == 404
     for name, value in IDS.items():
         assert resp.headers[name] == value

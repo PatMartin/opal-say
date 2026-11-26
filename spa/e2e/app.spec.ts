@@ -2,8 +2,7 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 
 /**
  * The dev-mode client targets http://127.0.0.1:8001; we intercept those calls so
- * the suite needs no live service. Stateful mocks (personas list) model what a
- * real service does — e.g. created entities appear on the next list call.
+ * the suite needs no live service.
  */
 
 const API = 'http://127.0.0.1:8001'
@@ -20,9 +19,6 @@ const profile = {
   speed: 1, volume: 1, output_format: 'wav', sample_rate: null, engine_options: {},
   created_at: now, updated_at: now,
 }
-const personas: object[] = [
-  { persona_id: 'amy', name: 'Amy', description: 'warm narrator', voice_id: 'v1', enabled: true, created_at: now, updated_at: now },
-]
 
 // A minimal valid WAV (44-byte header + a few PCM frames) for completed generate.
 function wavBytes(): Buffer {
@@ -61,7 +57,6 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     }
     if (method === 'GET' && path === '/api/v1/health/live') return json(route, { status: 'ok', ready: true })
     if (method === 'GET' && path === '/api/v1/health/ready') return json(route, { status: 'ok', ready: true })
-    if (method === 'GET' && path === '/api/v1/engine/') return json(route, [engine])
     if (method === 'GET' && path === '/api/v1/voice/') return json(route, [voice])
     if (method === 'GET' && path === '/api/v1/profile/') return json(route, [profile])
     if (method === 'GET' && path === '/api/v1/setting/') return json(route, { greeting: 'hi' })
@@ -74,29 +69,6 @@ async function mockApi(page: Page, opts: { failGenerate?: boolean } = {}) {
     }
     if (method === 'POST' && path === '/api/v1/service/stop') {
       return json(route, { state: 'stopped', pid: null, previous_pid: 4242, log_file: 'logs/opal_say.log' })
-    }
-
-    if (path === '/api/v1/persona/') {
-      if (method === 'GET') return json(route, personas)
-      if (method === 'POST') {
-        const body = route.request().postDataJSON()
-        personas.push(body)
-        return route.fulfill({
-          status: 201, contentType: 'application/json',
-          headers: { location: `/api/v1/persona/${body.persona_id}` },
-          body: JSON.stringify({ ...body, created_at: now, updated_at: now }),
-        })
-      }
-    }
-    const personaMatch = path.match(/^\/api\/v1\/persona\/([^/]+)$/)
-    if (personaMatch) {
-      const found = personas.find((p: any) => p.persona_id === personaMatch[1]) as any
-      if (method === 'GET') return found ? json(route, found) : json(route, { error: { code: 'not_found' } }, 404)
-      if (method === 'PATCH') return json(route, { ...found, ...route.request().postDataJSON(), updated_at: now })
-      if (method === 'DELETE') {
-        personas.splice(personas.indexOf(found), 1)
-        return route.fulfill({ status: 204 })
-      }
     }
 
     if (method === 'POST' && path === '/api/v1/generate') {
@@ -127,8 +99,6 @@ test('navigates every tab', async ({ page }) => {
     Generate: /^Generate$/,
     Voice: /^Voice$/,
     Profile: /^Profile$/,
-    Persona: /^Persona$/,
-    Engine: /^Engine$/,
     Setting: /^Setting$/,
     Backup: /^Backup/,
     Health: /^Health$/,
@@ -140,24 +110,10 @@ test('navigates every tab', async ({ page }) => {
   }
 })
 
-test('renders persona and creates one', async ({ page }) => {
-  await page.getByRole('button', { name: 'Persona', exact: true }).click()
-  // First data fetch can be slow while Vite transforms modules on a cold server.
-  await expect(page.getByRole('cell', { name: 'amy', exact: true })).toBeVisible({ timeout: 15_000 })
-
-  await page.getByLabel('Persona ID').fill('hal')
-  await page.getByLabel('Name').fill('HAL')
-  await page.getByLabel('Voice').selectOption('v1')
-  await page.getByLabel('Description').fill('calm computer')
-  await page.getByRole('button', { name: 'Create' }).click()
-
-  await expect(page.getByRole('cell', { name: 'hal', exact: true })).toBeVisible()
-})
-
 test('generates completed audio and shows the player', async ({ page }) => {
   await page.getByRole('button', { name: 'Generate', exact: true }).click()
   await page.getByLabel('Text').fill('Hello from the e2e suite.')
-  await page.getByLabel('Persona').selectOption('amy')
+  await page.getByLabel('Persona').fill('amy')
   await page.getByRole('button', { name: 'Generate audio' }).click()
   await expect(page.getByTestId('audio-result')).toBeVisible()
 })

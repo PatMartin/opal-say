@@ -9,7 +9,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from conftest import FakeEngine, make_profile, make_voice
+from conftest import FakeEngine, make_persona, make_profile, make_voice, persona_update, svc
 from opal_say.api.app import create_app
 from opal_say.persistence.store import Store
 
@@ -19,7 +19,7 @@ def populated(client):
     make_voice(client, "v1", engine_options={"pitch": 200})
     make_voice(client, "v2", ref="tone-b", description="second")
     profile = make_profile(client, "main", "v1", is_active=True, speed=1.5, engine_options={"pitch": 220})
-    assert client.post("/api/v1/persona/", json={"persona_id": "speaker", "name": "Speaker", "voice_id": "v2"}).status_code == 201
+    make_persona(client, "speaker", name="Speaker", voice_id="v2")
     client.put("/api/v1/setting/chunk_max_chars", json={"value": 120})
     assert client.patch(f"/api/v1/profile/{profile['id']}", json={"modules": {"opal-say": {"volume": 0.5}}}).status_code == 200
     response = client.post("/api/v1/config/save", json={"destination": "response"})
@@ -126,7 +126,7 @@ def test_managed_roundtrip_and_response_does_not_replace_it(client, populated, a
     managed = path.read_bytes()
     original, old = state(client)
     client.put("/api/v1/setting/default_speed", json={"value": 2.0})
-    client.patch("/api/v1/persona/speaker", json={"name": "Changed"})
+    persona_update(client, "speaker", name="Changed")
     assert client.post("/api/v1/config/save", json={"destination": "response"}).status_code == 200
     assert path.read_bytes() == managed
     loaded = client.post("/api/v1/config/load")
@@ -193,7 +193,7 @@ def test_load_is_full_replacement_and_preserves_foreign_compartments(client, pop
     assert client.post("/api/v1/config/load", json={"snapshot": empty}).status_code == 200
     assert client.get("/api/v1/voice/").json() == []
     assert client.get("/api/v1/profile/").json() == []
-    assert client.get("/api/v1/persona/").json() == []
+    assert svc(client).persona.list(None) == []
     assert client.get("/api/v1/setting/chunk_max_chars").json()["value"] == 400
 
 

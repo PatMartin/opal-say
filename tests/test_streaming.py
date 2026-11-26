@@ -13,7 +13,7 @@ import httpx
 import pytest
 from contract_check import check_response
 
-from conftest import make_profile, make_voice
+from conftest import engine_update, make_profile, make_voice
 from opal_say.schemas import GenerateStreamRequest
 
 SENTENCES = " ".join(f"This is sentence number {i}." for i in range(6))
@@ -99,7 +99,7 @@ def test_too_large_and_unavailable(client, voices):
     client.put("/api/v1/setting/max_text_chars", json={"value": "5"})
     assert client.post("/api/v1/generate/stream", json={"text": "123456", "voice_id": "v1"}).status_code == 413
     client.delete("/api/v1/setting/max_text_chars")
-    client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
+    engine_update(client, "fake", options={"available": False})
     assert client.post("/api/v1/generate/stream", json={"text": "x", "voice_id": "v1"}).status_code == 503
 
 

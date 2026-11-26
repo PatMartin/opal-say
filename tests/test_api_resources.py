@@ -1,31 +1,37 @@
-"""REST tests for engines, voices, profiles, settings and health, including validation/error paths."""
+"""REST tests for voices, profiles, settings and health, plus engine/persona service
+internals (their REST surface was removed); includes validation/error paths."""
 
 from __future__ import annotations
 
-from conftest import make_profile, make_voice
+import pytest
+
+from conftest import engine_update, make_profile, make_voice, svc
+from opal_say.service.errors import InvalidRequest, NotFound
 
 
-class TestEngines:
+class TestEngineService:
+    """Engine admin state and validation via the service layer (the REST/CLI
+    engine surface was removed; these behaviors back snapshots, health and readiness)."""
+
     def test_list_and_get(self, client):
-        ids = [e["engine_id"] for e in client.get("/api/v1/engine/").json()]
+        ids = [e["engine_id"] for e in svc(client).engine.list()]
         assert ids == ["alt", "fake"]
-        engine = client.get("/api/v1/engine/fake").json()
+        engine = svc(client).engine.get("fake")
         assert engine["enabled"] and engine["available"]
         assert engine["options"] == {"available": True}
         assert engine["metadata"] == {"version": "0.0-test"}
 
     def test_update_enable_and_merge_options(self, client):
-        resp = client.patch("/api/v1/engine/fake", json={"enabled": False})
-        assert resp.json()["enabled"] is False
-        resp = client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
-        assert resp.json()["options"] == {"available": False}
-        assert resp.json()["available"] is False
-        resp = client.patch("/api/v1/engine/fake", json={"options": {"available": None}})
-        assert resp.json()["options"] == {}
-        assert resp.json()["available"] is True
+        assert engine_update(client, "fake", enabled=False)["enabled"] is False
+        updated = engine_update(client, "fake", options={"available": False})
+        assert updated["options"] == {"available": False}
+        assert updated["available"] is False
+        cleared = engine_update(client, "fake", options={"available": None})
+        assert cleared["options"] == {}
+        assert cleared["available"] is True
 
     def test_update_persists_across_restart(self, client, config, engines):
-        client.patch("/api/v1/engine/fake", json={"enabled": False, "options": {"available": False}})
+        engine_update(client, "fake", enabled=False, options={"available": False})
         from fastapi.testclient import TestClient
 
         from conftest import FakeEngine
@@ -33,32 +39,27 @@ class TestEngines:
 
         app2 = create_app(config, engines=[FakeEngine("fake"), FakeEngine("alt")])
         with TestClient(app2) as c2:
-            engine = c2.get("/api/v1/engine/fake").json()
+            engine = svc(c2).engine.get("fake")
         app2.state.services.close()
         assert engine["enabled"] is False and engine["available"] is False
 
     def test_update_rejects_invalid_options(self, client):
-        resp = client.patch("/api/v1/engine/fake", json={"options": {"nope": 1, "available": "yes"}})
-        assert resp.status_code == 422
-        locs = [d["loc"] for d in resp.json()["error"]["details"]["errors"]]
-        assert ["body", "options", "nope"] in locs and ["body", "options", "available"] in locs
-
-    def test_update_validation(self, client):
-        assert client.patch("/api/v1/engine/fake", json={}).status_code == 422
-        assert client.patch("/api/v1/engine/fake", json={"bogus": True}).status_code == 422
-        assert client.patch("/api/v1/engine/fake", json={"enabled": None}).status_code == 422
-        assert client.patch("/api/v1/engine/missing", json={"enabled": True}).status_code == 404
+        with pytest.raises(InvalidRequest):
+            engine_update(client, "fake", options={"nope": 1, "available": "yes"})
+        with pytest.raises(NotFound):
+            engine_update(client, "missing", enabled=True)
 
     def test_validate(self, client):
-        assert client.post("/api/v1/engine/fake/validate").json() == {
-            "valid": True, "errors": [], "warnings": [], "details": {"version": "0.0-test"}
-        }
-        client.patch("/api/v1/engine/fake", json={"enabled": False, "options": {"available": False}})
-        result = client.post("/api/v1/engine/fake/validate").json()
-        assert result["valid"] is False
-        assert [e["code"] for e in result["errors"]] == ["engine_unavailable"]
-        assert [w["code"] for w in result["warnings"]] == ["engine_disabled"]
-        assert client.post("/api/v1/engine/missing/validate").status_code == 404
+        report = svc(client).engine.validate("fake")
+        assert report.valid and not report.errors and not report.warnings
+        assert report.details == {"version": "0.0-test"}
+        engine_update(client, "fake", enabled=False, options={"available": False})
+        report = svc(client).engine.validate("fake")
+        assert not report.valid
+        assert [e.code for e in report.errors] == ["engine_unavailable"]
+        assert [w.code for w in report.warnings] == ["engine_disabled"]
+        with pytest.raises(NotFound):
+            svc(client).engine.validate("missing")
 
 
 class TestVoices:
@@ -90,7 +91,7 @@ class TestVoices:
         assert resp.json()["error"]["details"]["errors"][0]["loc"] == ["body", "engine_options", "x"]
 
     def test_register_when_engine_unavailable_defers_resolution(self, client):
-        client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
+        engine_update(client, "fake", options={"available": False})
         voice = make_voice(client, "v1", ref="anything")
         assert voice["native_sample_rate"] is None
         result = client.post("/api/v1/voice/v1/validate").json()
@@ -203,10 +204,10 @@ class TestProfiles:
     def test_activation_requires_usable_engine(self, client):
         make_voice(client, "v1")
         p = make_profile(client, "p1", "v1")
-        client.patch("/api/v1/engine/fake", json={"enabled": False})
+        engine_update(client, "fake", enabled=False)
         resp = client.post(f"/api/v1/profile/{p['id']}/activate")
         assert resp.status_code == 409 and resp.json()["error"]["code"] == "engine_disabled"
-        client.patch("/api/v1/engine/fake", json={"enabled": True, "options": {"available": False}})
+        engine_update(client, "fake", enabled=True, options={"available": False})
         assert client.post(f"/api/v1/profile/{p['id']}/activate").json()["error"]["code"] == "engine_unavailable"
 
 
@@ -258,9 +259,9 @@ class TestSettings:
 class TestHealth:
     def test_states(self, client):
         assert client.get("/api/v1/health/").json()["status"] == "ok"
-        client.patch("/api/v1/engine/alt", json={"options": {"available": False}})
+        engine_update(client, "alt", options={"available": False})
         assert client.get("/api/v1/health/").json()["status"] == "degraded"
-        client.patch("/api/v1/engine/fake", json={"enabled": False})
+        engine_update(client, "fake", enabled=False)
         health = client.get("/api/v1/health/").json()
         assert health["status"] == "error"
         assert {e["engine_id"]: e["available"] for e in health["details"]["engines"]} == {"alt": False, "fake": True}

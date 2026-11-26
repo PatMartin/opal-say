@@ -105,7 +105,7 @@ def _needs_if_match(method: str, url: str) -> bool:
     """Configuration mutations carrying the mandatory If-Match precondition."""
     m = method.upper()
     if m in {"PATCH", "DELETE"} and url.startswith(
-        ("/api/v1/engine/", "/api/v1/voice/", "/api/v1/profile/", "/api/v1/persona/")
+        ("/api/v1/voice/", "/api/v1/profile/")
     ):
         return True
     if m in {"PUT", "DELETE", "PATCH"} and url.startswith("/api/v1/setting/"):
@@ -113,7 +113,6 @@ def _needs_if_match(method: str, url: str) -> bool:
     if m == "POST":
         return (
             url == "/api/v1/voice/"
-            or url == "/api/v1/persona/"
             or url == "/api/v1/profile/"
             or url == "/api/v1/config/load"
             or (url.startswith("/api/v1/profile/") and url.endswith("/activate"))
@@ -242,3 +241,37 @@ def make_profile(client: TestClient, name: str = "p1", voice_id: str = "v1", **e
     resp = client.post("/api/v1/profile/", json={"name": name, "modules": {"opal-say": own}, **extra})
     assert resp.status_code == 201, resp.text
     return resp.json()
+
+
+def svc(client: TestClient):
+    """The app's service container — engine/persona state is managed internally
+    (their REST surface was removed); tests reach it through here."""
+    return client.app.state.services
+
+
+def engine_update(client: TestClient, engine_id: str, **changes) -> dict:
+    """Patch engine admin state (enabled/options) directly, as the removed PATCH did."""
+    return svc(client).engine.update(engine_id, changes)
+
+
+def make_persona(client: TestClient, persona_id: str = "amy", name: str = "Amy", **extra) -> dict:
+    """Register a persona via the service layer."""
+    from opal_say.schemas import PersonaCreate
+
+    return svc(client).persona.create(PersonaCreate(persona_id=persona_id, name=name, **extra))
+
+
+def persona_update(client: TestClient, persona_id: str, **changes) -> dict:
+    """Patch a persona via the service layer."""
+    from opal_say.schemas import PersonaUpdate
+
+    return svc(client).persona.update(persona_id, PersonaUpdate(**changes))
+
+
+def svc_voice(client: TestClient, voice_id: str = "v1", engine_id: str = "fake", ref: str = "tone-a", **extra) -> dict:
+    """Register a voice via the service layer (no REST call needed)."""
+    from opal_say.schemas import VoiceCreate
+
+    return svc(client).voice.create(
+        VoiceCreate(voice_id=voice_id, name=voice_id.upper(), engine_id=engine_id, engine_voice_ref=ref, **extra)
+    )

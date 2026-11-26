@@ -12,22 +12,9 @@ opal say --api-url http://127.0.0.1:8001 --json service health
 
 Global options precede the group: `--api-url` (also `OPAL_SAY_API_URL`), `--timeout`, `--json`, `--env-file`, and `--no-env-file`. `OPAL_SAY_TOKEN` supplies the bearer credential when authentication is enabled. Keep credentials in environment variables, not command arguments, profile files or snapshots.
 
-Configuration writers fetch a strong whole-configuration ETag and send `If-Match`. Persona mutations also accept `--if-match ETAG`; an explicitly supplied stale tag is not refreshed or retried. HTTP failures exit 1; connection or argument failures exit 2. Invalid validation reports exit 1. Audio goes to the selected output; diagnostics go to stderr.
+Configuration writers fetch a strong whole-configuration ETag and send `If-Match`. HTTP failures exit 1; connection or argument failures exit 2. Invalid validation reports exit 1. Audio goes to the selected output; diagnostics go to stderr.
 
 `service health` is the human status command. Machine callers use `GET /api/v1/health/live` and `GET /api/v1/health/ready` directly; these probes deliberately have no CLI binding.
-
-## Engines
-
-```bash
-opal say engine list
-opal say engine get piper
-opal say engine update piper -O voices_dir="$HOME/piper/voices"
-opal say engine update kokoro -O model_path="$HOME/kokoro/kokoro-v1.0.int8.onnx" -O voices_path="$HOME/kokoro/voices-v1.0.bin"
-opal say engine update piper --enable
-opal say engine validate piper
-```
-
-Engine IDs refer to installed adapters. `update` accepts `--enable/--disable`, repeated `-O KEY=VALUE`, and `--options-json JSON`. Engine option updates are shallow patches; a null value removes an override. Runtime availability and administrative enablement are separate.
 
 ## Voices
 
@@ -90,21 +77,6 @@ Save that object as `delivery.json`, then run:
 opal say profile update PROFILE_ID --module delivery.json
 ```
 
-## Personas
-
-```bash
-opal say persona add --persona-id amy-persona --name Amy --voice-id amy
-opal say persona list --enabled
-opal say persona show amy-persona
-opal say persona update amy-persona --description "Warm delivery"
-opal say persona validate amy-persona
-opal say persona remove amy-persona
-```
-
-`--voice-id` is optional: unbound personas may be stored, but cannot supply a voice during synthesis. Creation and update support `--enabled/--no-enabled`; update also supports `--clear-description` and `--clear-voice-id`. Writes accept `--if-match ETAG`. The ETag covers the **complete logical configuration**, not one persona record.
-
-When an owner is configured, its same-ID persona wins while the local definition remains stored. Cached owner data is distinct from local records. Standalone use needs no owner. `persona validate` reports binding/availability failures without generating audio.
-
 ## Speech
 
 ```bash
@@ -116,7 +88,7 @@ opal say generate "Streaming." --voice amy --stream --sample-rate 16000 -o strea
 opal say generate "Incremental." --voice amy --incremental -o incremental.pcm
 ```
 
-Generation supports `--profile`, `--voice`, canonical `--persona-id`, retained alias `--persona`, `--engine`, `--speed`, `--volume`, `--format wav|pcm`, `--sample-rate`, repeated `-O KEY=VALUE`, and `--options-json JSON`. Different values for the two persona selectors are rejected. Explicit request values win over persona voice selection, namespaced profile defaults, and service defaults.
+Generation supports `--profile`, `--voice`, canonical `--persona-id`, retained alias `--persona`, `--engine`, `--speed`, `--volume`, `--format wav|pcm`, `--sample-rate`, repeated `-O KEY=VALUE`, and `--options-json JSON`. Different values for the two persona selectors are rejected. Explicit request values win over persona voice selection, namespaced profile defaults, and service defaults. Personas and engine options are managed through configuration snapshots (`resources.personas`, `resources.engines`) or a configured persona owner, not dedicated CLI commands.
 
 Choose `-o FILE`, `-o -` (binary stdout), or `--play`. Playback requires the optional `audio` extra and occurs on the CLI host, never the server. Supplying plain text directly to `opal say` is shorthand for local playback.
 
@@ -176,4 +148,4 @@ These control the tracked server process; the API must be reachable. Starting fr
 
 ## Retired callers
 
-The old backup/import/export/restore APIs and CLI group, the entire `info` command group (`info health` and retired `info version/ping/live/ready`), flat profile flags, collection settings PATCH and flat `setting` aliases are not compatibility shims. Use `config save/load/validate`, `service health`, named setting options and namespaced profile files instead. Existing numeric database profile IDs upgrade to their string representation; callers must stop coercing IDs to integers.
+The old backup/import/export/restore APIs and CLI group, the entire `info` command group (`info health` and retired `info version/ping/live/ready`), the `engine` and `persona` command groups, flat profile flags, collection settings PATCH and flat `setting` aliases are not compatibility shims. Use `config save/load/validate`, `service health`, named setting options and namespaced profile files instead. Existing numeric database profile IDs upgrade to their string representation; callers must stop coercing IDs to integers.

@@ -21,15 +21,10 @@ from opal_say.api.correlation import correlation_ids
 from opal_say.schemas import (
     ConfigSaveRequest,
     ConfigSnapshotRequest,
-    EngineRead,
-    EngineUpdate,
     GenerateRequest,
     GenerateStreamRequest,
     HealthRead,
     IncrementalStreamParams,
-    PersonaCreate,
-    PersonaRead,
-    PersonaUpdate,
     ProfileCreate,
     ProfileRead,
     ProfileUpdate,
@@ -288,36 +283,6 @@ def report_dict(report: Report) -> dict[str, Any]:
     }
 
 
-# -- engine ---------------------------------------------------------------------
-
-
-@router.get("/api/v1/engine/", tags=["engine"], operation_id="opal_engine_list",
-            response_model=list[EngineRead])
-def list_engine(response: Response, svc: Services = Depends(services)):
-    response.headers["ETag"] = config_etag(svc.store)
-    return svc.engine.list()
-
-
-@router.get("/api/v1/engine/{engine_id}", tags=["engine"], operation_id="opal_engine_get",
-            response_model=EngineRead)
-def get_engine(engine_id: str, response: Response, svc: Services = Depends(services)):
-    response.headers["ETag"] = config_etag(svc.store)
-    return svc.engine.get(engine_id)
-
-
-@router.patch("/api/v1/engine/{engine_id}", tags=["engine"],
-              operation_id="opal_engine_patch", response_model=EngineRead)
-def update_engine(engine_id: str, body: EngineUpdate, if_match: str | None = Header(None),
-                  svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.engine.update(engine_id, body.changes()))
-
-
-@router.post("/api/v1/engine/{engine_id}/validate", tags=["engine"],
-             operation_id="validate_engine", response_model=ValidationResult)
-def validate_engine(engine_id: str, svc: Services = Depends(services)):
-    return report_dict(svc.engine.validate(engine_id))
-
-
 # -- voice ----------------------------------------------------------------------
 
 
@@ -389,53 +354,6 @@ async def test_voice(request: Request, voice_id: str, body: VoiceTestRequest | N
         watch.cancel()
 
 
-# -- persona --------------------------------------------------------------------
-
-
-@router.get("/api/v1/persona/", tags=["persona"], operation_id="opal_persona_list",
-            response_model=list[PersonaRead])
-def list_persona(response: Response, enabled: bool | None = Query(None), svc: Services = Depends(services)):
-    response.headers["ETag"] = config_etag(svc.store)
-    records = {p["persona_id"]: p for p in svc.persona.list(None)}
-    if svc.generation.owner_url:
-        records.update({p["persona_id"]: p for p in svc.store.list_owner_personas()})
-    return [records[key] for key in sorted(records) if enabled is None or records[key]["enabled"] == enabled]
-
-
-@router.post("/api/v1/persona/", tags=["persona"], operation_id="opal_persona_create",
-             response_model=PersonaRead, status_code=201)
-def create_persona(body: PersonaCreate, response: Response, if_match: str | None = Header(None),
-                   svc: Services = Depends(services)):
-    persona = mutate_with_revision(svc.store, if_match, lambda: svc.persona.create(body))
-    response.headers["Location"] = f"/api/v1/persona/{persona['persona_id']}"
-    return persona
-
-
-@router.get("/api/v1/persona/{persona_id}", tags=["persona"],
-            operation_id="opal_persona_get", response_model=PersonaRead)
-def get_persona(persona_id: str, response: Response, svc: Services = Depends(services)):
-    response.headers["ETag"] = config_etag(svc.store)
-    return svc.generation.resolve_persona(persona_id) or svc.persona.get(persona_id)
-
-
-@router.post("/api/v1/persona/{persona_id}/validate", tags=["persona"],
-             operation_id="opal_persona_validate", response_model=ValidationResult)
-def validate_persona(persona_id: str, svc: Services = Depends(services)):
-    return report_dict(svc.persona.validate(persona_id))
-
-
-@router.patch("/api/v1/persona/{persona_id}", tags=["persona"],
-              operation_id="opal_persona_patch", response_model=PersonaRead)
-def update_persona(persona_id: str, body: PersonaUpdate, if_match: str | None = Header(None),
-                   svc: Services = Depends(services)):
-    return mutate_with_revision(svc.store, if_match, lambda: svc.persona.update(persona_id, body))
-
-
-@router.delete("/api/v1/persona/{persona_id}", tags=["persona"],
-               operation_id="opal_persona_delete", status_code=204)
-def delete_persona(persona_id: str, if_match: str | None = Header(None), svc: Services = Depends(services)):
-    mutate_with_revision(svc.store, if_match, lambda: svc.persona.delete(persona_id))
-    return Response(status_code=204)
 
 
 # -- profile --------------------------------------------------------------------

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { App } from '../App'
 import { pcmToWav } from '../audio'
-import { AUDIO_HEADERS, ENGINE, PROFILE, VOICE, audio, json, mockApi } from './mockApi'
+import { AUDIO_HEADERS, PROFILE, VOICE, audio, json, mockApi } from './mockApi'
 
 const BASE_ROUTES = {
   'GET /api/v1/health/': { name: 'opal-say-svc', version: '0.5.0', api_version: 'v1', live: true, ready: true, details: { engines: [] } },
@@ -10,7 +10,6 @@ const BASE_ROUTES = {
   'GET /api/v1/setting/': { chunk_max_chars: 400 },
   'GET /api/v1/profile/': [PROFILE],
   'GET /api/v1/voice/': [VOICE],
-  'GET /api/v1/engine/': [ENGINE],
 }
 
 async function openTab(name: string) {
@@ -138,7 +137,7 @@ describe('Voice', () => {
     await screen.findByText('en_US-amy-low')
     await userEvent.type(screen.getByLabelText('Voice ID'), 'new')
     await userEvent.type(screen.getByLabelText('Name'), 'New voice')
-    await userEvent.selectOptions(screen.getByLabelText('Engine', { selector: 'form select' }), 'piper')
+    await userEvent.type(screen.getByLabelText('Engine', { selector: 'form input' }), 'piper')
     await userEvent.type(screen.getByLabelText('Engine voice reference'), '/models/new.onnx')
     await userEvent.click(screen.getByRole('button', { name: 'Register' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/voice/')).toBe(true))
@@ -220,22 +219,6 @@ describe('Profile', () => {
     const row = (await screen.findByText('default')).closest('tr')!
     await userEvent.click(within(row).getByRole('button', { name: 'Delete' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('409 profile_active')
-  })
-})
-
-describe('Engine', () => {
-  it('toggles and validates an engine', async () => {
-    const calls = mockApi({
-      ...BASE_ROUTES,
-      'PATCH /api/v1/engine/piper': { ...ENGINE, enabled: false },
-      'POST /api/v1/engine/piper/validate': { valid: true, errors: [], warnings: [{ code: 'engine_disabled', message: 'disabled' }], details: {} },
-    })
-    render(<App />)
-    await openTab('Engine')
-    await userEvent.click(await screen.findByRole('button', { name: 'Disable' }))
-    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ enabled: false }))
-    await userEvent.click(screen.getByRole('button', { name: 'Validate' }))
-    expect(await screen.findByTestId('validation')).toHaveTextContent('warning: engine_disabled')
   })
 })
 

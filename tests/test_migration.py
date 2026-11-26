@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import make_persona, persona_update, svc, svc_voice
 from opal_say.api.app import create_app
 from opal_say.config import ServiceConfig
 from opal_say.contract import load_contract
@@ -31,22 +32,25 @@ def test_bundle_has_no_dangling_references():
 @pytest.mark.parametrize("tag", ['r0', 'W/"r0"', '*', '"r0","r1"'])
 def test_strong_preconditions_reject_malformed(app, tag):
     with TestClient(app) as client:
-        before = client.get("/api/v1/engine/fake").json()
-        response = client.patch("/api/v1/engine/fake", json={"enabled": False}, headers={"If-Match": tag})
+        svc_voice(client, "v1")
+        before = client.get("/api/v1/voice/v1").json()
+        response = client.patch("/api/v1/voice/v1", json={"name": "X"}, headers={"If-Match": tag})
         assert response.status_code == 422
-        assert client.get("/api/v1/engine/fake").json() == before
+        assert client.get("/api/v1/voice/v1").json() == before
 
 
 def test_opaque_stale_tag_is_precondition_failure(app):
     with TestClient(app) as client:
-        assert client.patch("/api/v1/engine/fake", json={"enabled": False},
+        svc_voice(client, "v1")
+        assert client.patch("/api/v1/voice/v1", json={"name": "X"},
                             headers={"If-Match": '"opaque"'}).status_code == 412
 
 
 def test_mutation_revision_and_cors(app):
     with TestClient(app) as client:
+        svc_voice(client, "v1")
         tag = client.get("/api/v1/setting/").headers["etag"]
-        response = client.patch("/api/v1/engine/fake", json={"enabled": False}, headers={"If-Match": tag})
+        response = client.patch("/api/v1/voice/v1", json={"name": "X"}, headers={"If-Match": tag})
         assert response.status_code == 200
         assert response.headers["etag"] != tag
         response = client.get("/api/v1/setting/", headers={"Origin": "http://localhost:5173"})
@@ -86,9 +90,8 @@ def test_persona_aliases_and_streams(app):
         for voice_id, ref in (("tone", "tone-a"), ("other", "tone-b")):
             assert write("POST", "/api/v1/voice/", {"voice_id": voice_id, "name": voice_id, "engine_id": "fake",
                                                     "engine_voice_ref": ref}).status_code == 201
-        assert write("POST", "/api/v1/persona/", {"persona_id": "unbound", "name": "Unbound"}).status_code == 201
-        assert write("POST", "/api/v1/persona/", {
-            "persona_id": "speaker", "name": "Speaker", "voice_id": "other"}).status_code == 201
+        make_persona(client, "unbound", name="Unbound")
+        make_persona(client, "speaker", name="Speaker", voice_id="other")
         assert write("POST", "/api/v1/profile/", {"id": "default", "name": "Default", "is_active": True,
                      "modules": {"opal-say": {"voice_id": "tone", "sample_rate": 16000}}}).status_code == 201
         for selection, expected in (({"persona_id": "speaker"}, "other"), ({"persona": "speaker"}, "other"),
@@ -108,8 +111,8 @@ def test_persona_aliases_and_streams(app):
             assert response.headers["x-opal-voice-id"] == expected
         assert client.post("/api/v1/generate", json={
             "text": "bad", "persona_id": "speaker", "persona": "unbound"}).status_code == 422
-        assert write("PATCH", "/api/v1/persona/speaker", {"voice_id": None}).json()["voice_id"] is None
-        assert client.post("/api/v1/persona/speaker/validate").status_code == 200
+        assert persona_update(client, "speaker", voice_id=None)["voice_id"] is None
+        assert svc(client).persona.validate("speaker") is not None
 
 
 def test_owner_conflict_preserves_local_and_context(app, monkeypatch):
@@ -124,28 +127,26 @@ def test_owner_conflict_preserves_local_and_context(app, monkeypatch):
 
     monkeypatch.setattr("opal_say.service.generation.httpx.get", owner)
     with TestClient(app) as client:
-        tag = client.get("/api/v1/setting/").headers["etag"]
-        response = client.post("/api/v1/persona/", json={"persona_id": "speaker", "name": "Local"}, headers={"If-Match": tag})
-        assert response.status_code == 201
+        make_persona(client, "speaker", name="Local")
         app.state.services.generation.owner_url = "http://owner.test"
-        response = client.get("/api/v1/persona/speaker", headers={
+        response = client.post("/api/v1/generate", json={"text": "Bad binding", "persona_id": "speaker"}, headers={
             "X-Opal-Transaction-Id": "transaction", "X-Opal-Request-Id": "parent"})
-        assert response.status_code == 200 and response.json()["origin"] == "owner"
-        assert response.json()["name"] == "Owner"
+        assert response.status_code == 422  # owner persona binds unknown voice 'other'
+        resolved = app.state.services.generation.resolve_persona("speaker")
+        assert resolved is not None and resolved["name"] == "Owner"
         assert app.state.services.store.get_persona("speaker")["name"] == "Local"
-        assert observed[-1]["X-Opal-Causation-Id"] == "parent"
-        assert observed[-1]["X-Opal-Transaction-Id"] == "transaction"
-        assert observed[-1]["X-Opal-Request-Id"] != "parent"
-        assert "X-Opal-Session-Id" not in observed[-1]
-        assert client.post("/api/v1/generate", json={"text": "Bad binding", "persona_id": "speaker"}).status_code == 422
+        assert observed[0]["X-Opal-Causation-Id"] == "parent"
+        assert observed[0]["X-Opal-Transaction-Id"] == "transaction"
+        assert observed[0]["X-Opal-Request-Id"] != "parent"
+        assert "X-Opal-Session-Id" not in observed[0]
 
         def offline(*args, **kwargs):
             raise httpx.ConnectError("offline")
 
         monkeypatch.setattr("opal_say.service.generation.httpx.get", offline)
-        assert client.get("/api/v1/persona/speaker").json()["name"] == "Owner"
+        assert app.state.services.generation.resolve_persona("speaker")["name"] == "Owner"
         app.state.services.generation.owner_url = None
-        assert client.get("/api/v1/persona/speaker").json()["name"] == "Local"
+        assert app.state.services.persona.get("speaker")["name"] == "Local"
 
 
 def test_namespaced_profiles(app):
@@ -265,6 +266,10 @@ def test_health_cutover(app):
         assert client.get("/api/v1/health/ready").status_code == 503
         assert client.get("/api/v1/info/").status_code == 404
         assert client.get("/api/v1/info/ping").status_code == 404
+        assert client.get("/api/v1/engine/").status_code == 404
+        assert client.get("/api/v1/engine/fake").status_code == 404
+        assert client.get("/api/v1/persona/").status_code == 404
+        assert client.get("/api/v1/persona/amy").status_code == 404
 
 
 def test_non_loopback_requires_authentication(tmp_path: Path):

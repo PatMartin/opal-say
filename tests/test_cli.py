@@ -13,6 +13,7 @@ from contract_check import check_response, match_operation
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
+from conftest import engine_update, make_persona, svc
 from opal_say.cli import audio
 from opal_say.cli import main as cli
 from opal_say.cli.client import ApiClient
@@ -54,13 +55,6 @@ def run(http):
 
 
 def test_full_cli_workflow(run, http, tmp_path, config):
-    out = run("--json engine list").stdout
-    assert [e["engine_id"] for e in json.loads(out)] == ["alt", "fake"]
-    assert "fake" in run("engine list").stdout
-    assert json.loads(run("--json engine get fake").stdout)["engine_id"] == "fake"
-    assert json.loads(run("engine update alt --disable -O available=true").stdout)["enabled"] is False
-    assert "valid" in run("engine validate fake").stdout
-
     run('voice add v1 --name "Voice One" --engine fake --ref tone-a -O pitch=300 --language en-US')
     run("voice add v2 --name Two --engine fake --ref tone-b --disabled")
     listing = json.loads(run("--json voice list --engine fake --enabled").stdout)
@@ -90,17 +84,12 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert json.loads(run(f"profile activate {p2['id']}").stdout)["is_active"] is True
     run(f"profile remove {p['id']}")
 
-    run('persona add --persona-id amy --name "Amy" --voice-id v1')
-    assert "amy" in run("persona list").stdout
-    assert json.loads(run("persona show amy").stdout)["voice_id"] == "v1"
-    assert json.loads(run("persona update amy --description warm").stdout)["description"] == "warm"
-    assert "valid" in run("persona validate amy").stdout
+    make_persona(http, "amy", name="Amy", voice_id="v1")
     persona_wav = tmp_path / "persona.wav"
     run(f'generate "as Amy" --persona-id amy -o {persona_wav.as_posix()}')
     assert persona_wav.stat().st_size > 0
     run(f'generate "alias" --persona amy -o {persona_wav.as_posix()}')
     run(f'generate "conflict" --persona-id amy --persona other -o {persona_wav.as_posix()}', code=2)
-    run("persona remove amy")
 
     pcm = tmp_path / "out.pcm"
     result = run(f'generate "Hello there. General Kenobi." -o {pcm.as_posix()} --format pcm --sample-rate 8000')
@@ -132,6 +121,8 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     assert json.loads(run("--json service health").stdout)["ready"] is True
     for retired in ("info", "info health", "info live", "info ready", "info version", "info ping"):
         run(retired, code=2)
+    for retired in ("engine", "engine list", "engine update fake", "persona", "persona list", "persona add"):
+        run(retired, code=2)
 
     assert json.loads(run("--json service start").stdout)["state"] == "running"
     assert "ready" in run("service log").stdout
@@ -150,6 +141,7 @@ def test_full_cli_workflow(run, http, tmp_path, config):
     run(f"config save --out {yaml_target.as_posix()}")
     run(f"config validate --in {yaml_target.as_posix()}")
     run("backup create", code=2)
+    svc(http).persona.delete("amy")
     run("voice remove v1")
     result = run("voice remove v2", code=1)  # still referenced by profile 'other'
     assert "voice_in_use" in result.stderr
@@ -176,9 +168,9 @@ def test_error_reporting(run):
     run("voice add a --name a --engine fake --ref tone-a -O novalue", code=2)
 
 
-def test_invalid_validation_result_exits_nonzero(run):
+def test_invalid_validation_result_exits_nonzero(run, http):
     run("voice add v --name V --engine fake --ref tone-a")
-    run("engine update fake -O available=false")
+    engine_update(http, "fake", options={"available": False})
     result = run("voice validate v", code=1)
     assert "INVALID" in result.stdout and "engine_unavailable" in result.stdout
 
@@ -193,14 +185,13 @@ def test_tree_command_prints_command_surface():
     result = CliRunner().invoke(cli.app, ["say", "tree"])
     assert result.exit_code == 0
     out = result.stdout
-    for cmd in ("generate", "engine", "voice", "profile", "setting", "config", "health"):
+    for cmd in ("generate", "voice", "profile", "setting", "config", "health"):
         assert cmd in out
     assert "speak" not in out  # hidden default command
     # Required args/options are bare; optional ones are bracketed.
     assert "generate TEXT [-o/--output" in out
-    assert "get ENGINE_ID" in out
     assert "--name STR" in out and "--value STR" in out
-    assert "[--stream]" in out and "[--enable/--disable]" in out
+    assert "[--stream]" in out and "[--enabled/--disabled]" in out
     assert "│   ├──" in out and "└──" in out
 
 
@@ -208,7 +199,7 @@ def test_tree_ascii_flag_prints_plain_ascii():
     result = CliRunner().invoke(cli.app, ["say", "tree", "--ascii"])
     assert result.exit_code == 0
     out = result.stdout
-    for cmd in ("generate", "engine", "voice", "profile", "setting", "config", "health"):
+    for cmd in ("generate", "voice", "profile", "setting", "config", "health"):
         assert cmd in out
     assert "generate TEXT [-o/--output" in out
     assert "+-- " in out or "`-- " in out

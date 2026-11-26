@@ -3,10 +3,8 @@ import { call, setBearerToken } from './api/client'
 import type { Health } from './api/types'
 import { ConfigPanel } from './components/BackupPanel'
 import { useLoad } from './components/common'
-import { EnginePanel } from './components/EnginePanel'
 import { GeneratePanel } from './components/GeneratePanel'
 import { HealthPanel } from './components/HealthPanel'
-import { PersonaPanel } from './components/PersonaPanel'
 import { ProfilePanel } from './components/ProfilePanel'
 import { ServicePanel } from './components/ServicePanel'
 import { SettingPanel } from './components/SettingPanel'
@@ -16,8 +14,6 @@ const TABS = {
   Generate: GeneratePanel,
   Voice: VoicePanel,
   Profile: ProfilePanel,
-  Persona: PersonaPanel,
-  Engine: EnginePanel,
   Setting: SettingPanel,
   Configuration: ConfigPanel,
   Health: HealthPanel,

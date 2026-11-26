@@ -7,7 +7,7 @@ stage is broken. Engine states stay visible independently under `engines`.
 
 from __future__ import annotations
 
-from conftest import make_profile, make_voice
+from conftest import engine_update, make_profile, make_voice
 
 
 def _ready(client):
@@ -61,7 +61,7 @@ def test_default_voice_disabled(client, app):
 
 def test_default_voice_engine_unavailable(client):
     make_profile(client, "p1", make_voice(client, "v1")["voice_id"], is_active=True)
-    assert client.patch("/api/v1/engine/fake", json={"options": {"available": False}}).status_code == 200
+    engine_update(client, "fake", options={"available": False})
     status, body = _ready(client)
     assert status == 503
     speech = body["details"]["speech"]
@@ -97,7 +97,7 @@ def test_usable_alternative_does_not_hide_broken_default(client, app):
 
 def test_degraded_engine_stays_ready_when_default_path_works(client):
     make_profile(client, "p1", make_voice(client, "v1")["voice_id"], is_active=True)
-    assert client.patch("/api/v1/engine/alt", json={"options": {"available": False}}).status_code == 200
+    engine_update(client, "alt", options={"available": False})
     status, body = _ready(client)
     assert status == 200 and body["ready"] is True and body["status"] == "degraded"
 

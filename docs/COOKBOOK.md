@@ -196,22 +196,26 @@ opal say voice validate en-us-ryan-medium
 ## 15. Disable an engine during maintenance
 
 Disabling routing prevents new requests from selecting an engine while preserving its
-configuration. Validate and re-enable it when maintenance is complete.
+configuration. Engine state lives in the `resources.engines` section of a configuration
+snapshot: save one, edit `enabled`, and load it back. Re-enable the same way when
+maintenance is complete.
 
 ```bash
-opal say engine update kokoro --disable
-opal say engine update kokoro --enable
-opal say engine validate kokoro
+opal say config save --out say-config.json
+# in say-config.json, set "enabled": false on the kokoro row of resources.engines
+opal say config load --in say-config.json
 ```
 
 ## 16. Tune the Piper model cache for a voice-heavy installation
 
-Engine options are engine-specific and merged with existing options. This raises Piper's
-model cache size without overwriting the configured voice directory.
+Engine options are engine-specific and live in `resources.engines[].options` in a
+configuration snapshot. This raises Piper's model cache size without overwriting the
+configured voice directory.
 
 ```bash
-opal say engine update piper -O cache_size=8
-opal say engine get piper
+opal say config save --out say-config.json
+# in say-config.json, set options.cache_size to 8 on the piper row of resources.engines
+opal say config load --in say-config.json
 ```
 
 ## 17. Reduce time-to-first-audio for streamed notices
@@ -259,21 +263,22 @@ opal say config validate --in before-upgrade.json
 ## 21. Give a recurring character a stable identity with a persona
 
 A persona binds a friendly name to a registered voice so scripts and other OPAL modules can pick a
-consistent character without remembering `voice_id`s. Register once, then select it with `--persona`.
+consistent character without remembering `voice_id`s. Personas are declared in the
+`resources.personas` section of a configuration snapshot, then selected with `--persona`/`--persona-id`.
 
 ```bash
-opal say persona add --persona-id amy --name "Amy" --voice-id en-us-amy-low \
-  --description "Warm receptionist voice"
-opal say persona list
+opal say config save --out say-config.json
+# in say-config.json, add to resources.personas:
+#   {"persona_id": "amy", "name": "Amy", "voice_id": "en-us-amy-low",
+#    "description": "Warm receptionist voice", "enabled": true}
+opal say config load --in say-config.json
 opal say generate "Welcome home." --persona amy --play
 # An explicit voice still wins for a one-off change of pace:
 opal say generate "Just this once." --persona amy --voice en-gb-alan-low --play
-# Check that the persona still resolves (registered, enabled, voice usable):
-opal say persona validate amy
 ```
 
-Rename or rebind with `persona update`; `persona remove` deletes the persona but leaves the voice
-registered. A voice can't be removed while a persona references it.
+Edit the persona rows and reload the snapshot to rename or rebind. A voice can't be
+removed while a persona references it.
 
 ---
 

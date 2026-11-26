@@ -79,13 +79,9 @@ export function buildUrl(op: OpId, opts: CallOptions = {}): string {
 
 /** Mutations on logical configuration carrying the mandatory If-Match precondition. */
 const PRECONDITION_OPS = new Set<OpId>([
-  'opal_engine_patch',
   'create_voice',
   'update_voice',
   'remove_voice',
-  'opal_persona_create',
-  'opal_persona_patch',
-  'opal_persona_delete',
   'opal_profile_patch',
   'opal_profile_delete',
   'opal_setting_put',

@@ -41,12 +41,6 @@ info:
     \ keeps media-specific transports but exposes correlation headers, defined failure behavior, and no unsupported\
     \ replay guarantee. Configuration save/load/validate excludes secrets and history.\n"
 tags:
-- name: engine
-  description: 'Discover and configure TTS engine installed by the service implementation.
-
-    Engines are not created or deleted through this API.
-
-    '
 - name: voice
   description: 'Register and manage OPAL voice backed by engine-specific resources already
 
@@ -63,18 +57,6 @@ tags:
     request does not name a profile explicitly.
 
     '
-- name: persona
-  description: 'Manage named persona: identities that bind a registered voice so requests can
-
-    select a consistent character with a single `persona_id` field. Personas and
-    profiles are explained together in the shared kernel doc `x-opal-persona`
-    (`profiles_vs_personas`). The schema is kept
-
-    flat for Say v1; sister OPAL services may adopt the same persona identifiers for
-
-    their own resources in future contract versions.
-
-    '
 - name: generate
   description: 'Generate completed or progressively streamed speech audio from plain text.
 
@@ -87,62 +69,10 @@ tags:
   description: Save, load, validate, and inspect portable module configuration.
 - name: service
   description: Service process lifecycle (start, stop, log tail).
-- name: engines
-  description: Engine registration and inspection.
 servers:
 - url: http://127.0.0.1:8080
   description: Illustrative local endpoint; actual bind address and port are configurable.
 paths:
-  /api/v1/engine/:
-    $ref: './shared/opal_kernel.yaml#/components/pathItems/engines_collection'
-  /api/v1/engine/{engine_id}:
-    $ref: './shared/opal_kernel.yaml#/components/pathItems/engine_item'
-  /api/v1/engine/{engine_id}/validate:
-    parameters:
-    - $ref: './shared/opal_kernel.yaml#/components/parameters/EngineId'
-    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalSessionIdParameter'
-    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalTransactionIdParameter'
-    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalRequestIdParameter'
-    - $ref: './shared/opal_kernel.yaml#/components/parameters/OpalCausationIdParameter'
-    post:
-      tags:
-      - engine
-      summary: Validate Engine
-      description: 'Validate that the engine is correctly configured and usable by the service.
-
-
-        Validation should check the adapter/runtime and current engine configuration.
-
-        A validation failure is normally returned as HTTP 200 with `valid: false` and
-
-        diagnostic messages because the validation operation itself completed normally.
-
-        '
-      operationId: validate_engine
-      responses:
-        '401':
-          $ref: './shared/opal_kernel.yaml#/components/responses/Unauthorized'
-        '403':
-          $ref: './shared/opal_kernel.yaml#/components/responses/Forbidden'
-        '200':
-          description: Engine validation result.
-          content:
-            application/json:
-              schema:
-                $ref: './shared/opal_kernel.yaml#/components/schemas/OpalValidationReport'
-          headers:
-            X-Opal-Session-Id:
-              $ref: './shared/opal_kernel.yaml#/components/headers/OpalSessionIdHeader'
-            X-Opal-Transaction-Id:
-              $ref: './shared/opal_kernel.yaml#/components/headers/OpalTransactionIdHeader'
-            X-Opal-Request-Id:
-              $ref: './shared/opal_kernel.yaml#/components/headers/OpalRequestIdHeader'
-            X-Opal-Causation-Id:
-              $ref: './shared/opal_kernel.yaml#/components/headers/OpalCausationIdHeader'
-        '404':
-          $ref: './shared/opal_kernel.yaml#/components/responses/NotFound'
-        '422':
-          $ref: './shared/opal_kernel.yaml#/components/responses/UnprocessableEntity'
   /api/v1/voice/:
     get:
       tags:
@@ -559,12 +489,6 @@ paths:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/profile_item'
   /api/v1/profile/{profile_id}/activate:
     $ref: './shared/opal_kernel.yaml#/components/pathItems/profile_activate'
-  /api/v1/persona/:
-    $ref: './shared/opal_kernel.yaml#/components/pathItems/persona_collection'
-  /api/v1/persona/{persona_id}/validate:
-    $ref: './shared/opal_kernel.yaml#/components/pathItems/persona_validate'
-  /api/v1/persona/{persona_id}:
-    $ref: './shared/opal_kernel.yaml#/components/pathItems/persona_item'
   /api/v1/generate:
     post:
       tags:
@@ -1295,6 +1219,11 @@ components:
           default: null
         engine_options:
           $ref: '#/components/schemas/EngineOptions'
+    OpalPersonaRead:
+      # Snapshot resources.personas rows are validated against this kernel
+      # schema; it is referenced here (rather than by a path) so it remains
+      # part of the bundled contract.
+      $ref: './shared/opal_kernel.yaml#/components/schemas/OpalPersonaRead'
 x-opal-context-standard:
   version: '2.0.0'
   headers:

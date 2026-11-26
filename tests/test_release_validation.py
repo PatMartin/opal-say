@@ -16,7 +16,7 @@ import wave
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import KOKORO_MODEL, KOKORO_VOICES, PIPER_MODEL, kokoro_ready, piper_ready
+from conftest import KOKORO_MODEL, KOKORO_VOICES, PIPER_MODEL, engine_update, kokoro_ready, piper_ready, svc
 from opal_say.api.app import create_app
 from opal_say.config import ServiceConfig
 
@@ -79,7 +79,7 @@ class TestPiperRelease:
             yield c
 
     def test_engine_available_and_model_loads(self, client):
-        body = client.get("/api/v1/engine/piper").json()
+        body = svc(client).engine.get("piper")
         assert body["available"] and body["enabled"]
 
     def test_wav_generate_format(self, client):
@@ -112,10 +112,7 @@ class TestPiperRelease:
         assert next(iter(engine._models._entries.values())).refs == 0
 
     def test_safe_config_update_between_requests(self, client):
-        resp = client.patch("/api/v1/engine/piper",
-                            json={"options": {"cache_size": 1}},
-                            headers={"If-Match": client.get("/api/v1/setting/").headers["etag"]})
-        assert resp.status_code == 200, resp.text
+        engine_update(client, "piper", options={"cache_size": 1})
         for _ in range(2):  # requests after the update still succeed
             resp = client.post("/api/v1/generate",
                                json={"text": "Post update.", "voice_id": "p", "output_format": "pcm"})
@@ -174,7 +171,7 @@ class TestKokoroRelease:
             yield c
 
     def test_engine_available_and_model_loads(self, client):
-        body = client.get("/api/v1/engine/kokoro").json()
+        body = svc(client).engine.get("kokoro")
         assert body["available"] and body["enabled"]
 
     def test_wav_generate_format(self, client):
@@ -194,10 +191,7 @@ class TestKokoroRelease:
         _ = arrivals
 
     def test_safe_config_update_between_requests(self, client):
-        resp = client.patch("/api/v1/engine/kokoro",
-                            json={"options": {"default_lang": "en-gb"}},
-                            headers={"If-Match": client.get("/api/v1/setting/").headers["etag"]})
-        assert resp.status_code == 200, resp.text
+        engine_update(client, "kokoro", options={"default_lang": "en-gb"})
         resp = client.post("/api/v1/generate",
                            json={"text": "Post update.", "voice_id": "k", "output_format": "pcm"})
         assert resp.status_code == 200 and len(resp.content) > 0

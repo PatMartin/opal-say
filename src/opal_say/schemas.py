@@ -56,11 +56,6 @@ class EngineRead(BaseModel):
     metadata: dict[str, Any]
 
 
-class EngineUpdate(_Patch):
-    enabled: NonNull[bool] = None
-    options: NonNull[EngineOptions] = None
-
-
 # -- voices --------------------------------------------------------------------
 
 

@@ -8,7 +8,7 @@ import wave
 import numpy as np
 import pytest
 
-from conftest import make_profile, make_voice
+from conftest import engine_update, make_profile, make_voice
 
 
 @pytest.fixture
@@ -139,12 +139,12 @@ def test_conflicts(client, setup, body, status, code):
 def test_disabled_voice_and_engine(client, setup):
     client.patch("/api/v1/voice/v2", json={"enabled": False})
     assert client.post("/api/v1/generate", json={"text": "x", "voice_id": "v2"}).json()["error"]["code"] == "voice_disabled"
-    client.patch("/api/v1/engine/fake", json={"enabled": False})
+    engine_update(client, "fake", enabled=False)
     assert client.post("/api/v1/generate", json={"text": "x", "voice_id": "v1"}).json()["error"]["code"] == "engine_disabled"
 
 
 def test_unavailable_engine_is_503(client, setup):
-    client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
+    engine_update(client, "fake", options={"available": False})
     resp = client.post("/api/v1/generate", json={"text": "x", "voice_id": "v1"})
     assert resp.status_code == 503 and resp.json()["error"]["code"] == "engine_unavailable"
 
@@ -196,7 +196,7 @@ def test_voice_test_endpoint(client, setup):
     assert client.post("/api/v1/voice/v1/test", json={"text": ""}).status_code == 422
     client.patch("/api/v1/voice/v1", json={"enabled": False})
     assert client.post("/api/v1/voice/v1/test").status_code == 409
-    client.patch("/api/v1/engine/fake", json={"options": {"available": False}})
+    engine_update(client, "fake", options={"available": False})
     assert client.post("/api/v1/voice/v2/test").status_code == 503
 
 

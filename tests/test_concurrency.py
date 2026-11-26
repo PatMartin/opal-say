@@ -10,7 +10,6 @@ import pytest
 from conftest import make_profile, make_voice
 
 PRECONDITION_CALLS = [
-    ("patch", "/api/v1/engine/fake", {"json": {"enabled": False}}),
     ("patch", "/api/v1/voice/v1", {"json": {"name": "X"}}),
     ("delete", "/api/v1/voice/v1", {}),
     ("patch", "/api/v1/profile/1", {"json": {"modules": {"opal-say": {"speed": 2.0}}}}),
@@ -29,7 +28,6 @@ def test_config_gets_return_strong_etag(client):
     p = make_profile(client, "p", "v1")
     client.put("/api/v1/setting/default_speed", json={"value": 1.25})
     for path in (
-        "/api/v1/engine/", "/api/v1/engine/fake",
         "/api/v1/voice/", "/api/v1/voice/v1",
         "/api/v1/profile/", f"/api/v1/profile/{p['id']}",
         "/api/v1/setting/", "/api/v1/setting/default_speed",
@@ -62,8 +60,9 @@ def test_stale_if_match_is_412(client, method, url, kw):
 
 
 def test_malformed_if_match_is_422(client):
+    make_voice(client, "v1")
     client.skip_contract = True
-    resp = client.patch("/api/v1/engine/fake", json={"enabled": True}, headers={"If-Match": "nonsense"})
+    resp = client.patch("/api/v1/voice/v1", json={"name": "X"}, headers={"If-Match": "nonsense"})
     assert resp.status_code == 422
 
 
@@ -79,10 +78,11 @@ def test_fresh_if_match_succeeds_and_bumps_revision(client):
 
 def test_simultaneous_updates_single_winner(client):
     """Two requests carrying the same base revision: exactly one may commit."""
+    make_voice(client, "v1")
     base = etag(client)
     client.skip_contract = True
-    r1 = client.patch("/api/v1/engine/fake", json={"enabled": False}, headers={"If-Match": base})
-    r2 = client.patch("/api/v1/engine/fake", json={"enabled": True}, headers={"If-Match": base})
+    r1 = client.patch("/api/v1/voice/v1", json={"name": "A"}, headers={"If-Match": base})
+    r2 = client.patch("/api/v1/voice/v1", json={"name": "B"}, headers={"If-Match": base})
     assert sorted([r1.status_code, r2.status_code]) == [200, 412]
 
 
